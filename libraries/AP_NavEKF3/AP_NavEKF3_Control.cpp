@@ -336,7 +336,8 @@ void NavEKF3_core::setAidingMode()
                         (imuSampleTime_ms - rngBcn.lastPassTime_ms > frontend->tiltDriftTimeMax_ms) &&
 #endif
                         (imuSampleTime_ms - lastPosPassTime_ms > frontend->tiltDriftTimeMax_ms) &&
-                        (imuSampleTime_ms - lastVelPassTime_ms > frontend->tiltDriftTimeMax_ms);
+                        (imuSampleTime_ms - lastVelPassTime_ms > frontend->tiltDriftTimeMax_ms) &&
+                        (imuSampleTime_ms - lastDopplerVelPassTime_ms > frontend->tiltDriftTimeMax_ms);
             }
 
             // Check if the loss of position accuracy has become critical
