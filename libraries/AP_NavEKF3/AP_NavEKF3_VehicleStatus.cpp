@@ -429,6 +429,63 @@ void NavEKF3_core::detectFlight()
         yawEstimator->setGyroBias(gyroBias);
     }
 
+    // save sensor angle calibration data at end of flight
+    if (frontend->option_is_enabled(NavEKF3::Option::CalDopplerSensorAngles) && !prevOnGround && onGround) {
+        for (uint8_t index=0; index<4; index++) {
+            if (dopplerAngleEst[index].initialised) {
+                const ftype max_variance = sq(radians(1.0f));
+                if (dopplerAngleEst[index].P[0][0] < max_variance) {
+                    switch (index) {
+                    case 0:
+                    {
+                        frontend->_dopplerYaw0.set_and_save_ifchanged(degrees((float)dopplerAngleEst[0].yaw));
+                        break;
+                    }
+                    case 1:
+                    {
+                        frontend->_dopplerYaw1.set_and_save_ifchanged(degrees((float)dopplerAngleEst[1].yaw));
+                        break;
+                    }
+                    case 2:
+                    {
+                        frontend->_dopplerYaw2.set_and_save_ifchanged(degrees((float)dopplerAngleEst[2].yaw));
+                        break;
+                    }
+                    case 3:
+                    {
+                        frontend->_dopplerYaw3.set_and_save_ifchanged(degrees((float)dopplerAngleEst[3].yaw));
+                        break;
+                    }
+                    }
+                }
+                if (dopplerAngleEst[index].P[1][1] < max_variance) {
+                    switch (index) {
+                    case 0:
+                    {
+                        frontend->_dopplerPitch0.set_and_save_ifchanged(degrees((float)dopplerAngleEst[0].pitch));
+                        break;
+                    }
+                    case 1:
+                    {
+                        frontend->_dopplerPitch1.set_and_save_ifchanged(degrees((float)dopplerAngleEst[1].pitch));
+                        break;
+                    }
+                    case 2:
+                    {
+                        frontend->_dopplerPitch2.set_and_save_ifchanged(degrees((float)dopplerAngleEst[2].pitch));
+                        break;
+                    }
+                    case 3:
+                    {
+                        frontend->_dopplerPitch3.set_and_save_ifchanged(degrees((float)dopplerAngleEst[3].pitch));
+                        break;
+                    }
+                    }
+                }
+            }
+        }
+    }
+
     // store current on-ground  and in-air status for next time
     prevOnGround = onGround;
     prevInFlight = inFlight;
