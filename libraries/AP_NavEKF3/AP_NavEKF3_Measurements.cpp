@@ -145,7 +145,7 @@ void NavEKF3_core::writeDopplerVel(float vel, float velErr, float yaw, float pit
 
     // limit update rate to maximum allowed by sensor buffers and fusion process
     // don't try to write to buffer until the filter has been initialised
-    if (((timeStamp_ms - dopplerVelMeasTime_ms) < frontend->sensorIntervalMin_ms) || !statesInitialised) {
+    if (!statesInitialised) {
         return;
     }
     dopplerVelMeasTime_ms = timeStamp_ms;
