@@ -447,11 +447,13 @@ void AP_AHRS::update(bool skip_ins_update)
         Vector3f vel;
         Quaternion quat;
         if (sim.get_velocity_NED(vel) && sim.get_quaternion(quat)) {
-            quat.earth_to_body(vel);
+            Matrix3f Tnb;
+            quat.inverse().rotation_matrix(Tnb);
+            const Vector3f velBF = Tnb * vel;
             for (uint8_t i=0; i<4; i++) {
                 const float sensorYaw = radians(float(90 * i));;
                 const float sensorPitch = radians(30.0f);
-                const float dopperVel = (vel.x * cosf(sensorYaw) + vel.y * sinf(sensorYaw)) * sinf(sensorPitch) + vel.z * cosf(sensorPitch);
+                const float dopperVel = (velBF.x * cosf(sensorYaw) + velBF.y * sinf(sensorYaw)) * sinf(sensorPitch) + velBF.z * cosf(sensorPitch);
                 const float dopplerVelErr = 0.3f;
                 uint32_t timeStamp_ms = AP_HAL::millis();
                 writeDopplerVel(dopperVel, dopplerVelErr, sensorYaw, sensorPitch, timeStamp_ms);
