@@ -439,6 +439,27 @@ void AP_AHRS::update(bool skip_ins_update)
         _view->update();
     }
 
+#if AP_AHRS_SIM_ENABLED
+    // test code for doppler interface
+    static uint32_t last_ms = 0;
+    if (AP_HAL::millis() - last_ms > 200) {
+        last_ms = AP_HAL::millis();
+        Vector3f vel;
+        Quaternion quat;
+        if (sim.get_velocity_NED(vel) && sim.get_quaternion(quat)) {
+            quat.earth_to_body(vel);
+            for (uint8_t i=0; i<4; i++) {
+                const float sensorYaw = radians(float(90 * i));;
+                const float sensorPitch = radians(30.0f);
+                const float dopperVel = (vel.x * cosf(sensorYaw) + vel.y * sinf(sensorYaw)) * sinf(sensorPitch) + vel.z * cosf(sensorPitch);
+                const float dopplerVelErr = 0.3f;
+                uint32_t timeStamp_ms = AP_HAL::millis();
+                writeDopplerVel(dopperVel, dopplerVelErr, sensorYaw, sensorPitch, timeStamp_ms);
+            }
+        }
+    }
+#endif
+
     // update AOA and SSA
     update_AOA_SSA();
 
