@@ -2164,7 +2164,7 @@ void NavEKF3_core::FuseDopplerVelocity(float dopplerVel, float dopplerVelObsVar,
     innovDopplerVel = dopplerVelPred - dopplerVel;
 
     // calculate the innovation consistency test ratio
-    dopplerVelTestRatio = sq(innovDopplerVel) / (sq(5.0f) * varInnovVtas);
+    dopplerVelTestRatio = sq(innovDopplerVel) / (sq(5.0f) * varInnovDopplerVel);
 
     if (dopplerVelTestRatio < 1.0f) {
         // Observation Jacobians
