@@ -888,6 +888,9 @@ private:
     // return true if the filter is ready to start using optical flow measurements for position and velocity estimation
     bool readyToUseOptFlow(void) const;
 
+    // return true if the filter is ready to start using optical flow measurements
+    bool readyToUseDopplerVelocity(void) const;
+
     // return true if the filter is ready to start using body frame odometry measurements
     bool readyToUseBodyOdm(void) const;
 

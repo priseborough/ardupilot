@@ -268,12 +268,14 @@ void NavEKF3_core::setAidingMode()
             // GPS aiding is the preferred option unless excluded by the user
             if (readyToUseGPS() || readyToUseRangeBeacon() || readyToUseExtNav()) {
                 PV_AidingMode = AID_ABSOLUTE;
-            } else if (readyToUseOptFlow() || readyToUseBodyOdm()) {
+            } else if (readyToUseOptFlow() || readyToUseBodyOdm() || readyToUseDopplerVelocity()) {
                 PV_AidingMode = AID_RELATIVE;
             }
             break;
         }
         case AID_RELATIVE: {
+            // Check if the fusion has timed out (doppler velocity measurements have been rejected for too long)
+            bool dopplerAidingTimeout = (imuSampleTime_ms - lastDopplerVelPassTime_ms > 5000);
             // Check if the fusion has timed out (flow measurements have been rejected for too long)
             bool flowFusionTimeout = ((imuSampleTime_ms - prevFlowFuseTime_ms) > 5000);
             // Check if the fusion has timed out (body odometry measurements have been rejected for too long)
@@ -282,7 +284,7 @@ void NavEKF3_core::setAidingMode()
             // If GPS or range beacons data is not available and flow fusion has timed out, then fall-back to no-aiding
             if (readyToUseGPS() || readyToUseRangeBeacon() || readyToUseExtNav()) {
                 PV_AidingMode = AID_ABSOLUTE;
-            } else if (flowFusionTimeout && bodyOdmFusionTimeout) {
+            } else if (flowFusionTimeout && bodyOdmFusionTimeout && dopplerAidingTimeout) {
                 PV_AidingMode = AID_NONE;
             }
             break;
@@ -517,6 +519,13 @@ bool NavEKF3_core::readyToUseOptFlow(void) const
     // We need stable roll/pitch angles and gyro bias estimates but do not need the yaw angle aligned to use optical flow
     return (imuSampleTime_ms - flowMeaTime_ms < 200) && tiltAlignComplete && delAngBiasLearned;
 }
+
+// return true if the filter is ready to start using optical flow measurements
+bool NavEKF3_core::readyToUseDopplerVelocity(void) const
+{
+    return dopplerVelDataNew.Nsensors >=2 && (imuSampleTime_ms - dopplerVelMeasTime_ms < 200) && tiltAlignComplete && delAngBiasLearned;
+}
+
 
 // return true if the filter is ready to start using body frame odometry measurements
 bool NavEKF3_core::readyToUseBodyOdm(void) const
