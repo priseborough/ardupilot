@@ -455,7 +455,7 @@ void AP_AHRS::update(bool skip_ins_update)
                 const float sensorPitch = radians(30.0f);
                 const float dopperVel = (velBF.x * cosf(sensorYaw) + velBF.y * sinf(sensorYaw)) * sinf(sensorPitch) + velBF.z * cosf(sensorPitch);
                 const float dopplerVelErr = 0.3f;
-                uint32_t timeStamp_ms = AP_HAL::millis();
+                uint32_t timeStamp_ms = AP_HAL::millis() - 50 + i*15;
                 writeDopplerVel(dopperVel, dopplerVelErr, sensorYaw, sensorPitch, timeStamp_ms);
             }
         }
