@@ -2079,6 +2079,7 @@ void NavEKF3_core::SelectDopplerVelFusion()
                 FuseDopplerVelocity(dopplerVelDataDelayed.vel[index], sq(dopplerVelDataDelayed.velErr[index]), dopplerVelDataDelayed.yaw[index], dopplerVelDataDelayed.pitch[index]);
                 innovations[index] = innovDopplerVel;
                 innovationVariances[index] = varInnovDopplerVel;
+                running_doppler_fusion = true;
             }
             if (index > dopplerVelDataDelayed.Nsensors -1) {
                 innovations[index] = nanf;
