@@ -2058,7 +2058,7 @@ void NavEKF3_core::SelectDopplerVelFusion()
     float innovations[4];
     float innovationVariances[4];
     const float nanf = AP::logger().quiet_nanf();
-    if (storedDopplerVel.recall(dopplerVelDataDelayed, imuDataDelayed.time_ms)) {
+    if (PV_AidingMode != AID_NONE && storedDopplerVel.recall(dopplerVelDataDelayed, imuDataDelayed.time_ms)) {
         for (uint8_t index=0; index<4; index++) {
             FuseDopplerVelocity(dopplerVelDataDelayed.vel[index], sq(dopplerVelDataDelayed.velErr[index]), dopplerVelDataDelayed.yaw[index], dopplerVelDataDelayed.pitch[index]);
             innovations[index] = innovDopplerVel;
