@@ -2059,7 +2059,7 @@ void NavEKF3_core::SelectDopplerVelFusion()
     float innovationVariances[4];
     for (uint8_t index=0; index<4; index++) {
         if (storedDopplerVel.recall(dopplerVelDataDelayed, imuDataDelayed.time_ms)) {
-            FuseDopplerVelocity(dopplerVelDataDelayed.vel, dopplerVelDataDelayed.velErr, dopplerVelDataDelayed.yaw, dopplerVelDataDelayed.pitch);
+            FuseDopplerVelocity(dopplerVelDataDelayed.vel, sq(dopplerVelDataDelayed.velErr), dopplerVelDataDelayed.yaw, dopplerVelDataDelayed.pitch);
             innovations[index] = innovDopplerVel;
             innovationVariances[index] = varInnovDopplerVel;
             logFusion = true;
