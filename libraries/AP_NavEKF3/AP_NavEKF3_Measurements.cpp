@@ -1017,9 +1017,11 @@ void NavEKF3_core::writeEulerYawAngle(float yawAngle, float yawAngleErr, uint32_
 {
     // limit update rate to maximum allowed by sensor buffers and fusion process
     // don't try to write to buffer until the filter has been initialised
-    if (((timeStamp_ms - yawMeasTime_ms) < frontend->sensorIntervalMin_ms) || !statesInitialised) {
+    if (((timeStamp_ms - yawMeasTime_ms) < frontend->sensorIntervalMin_ms) || !statesInitialised || last_yaw_time_ms == timeStamp_ms) {
         return;
     }
+
+    last_yaw_time_ms = timeStamp_ms;
 
     yawAngDataNew.yawAng = yawAngle;
     yawAngDataNew.yawAngErr = yawAngleErr;
@@ -1034,7 +1036,7 @@ void NavEKF3_core::writeEulerYawAngle(float yawAngle, float yawAngleErr, uint32_
 
     storedYawAng.push(yawAngDataNew);
 
-    yawMeasTime_ms = timeStamp_ms;
+    yawMeasTime_ms = imuSampleTime_ms;
 }
 
 // Writes the default equivalent airspeed and 1-sigma uncertainty in m/s to be used in forward flight if a measured airspeed is required and not available.

@@ -1359,6 +1359,7 @@ private:
     uint32_t yawMeasTime_ms;            // system time GPS yaw angle was last input to the data buffer
     EKF_obs_buffer_t<yaw_elements> storedYawAng;    // GPS yaw angle buffer
     yaw_elements yawAngDataNew;         // GPS yaw angle at the current time horizon
+    uint32_t last_yaw_time_ms;
     yaw_elements yawAngDataDelayed;     // GPS yaw angle at the fusion time horizon
     yaw_elements yawAngDataStatic;      // yaw angle (regardless of yaw source) when the vehicle was last on ground and not moving
 
