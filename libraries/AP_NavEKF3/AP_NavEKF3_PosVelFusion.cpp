@@ -2095,22 +2095,38 @@ void NavEKF3_core::SelectDopplerVelFusion()
             }
         }
         if (log_angle_estimates) {
-            const struct log_XKDA pkt1{
-                LOG_PACKET_HEADER_INIT(LOG_XKDA_MSG),
+            const struct log_XKDY pkt1{
+                LOG_PACKET_HEADER_INIT(LOG_XKDY_MSG),
                 time_us : AP::dal().micros64(),
                 core    : DAL_CORE(core_index),
                 yaw_0 : (float)dopplerAngleEst[0].yaw,
                 yaw_1 : (float)dopplerAngleEst[1].yaw,
                 yaw_2 : (float)dopplerAngleEst[2].yaw,
                 yaw_3 : (float)dopplerAngleEst[3].yaw,
+                yawVariance_0 : (float)dopplerAngleEst[0].P[0][0],
+                yawVariance_1 : (float)dopplerAngleEst[1].P[0][0],
+                yawVariance_2 : (float)dopplerAngleEst[2].P[0][0],
+                yawVariance_3 : (float)dopplerAngleEst[3].P[0][0]
+            };
+            AP::logger().WriteBlock(&pkt1, sizeof(pkt1));
+
+            const struct log_XKDP pkt2{
+                LOG_PACKET_HEADER_INIT(LOG_XKDP_MSG),
+                time_us : AP::dal().micros64(),
+                core    : DAL_CORE(core_index),
                 pitch_0 : (float)dopplerAngleEst[0].pitch,
                 pitch_1 : (float)dopplerAngleEst[1].pitch,
                 pitch_2 : (float)dopplerAngleEst[2].pitch,
-                pitch_3 : (float)dopplerAngleEst[3].pitch
+                pitch_3 : (float)dopplerAngleEst[3].pitch,
+                pitchVariance_0 : (float)dopplerAngleEst[0].P[1][1],
+                pitchVariance_1 : (float)dopplerAngleEst[1].P[1][1],
+                pitchVariance_2 : (float)dopplerAngleEst[2].P[1][1],
+                pitchVariance_3 : (float)dopplerAngleEst[3].P[1][1]
             };
-            AP::logger().WriteBlock(&pkt1, sizeof(pkt1));
+            AP::logger().WriteBlock(&pkt2, sizeof(pkt2));
+
             if (running_angle_cal) {
-                const struct log_XKDV pkt2{
+                const struct log_XKDV pkt3{
                     LOG_PACKET_HEADER_INIT(LOG_XKDV_MSG),
                     time_us : AP::dal().micros64(),
                     core    : DAL_CORE(core_index),
@@ -2123,9 +2139,10 @@ void NavEKF3_core::SelectDopplerVelFusion()
                     innovVar_2 : (float)dopplerAngleEst[2].innovVar,
                     innovVar_3 : (float)dopplerAngleEst[3].innovVar
                 };
-                AP::logger().WriteBlock(&pkt2, sizeof(pkt2));
+                AP::logger().WriteBlock(&pkt3, sizeof(pkt3));
             }
         }
+
         if (running_doppler_fusion) {
             const struct log_XKDV pkt2{
                 LOG_PACKET_HEADER_INIT(LOG_XKDV_MSG),

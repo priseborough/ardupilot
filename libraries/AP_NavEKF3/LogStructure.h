@@ -20,7 +20,8 @@
     LOG_XKY0_MSG, \
     LOG_XKY1_MSG, \
     LOG_XKDV_MSG, \
-    LOG_XKDA_MSG
+    LOG_XKDY_MSG, \
+    LOG_XKDP_MSG
 
 // @LoggerMessage: XKF0
 // @Description: EKF3 beacon sensor diagnostics
@@ -294,19 +295,19 @@ struct PACKED log_XKDV {
     float innovVar_3;
 };
 
-// @LoggerMessage: XKDA
-// @Description: EKF3 Body Frame Doppler Velocity Angles
+// @LoggerMessage: XKDY
+// @Description: EKF3 Body Frame Doppler Velocity Yaw Angles
 // @Field: TimeUS: Time since system startup
 // @Field: C: EKF3 core this data is for
 // @Field: Y0: Body frame yaw angle - sensor 0
 // @Field: Y1: Body frame yaw angle - sensor 1
 // @Field: Y2: Body frame yaw angle - sensor 2
 // @Field: Y3: Body frame yaw angle - sensor 3
-// @Field: P0: Body frame pitch angle - sensor 0
-// @Field: P1: Body frame pitch angle - sensor 1
-// @Field: P2: Body frame pitch angle - sensor 2
-// @Field: P3: Body frame pitch angle - sensor 3
-struct PACKED log_XKDA {
+// @Field: YV0: Body frame yaw angle variance - sensor 0
+// @Field: YV1: Body frame yaw angle variance - sensor 1
+// @Field: YV2: Body frame yaw angle variance - sensor 2
+// @Field: YV3: Body frame yaw angle variance - sensor 3
+struct PACKED log_XKDY {
     LOG_PACKET_HEADER;
     uint64_t time_us;
     uint8_t core;
@@ -314,10 +315,36 @@ struct PACKED log_XKDA {
     float yaw_1;
     float yaw_2;
     float yaw_3;
+    float yawVariance_0;
+    float yawVariance_1;
+    float yawVariance_2;
+    float yawVariance_3;
+};
+
+// @LoggerMessage: XKDP
+// @Description: EKF3 Body Frame Doppler Velocity Pitch Angles
+// @Field: TimeUS: Time since system startup
+// @Field: C: EKF3 core this data is for
+// @Field: Y0: Body frame pitch angle - sensor 0
+// @Field: Y1: Body frame pitch angle - sensor 1
+// @Field: Y2: Body frame pitch angle - sensor 2
+// @Field: Y3: Body frame pitch angle - sensor 3
+// @Field: YV0: Body frame pitch angle variance - sensor 0
+// @Field: YV1: Body frame pitch angle variance - sensor 1
+// @Field: YV2: Body frame pitch angle variance - sensor 2
+// @Field: YV3: Body frame pitch angle variance - sensor 3
+struct PACKED log_XKDP {
+    LOG_PACKET_HEADER;
+    uint64_t time_us;
+    uint8_t core;
     float pitch_0;
     float pitch_1;
     float pitch_2;
     float pitch_3;
+    float pitchVariance_0;
+    float pitchVariance_1;
+    float pitchVariance_2;
+    float pitchVariance_3;
 };
 
 // @LoggerMessage: XKT
@@ -505,8 +532,10 @@ struct PACKED log_XKV {
       "XKV2","QBffffffffffff","TimeUS,C,V12,V13,V14,V15,V16,V17,V18,V19,V20,V21,V22,V23", "s#------------", "F-------------" , true }, \
     { LOG_XKDV_MSG, sizeof(log_XKDV), \
       "XKDV","QBffffffff","TimeUS,C,I0,I1,I2,I3,IV0,IV1,IV2,IV3", "s#--------", "F---------" , true }, \
-    { LOG_XKDA_MSG, sizeof(log_XKDA), \
-      "XKDA","QBffffffff","TimeUS,C,Y0,Y1,Y2,Y3,P0,P1,P2,P3", "s#--------", "F---------" , true },
+    { LOG_XKDY_MSG, sizeof(log_XKDY), \
+      "XKDY","QBffffffff","TimeUS,C,Y0,Y1,Y2,Y3,YV0,YV1,YV2,YV3", "s#--------", "F---------" , true }, \
+    { LOG_XKDP_MSG, sizeof(log_XKDP), \
+      "XKDP","QBffffffff","TimeUS,C,P0,P1,P2,P3,PV0,PV1,PV2,PV3", "s#--------", "F---------" , true },
       #else
   #define LOG_STRUCTURE_FROM_NAVEKF3
 #endif
