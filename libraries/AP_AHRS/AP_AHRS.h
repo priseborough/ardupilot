@@ -292,7 +292,15 @@ public:
     // write body odometry measurements to the EKF
     void writeBodyFrameOdom(float quality, const Vector3f &delPos, const Vector3f &delAng, float delTime, uint32_t timeStamp_ms, uint16_t delay_ms, const Vector3f &posOffset);
 
-    // write body frame doppler velocity measurements to the EKF
+    /*
+     * Send individual doppler velocity measurements from a body fixed sensor to the EKF
+     *
+     * dopperVel is the velocity in the direction fo the sensor axis (m/s)
+     * dopplerVelErr is the 1-std deviation accuracy of the vel measurement (m/s)
+     * sensorYaw is the yaw angle of sensor axis in the body frame measured CW from the X/forward axis (rad)
+     * sensorPitch is the pitch angle of the sensor axis in the body frame measured up from the Z/down axis (rad)
+     * timeStamp_ms is the time from boot the measurement was taken (msec)
+    */
     void writeDopplerVel(float dopperVel, float dopplerVelErr, float sensorYaw, float sensorPitch, uint32_t timeStamp_ms);
 
     // Writes the default equivalent airspeed and its 1-sigma uncertainty in m/s to be used in forward flight if a measured airspeed is required and not available.
