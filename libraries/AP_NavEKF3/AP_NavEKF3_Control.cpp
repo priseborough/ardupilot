@@ -317,7 +317,7 @@ void NavEKF3_core::setAidingMode()
             bool dopplerAiding = (imuSampleTime_ms - lastDopplerVelPassTime_ms <= minTestTime_ms);
 
             // Check if attitude drift has been constrained by a measurement source
-            bool attAiding = posUsed || gpsVelUsed || optFlowUsed || airSpdUsed || dragUsed || rngBcnUsed || bodyOdmUsed;
+            bool attAiding = posUsed || gpsVelUsed || optFlowUsed || airSpdUsed || dragUsed || rngBcnUsed || bodyOdmUsed || dopplerAiding;
 
             // check if velocity drift has been constrained by a measurement source
             bool velAiding = gpsVelUsed || airSpdUsed || dragUsed || optFlowUsed || bodyOdmUsed || dopplerAiding;
