@@ -2074,9 +2074,17 @@ void NavEKF3_core::SelectDopplerVelFusion()
                 running_angle_cal = true;
                 log_angle_estimates = true;
             }
+            // Don't use dopper sensor to correct EKF states if calibrating sensors
             if (!running_angle_cal) {
-                // Don't use dopper sensor to correct EKF states if calibrating sensors
-                FuseDopplerVelocity(dopplerVelDataDelayed.vel[index], sq(dopplerVelDataDelayed.velErr[index]), dopplerVelDataDelayed.yaw[index], dopplerVelDataDelayed.pitch[index]);
+                ftype yaw,pitch;
+                if (dopplerAngleEst[index].initialised) {
+                    yaw = dopplerAngleEst[index].yaw;
+                    pitch = dopplerAngleEst[index].pitch;
+                } else {
+                    yaw = dopplerVelDataDelayed.yaw[index];
+                    pitch = dopplerVelDataDelayed.pitch[index];
+                }
+                FuseDopplerVelocity(dopplerVelDataDelayed.vel[index], sq(dopplerVelDataDelayed.velErr[index]), yaw, pitch);
                 innovations[index] = innovDopplerVel;
                 innovationVariances[index] = varInnovDopplerVel;
                 running_doppler_fusion = true;
