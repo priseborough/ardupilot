@@ -2087,7 +2087,7 @@ void NavEKF3_core::SelectDopplerVelFusion()
         }
         if (log_angle_estimates) {
             const struct log_XKDA pkt1{
-                LOG_PACKET_HEADER_INIT(LOG_XKDV_MSG),
+                LOG_PACKET_HEADER_INIT(LOG_XKDA_MSG),
                 time_us : AP::dal().micros64(),
                 core    : DAL_CORE(core_index),
                 yaw_0 : (float)dopplerAngleEst[0].yaw,
