@@ -28,10 +28,10 @@ Datasheets:
   L3G4200D gyro http://www.st.com/st-web-ui/static/active/en/resource/technical/document/datasheet/CD00265057.pdf
 */
 
-#include <AP_HAL.h>
+#include <AP_HAL/AP_HAL.h>
 #if CONFIG_HAL_BOARD == HAL_BOARD_LINUX
 
-#include <AP_Math.h>
+#include <AP_Math/AP_Math.h>
 #include "AP_InertialSensor_L3G4200D.h"
 #include <stdio.h>
 #include <unistd.h>
@@ -127,6 +127,23 @@ AP_InertialSensor_L3G4200D::AP_InertialSensor_L3G4200D(AP_InertialSensor &imu) :
 AP_InertialSensor_L3G4200D::~AP_InertialSensor_L3G4200D()
 {
     pthread_spin_destroy(&_data_lock);
+}
+
+/*
+  detect the sensor
+ */
+AP_InertialSensor_Backend *AP_InertialSensor_L3G4200D::detect(AP_InertialSensor &_imu)
+{
+    AP_InertialSensor_L3G4200D *sensor = new AP_InertialSensor_L3G4200D(_imu);
+    if (sensor == NULL) {
+        return NULL;
+    }
+    if (!sensor->_init_sensor()) {
+        delete sensor;
+        return NULL;
+    }
+
+    return sensor;
 }
 
 bool AP_InertialSensor_L3G4200D::_init_sensor(void) 
@@ -254,12 +271,7 @@ bool AP_InertialSensor_L3G4200D::update(void)
     _have_sample = false;
     pthread_spin_unlock(&_data_lock);
 
-    // Adjust for chip scaling to get m/s/s
-    accel *= ADXL345_ACCELEROMETER_SCALE_M_S;
     _publish_accel(_accel_instance, accel);
-
-    // Adjust for chip scaling to get radians/sec
-    gyro *= L3G4200D_GYRO_SCALE_R_S;
     _publish_gyro(_gyro_instance, gyro);
 
     if (_last_filter_hz != _accel_filter_cutoff()) {
@@ -305,7 +317,11 @@ void AP_InertialSensor_L3G4200D::_accumulate(void)
         if (hal.i2c->readRegisters(L3G4200D_I2C_ADDRESS, L3G4200D_REG_XL | L3G4200D_REG_AUTO_INCREMENT, 
                                    sizeof(buffer), (uint8_t *)&buffer[0][0]) == 0) {
             for (uint8_t i=0; i<num_samples_available; i++) {
-                _data[_data_idx].gyro_filtered = _gyro_filter.apply(Vector3f(buffer[i][0], -buffer[i][1], -buffer[i][2]));
+                Vector3f gyro = Vector3f(buffer[i][0], -buffer[i][1], -buffer[i][2]);
+                // Adjust for chip scaling to get radians/sec
+                gyro *= L3G4200D_GYRO_SCALE_R_S;
+                _rotate_and_correct_gyro(_gyro_instance, gyro);
+                _data[_data_idx].gyro_filtered = _gyro_filter.apply(gyro);
                 _have_gyro_sample = true;
             }
         }
@@ -325,7 +341,12 @@ void AP_InertialSensor_L3G4200D::_accumulate(void)
                                            sizeof(buffer[0]), num_samples_available,
                                            (uint8_t *)&buffer[0][0]) == 0) {
             for (uint8_t i=0; i<num_samples_available; i++) {
-                _data[_data_idx].accel_filtered = _accel_filter.apply(Vector3f(buffer[i][0], -buffer[i][1], -buffer[i][2]));
+                Vector3f accel = Vector3f(buffer[i][0], -buffer[i][1], -buffer[i][2]);
+                // Adjust for chip scaling to get m/s/s
+                accel *= ADXL345_ACCELEROMETER_SCALE_M_S;
+                _rotate_and_correct_accel(_accel_instance, accel);
+                _notify_new_accel_raw_sample(_accel_instance, accel);
+                _data[_data_idx].accel_filtered = _accel_filter.apply(accel);
                 _have_accel_sample = true;
             }
         }

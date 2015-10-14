@@ -1,13 +1,14 @@
 // -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 
 #include "Plane.h"
+#include <AP_RSSI/AP_RSSI.h>
 
 void Plane::init_barometer(void)
 {
-    gcs_send_text_P(SEVERITY_LOW, PSTR("Calibrating barometer"));    
+    gcs_send_text_P(MAV_SEVERITY_WARNING, PSTR("Calibrating barometer"));    
     barometer.calibrate();
 
-    gcs_send_text_P(SEVERITY_LOW, PSTR("barometer calibration complete"));
+    gcs_send_text_P(MAV_SEVERITY_WARNING, PSTR("barometer calibration complete"));
 }
 
 void Plane::init_rangefinder(void)
@@ -30,6 +31,15 @@ void Plane::read_rangefinder(void)
 
     rangefinder_height_update();
 #endif
+}
+
+/*
+  calibrate compass
+*/
+void Plane::compass_cal_update() {
+    if (!hal.util->get_soft_armed()) {
+        compass.compass_cal_update();
+    }
 }
 
 /*
@@ -65,7 +75,7 @@ void Plane::zero_airspeed(bool in_startup)
     read_airspeed();
     // update barometric calibration with new airspeed supplied temperature
     barometer.update_calibration();
-    gcs_send_text_P(SEVERITY_LOW,PSTR("zero airspeed calibrated"));
+    gcs_send_text_P(MAV_SEVERITY_WARNING,PSTR("zero airspeed calibrated"));
 }
 
 // read_battery - reads battery voltage and current and invokes failsafe
@@ -75,23 +85,29 @@ void Plane::read_battery(void)
     battery.read();
     compass.set_current(battery.current_amps());
 
-    if (!usb_connected && battery.exhausted(g.fs_batt_voltage, g.fs_batt_mah)) {
+    if (!usb_connected && 
+        hal.util->get_soft_armed() &&
+        battery.exhausted(g.fs_batt_voltage, g.fs_batt_mah)) {
         low_battery_event();
     }
 }
-
 
 // read the receiver RSSI as an 8 bit number for MAVLink
 // RC_CHANNELS_SCALED message
 void Plane::read_receiver_rssi(void)
 {
-    // avoid divide by zero
-    if (g.rssi_range <= 0) {
-        receiver_rssi = 0;
-    }else{
-        rssi_analog_source->set_pin(g.rssi_pin);
-        float ret = rssi_analog_source->voltage_average() * 255 / g.rssi_range;
-        receiver_rssi = constrain_int16(ret, 0, 255);
-    }
+    receiver_rssi = rssi.read_receiver_rssi_uint8();
 }
 
+/*
+  update RPM sensors
+ */
+void Plane::rpm_update(void)
+{
+    rpm_sensor.update();
+    if (rpm_sensor.healthy(0) || rpm_sensor.healthy(1)) {
+        if (should_log(MASK_LOG_RC)) {
+            DataFlash.Log_Write_RPM(rpm_sensor);
+        }
+    }
+}

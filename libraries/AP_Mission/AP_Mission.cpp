@@ -4,7 +4,7 @@
 /// @brief   Handles the MAVLINK command mission stack.  Reads and writes mission to storage.
 
 #include "AP_Mission.h"
-#include <AP_Terrain.h>
+#include <AP_Terrain/AP_Terrain.h>
 
 const AP_Param::GroupInfo AP_Mission::var_info[] PROGMEM = {
 
@@ -132,6 +132,7 @@ void AP_Mission::reset()
     _nav_cmd.index         = AP_MISSION_CMD_INDEX_NONE;
     _do_cmd.index          = AP_MISSION_CMD_INDEX_NONE;
     _prev_nav_cmd_index    = AP_MISSION_CMD_INDEX_NONE;
+    _prev_nav_cmd_wp_index = AP_MISSION_CMD_INDEX_NONE;
     init_jump_tracking();
 }
 
@@ -198,7 +199,7 @@ void AP_Mission::update()
     }
 
     // check if we have an active do command
-    if (!_flags.do_cmd_loaded || _do_cmd.index == AP_MISSION_CMD_INDEX_NONE) {
+    if (!_flags.do_cmd_loaded) {
         advance_current_do_cmd();
     }else{
         // run the active do command
@@ -312,6 +313,7 @@ bool AP_Mission::set_current_cmd(uint16_t index)
     // if index is zero then the user wants to completely restart the mission
     if (index == 0 || _flags.state == MISSION_COMPLETE) {
         _prev_nav_cmd_index = AP_MISSION_CMD_INDEX_NONE;
+        _prev_nav_cmd_wp_index = AP_MISSION_CMD_INDEX_NONE;
         // reset the jump tracking to zero
         init_jump_tracking();
         if (index == 0) {
@@ -346,6 +348,11 @@ bool AP_Mission::set_current_cmd(uint16_t index)
             index = cmd.index+1;
         }
 
+        // if we have not found a do command then set flag to show there are no do-commands to be run before nav command completes
+        if (!_flags.do_cmd_loaded) {
+            _flags.do_cmd_all_done = true;
+        }
+
         // if we got this far then the mission can safely be "resumed" from the specified index so we set the state to "stopped"
         _flags.state = MISSION_STOPPED;
         return true;
@@ -367,6 +374,10 @@ bool AP_Mission::set_current_cmd(uint16_t index)
         if (is_nav_cmd(cmd)) {
             // save previous nav command index
             _prev_nav_cmd_index = _nav_cmd.index;
+            // save separate previous nav command index if it contains lat,long,alt
+            if (!(cmd.content.location.lat == 0 && cmd.content.location.lng == 0)) {
+                _prev_nav_cmd_wp_index = _nav_cmd.index;
+            }
             // set current navigation command and start it
             _nav_cmd = cmd;
             _flags.nav_cmd_loaded = true;
@@ -381,6 +392,11 @@ bool AP_Mission::set_current_cmd(uint16_t index)
         }
         // move onto next command
         index = cmd.index+1;
+    }
+
+    // if we have not found a do command then set flag to show there are no do-commands to be run before nav command completes
+    if (!_flags.do_cmd_loaded) {
+        _flags.do_cmd_all_done = true;
     }
 
     // if we got this far we must have successfully advanced the nav command
@@ -512,6 +528,7 @@ bool AP_Mission::mavlink_to_mission_cmd(const mavlink_mission_item_t& packet, AP
 
     case MAV_CMD_NAV_LAND:                              // MAV ID: 21
         copy_location = true;
+        cmd.p1 = packet.param1;                         // abort target altitude(m)  (plane only)
         break;
 
     case MAV_CMD_NAV_TAKEOFF:                           // MAV ID: 22
@@ -520,7 +537,11 @@ bool AP_Mission::mavlink_to_mission_cmd(const mavlink_mission_item_t& packet, AP
         break;
 
     case MAV_CMD_NAV_CONTINUE_AND_CHANGE_ALT:           // MAV ID: 30
-        copy_location = true;                           // only using alt
+        copy_location = true;                           // lat/lng used for heading lock
+        cmd.p1 = packet.param1;                         // Climb/Descend
+                        // 0 = Neutral, cmd complete at +/- 5 of indicated alt.
+                        // 1 = Climb, cmd complete at or above indicated alt.
+                        // 2 = Descend, cmd complete at or below indicated alt.
         break;
 
     case MAV_CMD_NAV_LOITER_TO_ALT:                     // MAV ID: 31
@@ -676,6 +697,7 @@ bool AP_Mission::mavlink_to_mission_cmd(const mavlink_mission_item_t& packet, AP
         cmd.content.guided_limits.alt_min = packet.param2;  // min alt below which the command will be aborted.  0 for no lower alt limit
         cmd.content.guided_limits.alt_max = packet.param3;  // max alt above which the command will be aborted.  0 for no upper alt limit
         cmd.content.guided_limits.horiz_max = packet.param4;// max horizontal distance the vehicle can move before the command will be aborted.  0 for no horizontal limit
+        break;
 
     case MAV_CMD_DO_AUTOTUNE_ENABLE:                    // MAV ID: 211
         cmd.p1 = packet.param1;                         // disable=0 enable=1
@@ -694,6 +716,14 @@ bool AP_Mission::mavlink_to_mission_cmd(const mavlink_mission_item_t& packet, AP
 
     // copy location from mavlink to command
     if (copy_location || copy_alt) {
+
+        // sanity check location
+        if (copy_location) {
+            if (fabsf(packet.x) > 90.0f || fabsf(packet.y) > 180.0f) {
+                return false;
+            }
+        }
+
         switch (packet.frame) {
 
         case MAV_FRAME_MISSION:
@@ -830,6 +860,7 @@ bool AP_Mission::mission_cmd_to_mavlink(const AP_Mission::Mission_Command& cmd, 
 
     case MAV_CMD_NAV_LAND:                              // MAV ID: 21
         copy_location = true;
+        packet.param1 = cmd.p1;                        // abort target altitude(m)  (plane only)
         break;
 
     case MAV_CMD_NAV_TAKEOFF:                           // MAV ID: 22
@@ -838,7 +869,11 @@ bool AP_Mission::mission_cmd_to_mavlink(const AP_Mission::Mission_Command& cmd, 
         break;
 
     case MAV_CMD_NAV_CONTINUE_AND_CHANGE_ALT:           // MAV ID: 30
-        copy_location = true;                           //only using alt.
+        copy_location = true;                           // lat/lng used for heading lock
+        packet.param1 = cmd.p1;                         // Climb/Descend
+                        // 0 = Neutral, cmd complete at +/- 5 of indicated alt.
+                        // 1 = Climb, cmd complete at or above indicated alt.
+                        // 2 = Descend, cmd complete at or below indicated alt.
         break;
 
     case MAV_CMD_NAV_LOITER_TO_ALT:                     // MAV ID: 31
@@ -988,6 +1023,7 @@ bool AP_Mission::mission_cmd_to_mavlink(const AP_Mission::Mission_Command& cmd, 
         packet.param2 = cmd.content.guided_limits.alt_min;  // min alt below which the command will be aborted.  0 for no lower alt limit
         packet.param3 = cmd.content.guided_limits.alt_max;  // max alt above which the command will be aborted.  0 for no upper alt limit
         packet.param4 = cmd.content.guided_limits.horiz_max;// max horizontal distance the vehicle can move before the command will be aborted.  0 for no horizontal limit
+        break;
 
     case MAV_CMD_DO_AUTOTUNE_ENABLE:
         packet.param1 = cmd.p1;                         // disable=0 enable=1
@@ -1105,6 +1141,10 @@ bool AP_Mission::advance_current_nav_cmd()
         if (is_nav_cmd(cmd)) {
             // save previous nav command index
             _prev_nav_cmd_index = _nav_cmd.index;
+            // save separate previous nav command index if it contains lat,long,alt
+            if (!(cmd.content.location.lat == 0 && cmd.content.location.lng == 0)) {
+                _prev_nav_cmd_wp_index = _nav_cmd.index;
+            }
             // set current navigation command and start it
             _nav_cmd = cmd;
             _flags.nav_cmd_loaded = true;
@@ -1124,6 +1164,11 @@ bool AP_Mission::advance_current_nav_cmd()
         }
         // move onto next command
         cmd_index = cmd.index+1;
+    }
+
+    // if we have not found a do command then set flag to show there are no do-commands to be run before nav command completes
+    if (!_flags.do_cmd_loaded) {
+        _flags.do_cmd_all_done = true;
     }
 
     // if we got this far we must have successfully advanced the nav command

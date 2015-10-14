@@ -25,6 +25,29 @@ bool Plane::verify_land()
         return true;
     }
 
+    // when aborting a landing, mimic the verify_takeoff with steering hold. Once
+    // the altitude has been reached, restart the landing sequence
+    if (flight_stage == AP_SpdHgtControl::FLIGHT_LAND_ABORT) {
+
+        throttle_suppressed = false;
+        auto_state.land_complete = false;
+        nav_controller->update_heading_hold(get_bearing_cd(prev_WP_loc, next_WP_loc));
+
+        // see if we have reached abort altitude
+        if (adjusted_relative_altitude_cm() > auto_state.takeoff_altitude_rel_cm) {
+            next_WP_loc = current_loc;
+            mission.stop();
+            bool success = restart_landing_sequence();
+            mission.resume();
+            if (!success) {
+                // on a restart failure lets RTL or else the plane may fly away with nowhere to go!
+                set_mode(RTL);
+            }
+            // make sure to return false so it leaves the mission index alone
+        }
+        return false;
+    }
+
     float height = height_above_target();
 
     // use rangefinder to correct if possible
@@ -49,11 +72,14 @@ bool Plane::verify_land()
         (fabsf(auto_state.sink_rate) < 0.2f && !is_flying())) {
 
         if (!auto_state.land_complete) {
+            auto_state.post_landing_stats = true;
             if (!is_flying() && (millis()-auto_state.last_flying_ms) > 3000) {
                 gcs_send_text_fmt(PSTR("Flare crash detected: speed=%.1f"), (double)gps.ground_speed());
             } else {
-                gcs_send_text_fmt(PSTR("Flare %.1fm sink=%.2f speed=%.1f"), 
-                        (double)height, (double)auto_state.sink_rate, (double)gps.ground_speed());
+                gcs_send_text_fmt(PSTR("Flare %.1fm sink=%.2f speed=%.1f dist=%.1f"), 
+                                  (double)height, (double)auto_state.sink_rate,
+                                  (double)gps.ground_speed(),
+                                  (double)get_distance(current_loc, next_WP_loc));
             }
         }
         auto_state.land_complete = true;
@@ -80,6 +106,13 @@ bool Plane::verify_land()
                     get_distance(prev_WP_loc, current_loc) + 200);
     nav_controller->update_waypoint(prev_WP_loc, land_WP_loc);
 
+    // once landed and stationary, post some statistics
+    // this is done before disarm_if_autoland_complete() so that it happens on the next loop after the disarm
+    if (auto_state.post_landing_stats && !arming.is_armed()) {
+        auto_state.post_landing_stats = false;
+        gcs_send_text_fmt(PSTR("Distance from LAND point=%.2fm"), (double)get_distance(current_loc, next_WP_loc));
+    }
+
     // check if we should auto-disarm after a confirmed landing
     disarm_if_autoland_complete();
 
@@ -87,7 +120,8 @@ bool Plane::verify_land()
       we return false as a landing mission item never completes
 
       we stay on this waypoint unless the GCS commands us to change
-      mission item or reset the mission, or a go-around is commanded
+      mission item, reset the mission, command a go-around or finish
+      a land_abort procedure.
      */
     return false;
 }
@@ -105,7 +139,7 @@ void Plane::disarm_if_autoland_complete()
         /* we have auto disarm enabled. See if enough time has passed */
         if (millis() - auto_state.last_flying_ms >= g.land_disarm_delay*1000UL) {
             if (disarm_motors()) {
-                gcs_send_text_P(SEVERITY_LOW,PSTR("Auto-Disarmed"));
+                gcs_send_text_P(MAV_SEVERITY_WARNING,PSTR("Auto-Disarmed"));
             }
         }
     }
@@ -130,6 +164,12 @@ void Plane::setup_landing_glide_slope(void)
         const float land_projection = 500;        
         int32_t land_bearing_cd = get_bearing_cd(prev_WP_loc, next_WP_loc);
         float total_distance = get_distance(prev_WP_loc, next_WP_loc);
+
+        // If someone mistakenly puts all 0's in their LAND command then total_distance
+        // will be calculated as 0 and cause a divide by 0 error below.  Lets avoid that.
+        if (total_distance < 1) {
+            total_distance = 1;
+        }
 
         // height we need to sink for this WP
         float sink_height = (prev_WP_loc.alt - next_WP_loc.alt)*0.01f;
@@ -197,6 +237,53 @@ void Plane::setup_landing_glide_slope(void)
         constrain_target_altitude_location(loc, prev_WP_loc);
 }
 
+/*
+     Restart a landing by first checking for a DO_LAND_START and
+     jump there. Otherwise decrement waypoint so we would re-start
+     from the top with same glide slope. Return true if successful.
+ */
+bool Plane::restart_landing_sequence()
+{
+    if (mission.get_current_nav_cmd().id != MAV_CMD_NAV_LAND) {
+        return false;
+    }
+
+    uint16_t do_land_start_index = mission.get_landing_sequence_start();
+    uint16_t prev_cmd_with_wp_index = mission.get_prev_nav_cmd_with_wp_index();
+    bool success = false;
+    uint16_t current_index = mission.get_current_nav_index();
+    AP_Mission::Mission_Command cmd;
+
+    if (mission.read_cmd_from_storage(current_index+1,cmd) &&
+            cmd.id == MAV_CMD_NAV_CONTINUE_AND_CHANGE_ALT &&
+            (cmd.p1 == 0 || cmd.p1 == 1) &&
+            mission.set_current_cmd(current_index+1))
+    {
+        // if the next immediate command is MAV_CMD_NAV_CONTINUE_AND_CHANGE_ALT to climb, do it
+        gcs_send_text_fmt(PSTR("Restarted landing sequence climbing to %dm"), cmd.content.location.alt/100);
+        success =  true;
+    }
+    else if (do_land_start_index != 0 &&
+            mission.set_current_cmd(do_land_start_index))
+    {
+        // look for a DO_LAND_START and use that index
+        gcs_send_text_fmt(PSTR("Restarted landing via DO_LAND_START: %d"),do_land_start_index);
+        success =  true;
+    }
+    else if (prev_cmd_with_wp_index != AP_MISSION_CMD_INDEX_NONE &&
+               mission.set_current_cmd(prev_cmd_with_wp_index))
+    {
+        // if a suitable navigation waypoint was just executed, one that contains lat/lng/alt, then
+        // repeat that cmd to restart the landing from the top of approach to repeat intended glide slope
+        gcs_send_text_fmt(PSTR("Restarted landing sequence at waypoint %d"), prev_cmd_with_wp_index);
+        success =  true;
+    } else {
+        gcs_send_text_fmt(PSTR("Unable to restart landing sequence!"));
+        success =  false;
+    }
+    return success;
+}
+
 /* 
    find the nearest landing sequence starting point (DO_LAND_START) and
    switch to that mission item.  Returns false if no DO_LAND_START
@@ -214,12 +301,12 @@ bool Plane::jump_to_landing_sequence(void)
                 mission.resume();
             }
 
-            gcs_send_text_P(SEVERITY_LOW, PSTR("Landing sequence begun."));
+            gcs_send_text_P(MAV_SEVERITY_WARNING, PSTR("Landing sequence begun."));
             return true;
         }            
     }
 
-    gcs_send_text_P(SEVERITY_HIGH, PSTR("Unable to start landing sequence."));
+    gcs_send_text_P(MAV_SEVERITY_CRITICAL, PSTR("Unable to start landing sequence."));
     return false;
 }
 

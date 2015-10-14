@@ -19,17 +19,17 @@
  *       Code by RandyMackay. DIYDrones.com
  *
  */
-#include <AP_HAL.h>
-#include <AP_Math.h>
+#include <AP_HAL/AP_HAL.h>
+#include <AP_Math/AP_Math.h>
 #include "AP_MotorsTri.h"
 
 extern const AP_HAL::HAL& hal;
 
 const AP_Param::GroupInfo AP_MotorsTri::var_info[] PROGMEM = {
     // variables from parent vehicle
-    AP_NESTEDGROUPINFO(AP_Motors, 0),
+    AP_NESTEDGROUPINFO(AP_MotorsMulticopter, 0),
 
-    // parameters 1 ~ 29 reserved for tradheli
+    // parameters 1 ~ 29 were reserved for tradheli
     // parameters 30 ~ 39 reserved for tricopter
     // parameters 40 ~ 49 for single copter and coax copter (these have identical parameter files)
 
@@ -74,9 +74,6 @@ const AP_Param::GroupInfo AP_MotorsTri::var_info[] PROGMEM = {
 // init
 void AP_MotorsTri::Init()
 {
-    // call parent Init function to set-up throttle curve
-    AP_Motors::Init();
-
     // set update rate for the 3 motors (but not the servo on channel 7)
     set_update_rate(_speed_hz);
 
@@ -97,9 +94,9 @@ void AP_MotorsTri::set_update_rate( uint16_t speed_hz )
 
     // set update rate for the 3 motors (but not the servo on channel 7)
     uint32_t mask = 
-	    1U << pgm_read_byte(&_motor_to_channel_map[AP_MOTORS_MOT_1]) |
-	    1U << pgm_read_byte(&_motor_to_channel_map[AP_MOTORS_MOT_2]) |
-	    1U << pgm_read_byte(&_motor_to_channel_map[AP_MOTORS_MOT_4]);
+	    1U << AP_MOTORS_MOT_1 |
+	    1U << AP_MOTORS_MOT_2 |
+	    1U << AP_MOTORS_MOT_4;
     hal.rcout->set_freq(mask, _speed_hz);
 }
 
@@ -107,9 +104,9 @@ void AP_MotorsTri::set_update_rate( uint16_t speed_hz )
 void AP_MotorsTri::enable()
 {
     // enable output channels
-    hal.rcout->enable_ch(pgm_read_byte(&_motor_to_channel_map[AP_MOTORS_MOT_1]));
-    hal.rcout->enable_ch(pgm_read_byte(&_motor_to_channel_map[AP_MOTORS_MOT_2]));
-    hal.rcout->enable_ch(pgm_read_byte(&_motor_to_channel_map[AP_MOTORS_MOT_4]));
+    hal.rcout->enable_ch(AP_MOTORS_MOT_1);
+    hal.rcout->enable_ch(AP_MOTORS_MOT_2);
+    hal.rcout->enable_ch(AP_MOTORS_MOT_4);
     hal.rcout->enable_ch(AP_MOTORS_CH_TRI_YAW);
 }
 
@@ -120,10 +117,12 @@ void AP_MotorsTri::output_min()
     limit.throttle_lower = true;
 
     // send minimum value to each motor
-    hal.rcout->write(pgm_read_byte(&_motor_to_channel_map[AP_MOTORS_MOT_1]), _throttle_radio_min);
-    hal.rcout->write(pgm_read_byte(&_motor_to_channel_map[AP_MOTORS_MOT_2]), _throttle_radio_min);
-    hal.rcout->write(pgm_read_byte(&_motor_to_channel_map[AP_MOTORS_MOT_4]), _throttle_radio_min);
+    hal.rcout->cork();
+    hal.rcout->write(AP_MOTORS_MOT_1, _throttle_radio_min);
+    hal.rcout->write(AP_MOTORS_MOT_2, _throttle_radio_min);
+    hal.rcout->write(AP_MOTORS_MOT_4, _throttle_radio_min);
     hal.rcout->write(AP_MOTORS_CH_TRI_YAW, _yaw_servo_trim);
+    hal.rcout->push();
 }
 
 // get_motor_mask - returns a bitmask of which outputs are being used for motors or servos (1 means being used)
@@ -131,9 +130,9 @@ void AP_MotorsTri::output_min()
 uint16_t AP_MotorsTri::get_motor_mask()
 {
     // tri copter uses channels 1,2,4 and 7
-    return (1U << pgm_read_byte(&_motor_to_channel_map[AP_MOTORS_MOT_1])) |
-        (1U << pgm_read_byte(&_motor_to_channel_map[AP_MOTORS_MOT_2])) |
-        (1U << pgm_read_byte(&_motor_to_channel_map[AP_MOTORS_MOT_4])) |
+    return (1U << AP_MOTORS_MOT_1) |
+        (1U << AP_MOTORS_MOT_2) |
+        (1U << AP_MOTORS_MOT_4) |
         (1U << AP_MOTORS_CH_TRI_YAW);
 }
 
@@ -150,10 +149,9 @@ void AP_MotorsTri::output_armed_not_stabilizing()
     limit.throttle_lower = false;
     limit.throttle_upper = false;
 
-    int16_t min_thr = rel_pwm_to_thr_range(_spin_when_armed_ramped);
-
-    if (_throttle_control_input <= min_thr) {
-        _throttle_control_input = min_thr;
+    int16_t thr_in_min = rel_pwm_to_thr_range(_spin_when_armed_ramped);
+    if (_throttle_control_input <= thr_in_min) {
+        _throttle_control_input = thr_in_min;
         limit.throttle_lower = true;
     }
 
@@ -175,13 +173,17 @@ void AP_MotorsTri::output_armed_not_stabilizing()
         motor_out[AP_MOTORS_MOT_4] = apply_thrust_curve_and_volt_scaling(motor_out[AP_MOTORS_MOT_4], out_min, out_max);
     }
 
+    hal.rcout->cork();
+
     // send output to each motor
-    hal.rcout->write(pgm_read_byte(&_motor_to_channel_map[AP_MOTORS_MOT_1]), motor_out[AP_MOTORS_MOT_1]);
-    hal.rcout->write(pgm_read_byte(&_motor_to_channel_map[AP_MOTORS_MOT_2]), motor_out[AP_MOTORS_MOT_2]);
-    hal.rcout->write(pgm_read_byte(&_motor_to_channel_map[AP_MOTORS_MOT_4]), motor_out[AP_MOTORS_MOT_4]);
+    hal.rcout->write(AP_MOTORS_MOT_1, motor_out[AP_MOTORS_MOT_1]);
+    hal.rcout->write(AP_MOTORS_MOT_2, motor_out[AP_MOTORS_MOT_2]);
+    hal.rcout->write(AP_MOTORS_MOT_4, motor_out[AP_MOTORS_MOT_4]);
 
     // send centering signal to yaw servo
     hal.rcout->write(AP_MOTORS_CH_TRI_YAW, _yaw_servo_trim);
+
+    hal.rcout->push();
 }
 
 // sends commands to the motors
@@ -203,8 +205,9 @@ void AP_MotorsTri::output_armed_stabilizing()
     limit.throttle_upper = false;
 
     // Throttle is 0 to 1000 only
-    if (_throttle_control_input <= 0) {
-        _throttle_control_input = 0;
+    int16_t thr_in_min = rel_pwm_to_thr_range(_min_throttle);
+    if (_throttle_control_input <= thr_in_min) {
+        _throttle_control_input = thr_in_min;
         limit.throttle_lower = true;
     }
     if (_throttle_control_input >= _max_throttle) {
@@ -287,13 +290,17 @@ void AP_MotorsTri::output_armed_stabilizing()
         motor_out[AP_MOTORS_MOT_4] = max(motor_out[AP_MOTORS_MOT_4],    out_min);
     }
 
+    hal.rcout->cork();
+
     // send output to each motor
-    hal.rcout->write(pgm_read_byte(&_motor_to_channel_map[AP_MOTORS_MOT_1]), motor_out[AP_MOTORS_MOT_1]);
-    hal.rcout->write(pgm_read_byte(&_motor_to_channel_map[AP_MOTORS_MOT_2]), motor_out[AP_MOTORS_MOT_2]);
-    hal.rcout->write(pgm_read_byte(&_motor_to_channel_map[AP_MOTORS_MOT_4]), motor_out[AP_MOTORS_MOT_4]);
+    hal.rcout->write(AP_MOTORS_MOT_1, motor_out[AP_MOTORS_MOT_1]);
+    hal.rcout->write(AP_MOTORS_MOT_2, motor_out[AP_MOTORS_MOT_2]);
+    hal.rcout->write(AP_MOTORS_MOT_4, motor_out[AP_MOTORS_MOT_4]);
 
     // send out to yaw command to tail servo
     hal.rcout->write(AP_MOTORS_CH_TRI_YAW, yaw_radio_output);
+
+    hal.rcout->push();
 }
 
 // output_disarmed - sends commands to the motors
@@ -317,11 +324,11 @@ void AP_MotorsTri::output_test(uint8_t motor_seq, int16_t pwm)
     switch (motor_seq) {
         case 1:
             // front right motor
-            hal.rcout->write(pgm_read_byte(&_motor_to_channel_map[AP_MOTORS_MOT_1]), pwm);
+            hal.rcout->write(AP_MOTORS_MOT_1, pwm);
             break;
         case 2:
             // back motor
-            hal.rcout->write(pgm_read_byte(&_motor_to_channel_map[AP_MOTORS_MOT_4]), pwm);
+            hal.rcout->write(AP_MOTORS_MOT_4, pwm);
             break;
         case 3:
             // back servo
@@ -329,7 +336,7 @@ void AP_MotorsTri::output_test(uint8_t motor_seq, int16_t pwm)
             break;
         case 4:
             // front left motor
-            hal.rcout->write(pgm_read_byte(&_motor_to_channel_map[AP_MOTORS_MOT_2]), pwm);
+            hal.rcout->write(AP_MOTORS_MOT_2, pwm);
             break;
         default:
             // do nothing

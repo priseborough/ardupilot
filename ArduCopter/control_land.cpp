@@ -30,6 +30,9 @@ bool Copter::land_init(bool ignore_checks)
 
     land_pause = false;
 
+    // reset flag indicating if pilot has applied roll or pitch inputs during landing
+    ap.land_repo_active = false;
+
     return true;
 }
 
@@ -54,7 +57,13 @@ void Copter::land_gps_run()
 
     // if not auto armed or landed or motor interlock not enabled set throttle to zero and exit immediately
     if(!ap.auto_armed || ap.land_complete || !motors.get_interlock()) {
+#if FRAME_CONFIG == HELI_FRAME  // Helicopters always stabilize roll/pitch/yaw
+        // call attitude controller
+        attitude_control.angle_ef_roll_pitch_rate_ef_yaw_smooth(0, 0, 0, get_smoothing_gain());
+        attitude_control.set_throttle_out(0,false,g.throttle_filt);
+#else   // multicopters do not stabilize roll/pitch/yaw when disarmed
         attitude_control.set_throttle_out_unstabilized(0,true,g.throttle_filt);
+#endif
         wp_nav.init_loiter_target();
 
 #if LAND_REQUIRE_MIN_THROTTLE_TO_DISARM == ENABLED
@@ -85,6 +94,11 @@ void Copter::land_gps_run()
             // process pilot's roll and pitch input
             roll_control = channel_roll->control_in;
             pitch_control = channel_pitch->control_in;
+
+            // record if pilot has overriden roll or pitch
+            if (roll_control != 0 || pitch_control != 0) {
+                ap.land_repo_active = true;
+            }
         }
 
         // get pilot's desired yaw rate
@@ -93,6 +107,13 @@ void Copter::land_gps_run()
 
     // process roll, pitch inputs
     wp_nav.set_pilot_desired_acceleration(roll_control, pitch_control);
+
+#if PRECISION_LANDING == ENABLED
+    // run precision landing
+    if (!ap.land_repo_active) {
+        wp_nav.shift_loiter_target(precland.get_target_shift(wp_nav.get_loiter_target()));
+    }
+#endif
 
     // run loiter controller
     wp_nav.update_loiter(ekfGndSpdLimit, ekfNavVelGainScaler);
@@ -125,9 +146,30 @@ void Copter::land_nogps_run()
     float target_roll = 0.0f, target_pitch = 0.0f;
     float target_yaw_rate = 0;
 
+    // process pilot inputs
+    if (!failsafe.radio) {
+        if (g.land_repositioning) {
+            // apply SIMPLE mode transform to pilot inputs
+            update_simple_mode();
+
+            // get pilot desired lean angles
+            get_pilot_desired_lean_angles(channel_roll->control_in, channel_pitch->control_in, target_roll, target_pitch, aparm.angle_max);
+        }
+
+        // get pilot's desired yaw rate
+        target_yaw_rate = get_pilot_desired_yaw_rate(channel_yaw->control_in);
+    }
+
     // if not auto armed or landed or motor interlock not enabled set throttle to zero and exit immediately
     if(!ap.auto_armed || ap.land_complete || !motors.get_interlock()) {
+#if FRAME_CONFIG == HELI_FRAME  // Helicopters always stabilize roll/pitch/yaw
+        // call attitude controller
+        attitude_control.angle_ef_roll_pitch_rate_ef_yaw_smooth(target_roll, target_pitch, target_yaw_rate, get_smoothing_gain());
+        attitude_control.set_throttle_out(0,false,g.throttle_filt);
+#else   // multicopters do not stabilize roll/pitch/yaw when disarmed
         attitude_control.set_throttle_out_unstabilized(0,true,g.throttle_filt);
+#endif
+
 #if LAND_REQUIRE_MIN_THROTTLE_TO_DISARM == ENABLED
         // disarm when the landing detector says we've landed and throttle is at minimum
         if (ap.land_complete && (ap.throttle_zero || failsafe.radio)) {
@@ -140,20 +182,6 @@ void Copter::land_nogps_run()
         }
 #endif
         return;
-    }
-
-    // process pilot inputs
-    if (!failsafe.radio) {
-        if (g.land_repositioning) {
-            // apply SIMPLE mode transform to pilot inputs
-            update_simple_mode();
-
-            // get pilot desired lean angles
-            get_pilot_desired_lean_angles(channel_roll->control_in, channel_pitch->control_in, target_roll, target_pitch);
-        }
-
-        // get pilot's desired yaw rate
-        target_yaw_rate = get_pilot_desired_yaw_rate(channel_yaw->control_in);
     }
 
     // call attitude controller

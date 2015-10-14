@@ -1,9 +1,9 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 
-#include <AP_HAL.h>
+#include <AP_HAL/AP_HAL.h>
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
-#include <AP_Baro.h>
+#include "AP_Baro.h"
 #include "AP_Baro_PX4.h"
 
 #include <sys/types.h>
@@ -26,8 +26,9 @@ AP_Baro_PX4::AP_Baro_PX4(AP_Baro &baro) :
     memset(instances, 0, sizeof(instances));
     instances[0].fd = open(BARO_BASE_DEVICE_PATH"0", O_RDONLY);
     instances[1].fd = open(BARO_BASE_DEVICE_PATH"1", O_RDONLY);
+    instances[2].fd = open(BARO_BASE_DEVICE_PATH"2", O_RDONLY);
 
-    for (uint8_t i=0; i<2; i++) {
+    for (uint8_t i=0; i<3; i++) {
         if (instances[i].fd != -1) {
             _num_instances = i+1;
         } else {

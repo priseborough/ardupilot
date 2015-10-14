@@ -22,8 +22,8 @@
 #ifndef __AP_MOUNT_BACKEND_H__
 #define __AP_MOUNT_BACKEND_H__
 
-#include <AP_Common.h>
-#include <AP_Mount.h>
+#include <AP_Common/AP_Common.h>
+#include "AP_Mount.h"
 
 class AP_Mount_Backend
 {
@@ -56,6 +56,9 @@ public:
     // set_roi_target - sets target location that mount should attempt to point towards
     virtual void set_roi_target(const struct Location &target_loc);
 
+    // control - control the mount
+    virtual void control(int32_t pitch_or_lat, int32_t roll_or_lon, int32_t yaw_or_alt, MAV_MOUNT_MODE mount_mode);
+    
     // configure_msg - process MOUNT_CONFIGURE messages received from GCS
     virtual void configure_msg(mavlink_message_t* msg);
 

@@ -5,17 +5,7 @@
 #define DATAFLASH_NO_CLI
 #endif
 
-#include <AP_HAL.h>
-#include <AP_Common.h>
-#include <AP_Param.h>
-#include <AP_GPS.h>
-#include <AP_InertialSensor.h>
-#include <AP_Baro.h>
-#include <AP_AHRS.h>
-#include <AP_Vehicle.h>
-#include "../AP_Airspeed/AP_Airspeed.h"
-#include "../AP_BattMonitor/AP_BattMonitor.h"
-#include <stdint.h>
+#include "DataFlash.h"
 
 class DataFlash_Backend
 {
@@ -23,17 +13,34 @@ public:
     FUNCTOR_TYPEDEF(print_mode_fn, void, AP_HAL::BetterStream*, uint8_t);
 
     DataFlash_Backend(DataFlash_Class &front) :
-        _front(front)
+        _front(front),
+        _writing_startup_messages(false),
+        _internal_errors(0),
+        _dropped(0),
+        _last_periodic_1Hz(0),
+        _last_periodic_10Hz(0)
         { }
+
+    void internal_error();
 
     virtual bool CardInserted(void) = 0;
 
     // erase handling
-    virtual bool NeedErase(void) = 0;
     virtual void EraseAll() = 0;
 
+    virtual bool NeedPrep() = 0;
+    virtual void Prep() = 0;
+
     /* Write a block of data at current offset */
-    virtual void WriteBlock(const void *pBuffer, uint16_t size) = 0;
+    bool WriteBlock(const void *pBuffer, uint16_t size) {
+        return WritePrioritisedBlock(pBuffer, size, false);
+    }
+
+    bool WriteCriticalBlock(const void *pBuffer, uint16_t size) {
+        return WritePrioritisedBlock(pBuffer, size, true);
+    }
+
+    virtual bool WritePrioritisedBlock(const void *pBuffer, uint16_t size, bool is_critical) = 0;
 
     // high level interface
     virtual uint16_t find_last_log(void) = 0;
@@ -63,6 +70,8 @@ public:
         _structures = structure;
     }
 
+    virtual uint16_t bufferspace_available() = 0;
+
     virtual uint16_t start_new_log(void) = 0;
     bool log_write_started;
 
@@ -73,8 +82,17 @@ public:
     virtual void flush(void) { }
 #endif
 
+    virtual void periodic_tasks();
+
+    virtual void WroteStartupFormat() { }
+    virtual void WroteStartupParam() { }
+
 protected:
     DataFlash_Class &_front;
+
+    virtual void periodic_10Hz(const uint32_t now);
+    virtual void periodic_1Hz(const uint32_t now);
+    virtual void periodic_fullrate(const uint32_t now);
 
     /*
     read and print a log entry using the format strings from the given structure
@@ -92,6 +110,16 @@ protected:
     */
     virtual bool ReadBlock(void *pkt, uint16_t size) = 0;
 
+    virtual bool WriteBlockCheckStartupMessages();
+    virtual void WriteMoreStartupMessages();
+    virtual void push_log_blocks();
+    bool _writing_startup_messages = false;
+
+    uint32_t _internal_errors;
+    uint32_t _dropped;
+private:
+    uint32_t _last_periodic_1Hz;
+    uint32_t _last_periodic_10Hz;
 };
 
 #endif

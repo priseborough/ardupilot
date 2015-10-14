@@ -10,7 +10,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 
-#include <AP_HAL.h>
+#include <AP_HAL/AP_HAL.h>
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_LINUX
 
@@ -105,19 +105,6 @@ void LinuxRCOutput_AioPRU::write(uint8_t ch, uint16_t period_us)
 {
    if(ch < PWM_CHAN_COUNT) {
       pwm->channel[ch].time_high = TICK_PER_US * period_us;
-   }
-}
-
-void LinuxRCOutput_AioPRU::write(uint8_t ch, uint16_t* period_us, uint8_t len)
-{
-   uint8_t i;
-
-   if(len > PWM_CHAN_COUNT) {
-      len = PWM_CHAN_COUNT;
-   }
-
-   for(i = 0; i < len; i++) {
-      write(ch + i, period_us[i]);
    }
 }
 

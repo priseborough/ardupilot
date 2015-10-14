@@ -1,7 +1,7 @@
 #ifndef __AP_HAL_LINUX_RCINPUT_NAVIO_H__
 #define __AP_HAL_LINUX_RCINPUT_NAVIO_H__
 
-#include <AP_HAL_Linux.h>
+#include "AP_HAL_Linux.h"
 #include "RCInput.h"
 #include <signal.h>
 #include <pthread.h>
@@ -24,9 +24,9 @@
 
 
 enum state_t{
-				RCIN_NAVIO_INITIAL_STATE = -1,
-				RCIN_NAVIO_ZERO_STATE = 0,
-				RCIN_NAVIO_ONE_STATE = 1
+    RCIN_NAVIO_INITIAL_STATE = -1,
+    RCIN_NAVIO_ZERO_STATE = 0,
+    RCIN_NAVIO_ONE_STATE = 1
 };
 
 
@@ -123,9 +123,11 @@ private:
     void init_PCM();
     void init_DMA();
     void init_buffer();
-    static void stop_dma_and_exit(int param);
+    static void stop_dma();
+    static void termination_handler(int signum);
     void set_sigaction();
     void set_physical_addresses(int version);
+    void deinit() override;
 
 };
 

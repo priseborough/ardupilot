@@ -21,9 +21,9 @@
 //  Swift Binary Protocol format: http://docs.swift-nav.com/
 //
 
-#include <AP_GPS.h>
+#include "AP_GPS.h"
 #include "AP_GPS_SBP.h"
-#include <DataFlash.h>
+#include <DataFlash/DataFlash.h>
 
 #if GPS_RTK_AVAILABLE
 
@@ -277,10 +277,7 @@ AP_GPS_SBP::_attempt_state_update()
         float ground_vector_sq = state.velocity[0]*state.velocity[0] + state.velocity[1]*state.velocity[1];
         state.ground_speed = safe_sqrt(ground_vector_sq);
 
-        state.ground_course_cd = (int32_t) 100*ToDeg(atan2f(state.velocity[1], state.velocity[0]));
-        if (state.ground_course_cd < 0) {
-          state.ground_course_cd += 36000;
-        }
+        state.ground_course_cd = wrap_360_cd((int32_t) 100*ToDeg(atan2f(state.velocity[1], state.velocity[0])));
 
         // Update position state
 
@@ -451,7 +448,7 @@ AP_GPS_SBP::logging_write_headers(void)
 {
     if (!logging_started) {
         logging_started = true;
-        gps._DataFlash->AddLogFormats(sbp_log_structures, sizeof(sbp_log_structures) / sizeof(LogStructure));
+        gps._DataFlash->AddLogFormats(sbp_log_structures, ARRAY_SIZE(sbp_log_structures));
     }
 }
 

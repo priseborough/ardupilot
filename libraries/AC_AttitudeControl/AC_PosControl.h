@@ -2,16 +2,16 @@
 #ifndef AC_POSCONTROL_H
 #define AC_POSCONTROL_H
 
-#include <AP_Common.h>
-#include <AP_Param.h>
-#include <AP_Math.h>
-#include <AC_PID.h>             // PID library
-#include <AC_PI_2D.h>           // PID library (2-axis)
-#include <AC_P.h>               // P library
-#include <AP_InertialNav.h>     // Inertial Navigation library
-#include <AC_AttitudeControl.h> // Attitude control library
-#include <AP_Motors.h>          // motors library
-#include <AP_Vehicle.h>         // common vehicle parameters
+#include <AP_Common/AP_Common.h>
+#include <AP_Param/AP_Param.h>
+#include <AP_Math/AP_Math.h>
+#include <AC_PID/AC_PID.h>             // PID library
+#include <AC_PID/AC_PI_2D.h>           // PID library (2-axis)
+#include <AC_PID/AC_P.h>               // P library
+#include <AP_InertialNav/AP_InertialNav.h>     // Inertial Navigation library
+#include "AC_AttitudeControl.h" // Attitude control library
+#include <AP_Motors/AP_Motors.h>          // motors library
+#include <AP_Vehicle/AP_Vehicle.h>         // common vehicle parameters
 
 
 // position controller default definitions
@@ -22,7 +22,6 @@
 #define POSCONTROL_STOPPING_DIST_Z_MAX          200.0f  // max stopping distance vertically   
                                                         // should be 1.5 times larger than POSCONTROL_ACCELERATION.
                                                         // max acceleration = max lean angle * 980 * pi / 180.  i.e. 23deg * 980 * 3.141 / 180 = 393 cm/s/s
-#define POSCONTROL_TAKEOFF_JUMP_CM                0.0f  // during take-off altitude target is set to current altitude + this value
 
 #define POSCONTROL_SPEED                        500.0f  // default horizontal speed in cm/s
 #define POSCONTROL_SPEED_DOWN                  -150.0f  // default descent rate in cm/s
@@ -220,7 +219,7 @@ public:
 
     /// update_xy_controller - run the horizontal position controller - should be called at 100hz or higher
     ///     when use_desired_velocity is true the desired velocity (i.e. feed forward) is incorporated at the pos_to_rate step
-    void update_xy_controller(xy_mode mode, float ekfNavVelGainScaler);
+    void update_xy_controller(xy_mode mode, float ekfNavVelGainScaler, bool use_althold_lean_angle);
 
     /// set_target_to_stopping_point_xy - sets horizontal target to reasonable stopping position in cm from home
     void set_target_to_stopping_point_xy();
@@ -332,7 +331,7 @@ private:
 
     /// accel_to_lean_angles - horizontal desired acceleration to lean angles
     ///    converts desired accelerations provided in lat/lon frame to roll/pitch angles
-    void accel_to_lean_angles(float dt_xy, float ekfNavVelGainScaler);
+    void accel_to_lean_angles(float dt_xy, float ekfNavVelGainScaler, bool use_althold_lean_angle);
 
     /// calc_leash_length - calculates the horizontal leash length given a maximum speed, acceleration and position kP gain
     float calc_leash_length(float speed_cms, float accel_cms, float kP) const;

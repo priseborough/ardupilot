@@ -1,7 +1,7 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
-#include <AP_HAL.h>
-#include <AC_PosControl.h>
-#include <AP_Math.h>
+#include <AP_HAL/AP_HAL.h>
+#include "AC_PosControl.h"
+#include <AP_Math/AP_Math.h>
 
 extern const AP_HAL::HAL& hal;
 
@@ -254,7 +254,7 @@ void AC_PosControl::init_takeoff()
 {
     const Vector3f& curr_pos = _inav.get_position();
 
-    _pos_target.z = curr_pos.z + POSCONTROL_TAKEOFF_JUMP_CM;
+    _pos_target.z = curr_pos.z;
 
     // freeze feedforward to avoid jump
     freeze_ff_z();
@@ -579,7 +579,7 @@ void AC_PosControl::init_xy_controller(bool reset_I)
 }
 
 /// update_xy_controller - run the horizontal position controller - should be called at 100hz or higher
-void AC_PosControl::update_xy_controller(xy_mode mode, float ekfNavVelGainScaler)
+void AC_PosControl::update_xy_controller(xy_mode mode, float ekfNavVelGainScaler, bool use_althold_lean_angle)
 {
     // compute dt
     uint32_t now = hal.scheduler->millis();
@@ -604,7 +604,7 @@ void AC_PosControl::update_xy_controller(xy_mode mode, float ekfNavVelGainScaler
     rate_to_accel_xy(dt, ekfNavVelGainScaler);
 
     // run position controller's acceleration to lean angle step
-    accel_to_lean_angles(dt, ekfNavVelGainScaler);
+    accel_to_lean_angles(dt, ekfNavVelGainScaler, use_althold_lean_angle);
 }
 
 float AC_PosControl::time_since_last_xy_update() const
@@ -666,7 +666,7 @@ void AC_PosControl::update_vel_controller_xyz(float ekfNavVelGainScaler)
     rate_to_accel_xy(dt, ekfNavVelGainScaler);
 
     // run acceleration to lean angle step
-    accel_to_lean_angles(dt, ekfNavVelGainScaler);
+    accel_to_lean_angles(dt, ekfNavVelGainScaler, false);
 
     // update altitude target
     set_alt_target_from_climb_rate(_vel_desired.z, dt, false);
@@ -791,7 +791,6 @@ void AC_PosControl::pos_to_rate_xy(xy_mode mode, float dt, float ekfNavVelGainSc
 void AC_PosControl::rate_to_accel_xy(float dt, float ekfNavVelGainScaler)
 {
     const Vector3f &vel_curr = _inav.get_velocity();  // current velocity in cm/s
-    float accel_total;                          // total acceleration in cm/s/s
     Vector2f vel_xy_p, vel_xy_i;
 
     // reset last velocity target to current target
@@ -839,26 +838,32 @@ void AC_PosControl::rate_to_accel_xy(float dt, float ekfNavVelGainScaler)
     // combine feed forward accel with PID output from velocity error and scale PID output to compensate for optical flow measurement induced EKF noise
     _accel_target.x = _accel_feedforward.x + (vel_xy_p.x + vel_xy_i.x) * ekfNavVelGainScaler;
     _accel_target.y = _accel_feedforward.y + (vel_xy_p.y + vel_xy_i.y) * ekfNavVelGainScaler;
+}
+
+/// accel_to_lean_angles - horizontal desired acceleration to lean angles
+///    converts desired accelerations provided in lat/lon frame to roll/pitch angles
+void AC_PosControl::accel_to_lean_angles(float dt, float ekfNavVelGainScaler, bool use_althold_lean_angle)
+{
+    float accel_total;                          // total acceleration in cm/s/s
+    float accel_right, accel_forward;
+    float lean_angle_max = _attitude_control.lean_angle_max();
+    float accel_max = POSCONTROL_ACCEL_XY_MAX;
+
+    // limit acceleration if necessary
+    if (use_althold_lean_angle) {
+        accel_max = min(accel_max, GRAVITY_MSS * 100.0f * sinf(ToRad(constrain_float(_attitude_control.get_althold_lean_angle_max(),1000,8000)/100.0f)));
+    }
 
     // scale desired acceleration if it's beyond acceptable limit
-    // To-Do: move this check down to the accel_to_lean_angle method?
     accel_total = pythagorous2(_accel_target.x, _accel_target.y);
-    if (accel_total > POSCONTROL_ACCEL_XY_MAX && accel_total > 0.0f) {
-        _accel_target.x = POSCONTROL_ACCEL_XY_MAX * _accel_target.x/accel_total;
-        _accel_target.y = POSCONTROL_ACCEL_XY_MAX * _accel_target.y/accel_total;
+    if (accel_total > accel_max && accel_total > 0.0f) {
+        _accel_target.x = accel_max * _accel_target.x/accel_total;
+        _accel_target.y = accel_max * _accel_target.y/accel_total;
         _limit.accel_xy = true;     // unused
     } else {
         // reset accel limit flag
         _limit.accel_xy = false;
     }
-}
-
-/// accel_to_lean_angles - horizontal desired acceleration to lean angles
-///    converts desired accelerations provided in lat/lon frame to roll/pitch angles
-void AC_PosControl::accel_to_lean_angles(float dt, float ekfNavVelGainScaler)
-{
-    float accel_right, accel_forward;
-    float lean_angle_max = _attitude_control.lean_angle_max();
 
     // reset accel to current desired acceleration
     if (_flags.reset_accel_to_lean_xy) {

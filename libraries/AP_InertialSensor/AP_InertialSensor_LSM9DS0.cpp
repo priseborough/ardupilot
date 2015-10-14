@@ -15,12 +15,12 @@
  *  -- Adapted from Victor Mayoral Vilches's legacy driver under folder LSM9DS0
  */
 
-#include <AP_HAL.h>
+#include <AP_HAL/AP_HAL.h>
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_LINUX
 
  #include "AP_InertialSensor_LSM9DS0.h"
- #include "../AP_HAL_Linux/GPIO.h"
+ #include <AP_HAL_Linux/GPIO.h>
 
 extern const AP_HAL::HAL& hal;
 
@@ -739,6 +739,9 @@ void AP_InertialSensor_LSM9DS0::_read_data_transaction_a()
     _accel_raw_data(&raw_data);
 
     Vector3f accel_data(raw_data.x, -raw_data.y, -raw_data.z);
+    accel_data *= _accel_scale;
+    _rotate_and_correct_accel(_accel_instance, accel_data);
+    _notify_new_accel_raw_sample(_accel_instance, accel_data);
     _accel_filtered = _accel_filter.apply(accel_data);
     _accel_sample_available = true;
 }
@@ -752,23 +755,19 @@ void AP_InertialSensor_LSM9DS0::_read_data_transaction_g()
     _gyro_raw_data(&raw_data);
 
     Vector3f gyro_data(raw_data.x, -raw_data.y, -raw_data.z);
+    gyro_data *= _gyro_scale;
+    _rotate_and_correct_gyro(_gyro_instance, gyro_data);
     _gyro_filtered = _gyro_filter.apply(gyro_data);
     _gyro_sample_available = true;
 }
 
 bool AP_InertialSensor_LSM9DS0::update()
 {
-    Vector3f gyro = _gyro_filtered;
-    Vector3f accel = _accel_filtered;
-
     _accel_sample_available = false;
     _gyro_sample_available = false;
 
-    accel *= _accel_scale;
-    gyro *= _gyro_scale;
-
-    _publish_gyro(_gyro_instance, gyro);
-    _publish_accel(_accel_instance, accel);
+    _publish_gyro(_gyro_instance, _gyro_filtered);
+    _publish_accel(_accel_instance, _accel_filtered);
 
     if (_last_accel_filter_hz != _accel_filter_cutoff()) {
         _set_accel_filter(_accel_filter_cutoff());

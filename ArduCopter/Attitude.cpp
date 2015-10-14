@@ -11,12 +11,16 @@ float Copter::get_smoothing_gain()
 
 // get_pilot_desired_angle - transform pilot's roll or pitch input into a desired lean angle
 // returns desired angle in centi-degrees
-void Copter::get_pilot_desired_lean_angles(float roll_in, float pitch_in, float &roll_out, float &pitch_out)
+void Copter::get_pilot_desired_lean_angles(float roll_in, float pitch_in, float &roll_out, float &pitch_out, float angle_max)
 {
-    float angle_max = constrain_float(aparm.angle_max,1000,8000);
-    float scaler = (float)angle_max/(float)ROLL_PITCH_INPUT_MAX;
+    // sanity check angle max parameter
+    aparm.angle_max = constrain_int16(aparm.angle_max,1000,8000);
 
-    // scale roll_in, pitch_in to correct units
+    // limit max lean angle
+    angle_max = constrain_float(angle_max, 1000, aparm.angle_max);
+
+    // scale roll_in, pitch_in to ANGLE_MAX parameter range
+    float scaler = aparm.angle_max/(float)ROLL_PITCH_INPUT_MAX;
     roll_in *= scaler;
     pitch_in *= scaler;
 
@@ -36,9 +40,9 @@ void Copter::get_pilot_desired_lean_angles(float roll_in, float pitch_in, float 
     pitch_out = pitch_in;
 }
 
-// get_pilot_desired_heading - transform pilot's yaw input into a desired heading
-// returns desired angle in centi-degrees
-// To-Do: return heading as a float?
+// get_pilot_desired_heading - transform pilot's yaw input into a
+// desired yaw rate
+// returns desired yaw rate in centi-degrees per second
 float Copter::get_pilot_desired_yaw_rate(int16_t stick_angle)
 {
     // convert pilot input to the desired yaw rate
@@ -49,8 +53,10 @@ float Copter::get_pilot_desired_yaw_rate(int16_t stick_angle)
 void Copter::check_ekf_yaw_reset()
 {
     float yaw_angle_change_rad = 0.0f;
-    if (ahrs.get_NavEKF().getLastYawResetAngle(yaw_angle_change_rad)) {
+    uint32_t new_ekfYawReset_ms = ahrs.getLastYawResetAngle(yaw_angle_change_rad);
+    if (new_ekfYawReset_ms != ekfYawReset_ms) {
         attitude_control.shift_ef_yaw_target(ToDeg(yaw_angle_change_rad) * 100.0f);
+        ekfYawReset_ms = new_ekfYawReset_ms;
     }
 }
 
@@ -136,7 +142,7 @@ int16_t Copter::get_pilot_desired_throttle(int16_t throttle_control)
 
     // ensure reasonable throttle values
     throttle_control = constrain_int16(throttle_control,0,1000);
-    g.throttle_mid = constrain_int16(g.throttle_mid,300,700);
+    g.throttle_mid = constrain_int16(g.throttle_mid,g.throttle_min+50,700);
 
     // check throttle is above, below or in the deadband
     if (throttle_control < mid_stick) {
@@ -214,12 +220,18 @@ float Copter::get_throttle_pre_takeoff(float input_thr)
     }
 
     // TODO: does this parameter sanity check really belong here?
-    g.throttle_mid = constrain_int16(g.throttle_mid,300,700);
+    g.throttle_mid = constrain_int16(g.throttle_mid,g.throttle_min+50,700);
 
     float in_min = g.throttle_min;
     float in_max = get_takeoff_trigger_throttle();
 
+#if FRAME_CONFIG == HELI_FRAME
+    // helicopters swash will move from bottom to 1/2 of mid throttle
+    float out_min = 0;
+#else
+    // multicopters will output between spin-when-armed and 1/2 of mid throttle
     float out_min = motors.get_throttle_warn();
+#endif
     float out_max = get_non_takeoff_throttle();
 
     if ((g.throttle_behavior & THR_BEHAVE_FEEDBACK_FROM_MID_STICK) != 0) {
@@ -301,4 +313,13 @@ void Copter::update_poscon_alt_max()
 
     // pass limit to pos controller
     pos_control.set_alt_max(alt_limit_cm);
+}
+
+// rotate vector from vehicle's perspective to North-East frame
+void Copter::rotate_body_frame_to_NE(float &x, float &y)
+{
+    float ne_x = x*ahrs.cos_yaw() - y*ahrs.sin_yaw();
+    float ne_y = x*ahrs.sin_yaw() + y*ahrs.cos_yaw();
+    x = ne_x;
+    y = ne_y;
 }

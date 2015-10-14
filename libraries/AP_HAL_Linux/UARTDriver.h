@@ -2,11 +2,18 @@
 #ifndef __AP_HAL_LINUX_UARTDRIVER_H__
 #define __AP_HAL_LINUX_UARTDRIVER_H__
 
-#include <AP_HAL_Linux.h>
+#include "AP_HAL_Linux.h"
+
+#include "SerialDevice.h"
 
 class Linux::LinuxUARTDriver : public AP_HAL::UARTDriver {
 public:
     LinuxUARTDriver(bool default_console);
+
+    static LinuxUARTDriver *from(AP_HAL::UARTDriver *uart) {
+        return static_cast<LinuxUARTDriver*>(uart);
+    }
+
     /* Linux implementations of UARTDriver virtual methods */
     void begin(uint32_t b);
     void begin(uint32_t b, uint16_t rxS, uint16_t txS);
@@ -27,13 +34,13 @@ public:
 
     void set_device_path(const char *path);
 
+    bool _write_pending_bytes(void);
     virtual void _timer_tick(void);
 
     enum flow_control get_flow_control(void) { return _flow_control; }
 
 private:
-    int _rd_fd;
-    int _wr_fd;
+    SerialDevice *_device = nullptr;
     bool _nonblocking_writes;
     bool _console;
     volatile bool _in_timer;
@@ -44,8 +51,11 @@ private:
     bool _packetise; // true if writes should try to be on mavlink boundaries
     enum flow_control _flow_control;
 
-    void _tcp_start_connection(bool wait_for_connection);
+    void _allocate_buffers(uint16_t rxS, uint16_t txS);
+    void _deallocate_buffers();
     void _udp_start_connection(void);
+    void _tcp_start_connection(void);
+    bool _serial_start_connection(void);
 
     enum device_type {
         DEVICE_TCP,

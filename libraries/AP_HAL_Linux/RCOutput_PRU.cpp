@@ -1,5 +1,5 @@
 
-#include <AP_HAL.h>
+#include <AP_HAL/AP_HAL.h>
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_LINUX
 
@@ -73,17 +73,6 @@ void LinuxRCOutput_PRU::disable_ch(uint8_t ch)
 void LinuxRCOutput_PRU::write(uint8_t ch, uint16_t period_us)
 {
     sharedMem_cmd->periodhi[chan_pru_map[ch]][1] = TICK_PER_US*period_us;
-}
-
-void LinuxRCOutput_PRU::write(uint8_t ch, uint16_t* period_us, uint8_t len)
-{
-    uint8_t i;
-    if(len>PWM_CHAN_COUNT){
-        len = PWM_CHAN_COUNT;
-    }
-    for(i=0;i<len;i++){
-        write(ch+i,period_us[i]);
-    }
 }
 
 uint16_t LinuxRCOutput_PRU::read(uint8_t ch)

@@ -7,24 +7,27 @@
   Andrew Tridgell November 2011
  */
 
-#include <AP_HAL.h>
+#include <AP_HAL/AP_HAL.h>
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
 
-#include <AP_HAL_SITL.h>
+#include "AP_HAL_SITL.h"
 #include "AP_HAL_SITL_Namespace.h"
 #include "HAL_SITL_Class.h"
 
-#include <AP_Math.h>
-#include "../SITL/SITL.h"
+#include <AP_Math/AP_Math.h>
+#include <SITL/SITL.h>
 #include "Scheduler.h"
 #include "UARTDriver.h"
-#include "../AP_GPS/AP_GPS.h"
-#include "../AP_GPS/AP_GPS_UBLOX.h"
+#include <AP_GPS/AP_GPS.h>
+#include <AP_GPS/AP_GPS_UBLOX.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
 #include <time.h>
 #include <stdio.h>
 #include <sys/time.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <fcntl.h>
 
 #pragma GCC diagnostic ignored "-Wunused-result"
 
@@ -211,8 +214,19 @@ void SITL_State::_update_gps_ubx(const struct gps_data *d)
         uint8_t satellites;
         uint32_t res2;
     } sol;
+    struct PACKED ubx_nav_dop {
+        uint32_t time;                                  // GPS msToW
+        uint16_t gDOP;
+        uint16_t pDOP;
+        uint16_t tDOP;
+        uint16_t vDOP;
+        uint16_t hDOP;
+        uint16_t nDOP;
+        uint16_t eDOP;
+    } dop;
     const uint8_t MSG_POSLLH = 0x2;
     const uint8_t MSG_STATUS = 0x3;
+    const uint8_t MSG_DOP = 0x4;
     const uint8_t MSG_VELNED = 0x12;
     const uint8_t MSG_SOL = 0x6;
     uint16_t time_week;
@@ -256,10 +270,20 @@ void SITL_State::_update_gps_ubx(const struct gps_data *d)
     sol.time = time_week_ms;
     sol.week = time_week;
 
+    dop.time = time_week_ms;
+    dop.gDOP = 65535;
+    dop.pDOP = 65535;
+    dop.tDOP = 65535;
+    dop.vDOP = 200;
+    dop.hDOP = 121;
+    dop.nDOP = 65535;
+    dop.eDOP = 65535;
+
     _gps_send_ubx(MSG_POSLLH, (uint8_t*)&pos, sizeof(pos));
     _gps_send_ubx(MSG_STATUS, (uint8_t*)&status, sizeof(status));
     _gps_send_ubx(MSG_VELNED, (uint8_t*)&velned, sizeof(velned));
     _gps_send_ubx(MSG_SOL,    (uint8_t*)&sol, sizeof(sol));
+    _gps_send_ubx(MSG_DOP,    (uint8_t*)&dop, sizeof(dop));
 }
 
 static void swap_uint32(uint32_t *v, uint8_t n)
@@ -678,6 +702,31 @@ void SITL_State::_update_gps_sbp(const struct gps_data *d)
     do_every_count++;
 }
 
+
+/*
+  temporary method to use file as GPS data
+ */
+void SITL_State::_update_gps_file(const struct gps_data *d)
+{
+    static int fd = -1;
+    if (fd == -1) {
+        fd = open("/tmp/gps.dat", O_RDONLY);
+    }
+    if (fd == -1) {
+        return;
+    }
+    char buf[200];
+    ssize_t ret = ::read(fd, buf, sizeof(buf));
+    if (ret > 0) {
+        ::printf("wrote gps %u bytes\n", (unsigned)ret);
+        _gps_write((const uint8_t *)buf, ret);
+    }
+    if (ret == 0) {
+        ::printf("gps rewind\n");
+        lseek(fd, 0, SEEK_SET);
+    }
+}
+
 /*
   possibly send a new GPS packet
  */
@@ -779,6 +828,10 @@ void SITL_State::_update_gps(double latitude, double longitude, float altitude,
 
     case SITL::GPS_TYPE_SBP:
         _update_gps_sbp(&d);
+        break;
+
+    case SITL::GPS_TYPE_FILE:
+        _update_gps_file(&d);
         break;
 
     }

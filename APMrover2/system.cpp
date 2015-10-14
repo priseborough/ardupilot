@@ -210,8 +210,9 @@ void Rover::init_ardupilot()
     }
 #endif
 
+	init_capabilities();
+
 	startup_ground();
-    Log_Write_Startup(TYPE_GROUNDSTART_MSG);
 
     set_mode((enum mode)g.initial_mode.get());
 
@@ -227,10 +228,10 @@ void Rover::startup_ground(void)
 {
     set_mode(INITIALISING);
 
-	gcs_send_text_P(SEVERITY_LOW,PSTR("<startup_ground> GROUND START"));
+	gcs_send_text_P(MAV_SEVERITY_WARNING,PSTR("<startup_ground> GROUND START"));
 
 	#if(GROUND_START_DELAY > 0)
-		gcs_send_text_P(SEVERITY_LOW,PSTR("<startup_ground> With Delay"));
+		gcs_send_text_P(MAV_SEVERITY_WARNING,PSTR("<startup_ground> With Delay"));
 		delay(GROUND_START_DELAY * 1000);
 	#endif
 
@@ -254,7 +255,7 @@ void Rover::startup_ground(void)
     ins.set_raw_logging(should_log(MASK_LOG_IMU_RAW));
     ins.set_dataflash(&DataFlash);
 
-	gcs_send_text_P(SEVERITY_LOW,PSTR("\n\n Ready to drive."));
+	gcs_send_text_P(MAV_SEVERITY_WARNING,PSTR("\n\n Ready to drive."));
 }
 
 /*
@@ -277,6 +278,11 @@ void Rover::set_mode(enum mode mode)
 		// don't switch modes if we are already in the correct mode.
 		return;
 	}
+
+    // If we are changing out of AUTO mode reset the loiter timer
+    if (control_mode == AUTO)
+        loiter_time = 0;
+
 	control_mode = mode;
     throttle_last = 0;
     throttle = 500;
@@ -387,26 +393,19 @@ void Rover::failsafe_trigger(uint8_t failsafe_type, bool on)
 
 void Rover::startup_INS_ground(void)
 {
-    gcs_send_text_P(SEVERITY_MEDIUM, PSTR("Warming up ADC..."));
+    gcs_send_text_P(MAV_SEVERITY_ALERT, PSTR("Warming up ADC..."));
  	mavlink_delay(500);
 
 	// Makes the servos wiggle twice - about to begin INS calibration - HOLD LEVEL AND STILL!!
 	// -----------------------
-    gcs_send_text_P(SEVERITY_MEDIUM, PSTR("Beginning INS calibration; do not move vehicle"));
+    gcs_send_text_P(MAV_SEVERITY_ALERT, PSTR("Beginning INS calibration; do not move vehicle"));
 	mavlink_delay(1000);
 
     ahrs.init();
 	ahrs.set_fly_forward(true);
     ahrs.set_vehicle_class(AHRS_VEHICLE_GROUND);
 
-    AP_InertialSensor::Start_style style;
-    if (g.skip_gyro_cal) {
-        style = AP_InertialSensor::WARM_START;
-    } else {
-        style = AP_InertialSensor::COLD_START;
-    }
-
-	ins.init(style, ins_sample_rate);
+	ins.init(ins_sample_rate);
 
     ahrs.reset();
 }
@@ -504,11 +503,7 @@ bool Rover::should_log(uint32_t mask)
     }
     bool ret = hal.util->get_soft_armed() || (g.log_bitmask & MASK_LOG_WHEN_DISARMED) != 0;
     if (ret && !DataFlash.logging_started() && !in_log_download) {
-        // we have to set in_mavlink_delay to prevent logging while
-        // writing headers
-        in_mavlink_delay = true;
         start_logging();
-        in_mavlink_delay = false;
     }
     return ret;
 }

@@ -6,9 +6,10 @@
 #ifndef AC_ATTITUDECONTROL_HELI_H
 #define AC_ATTITUDECONTROL_HELI_H
 
-#include <AC_AttitudeControl.h>
-#include <AC_HELI_PID.h>
-#include <Filter.h>
+#include "AC_AttitudeControl.h"
+#include <AP_Motors/AP_MotorsHeli.h>
+#include <AC_PID/AC_HELI_PID.h>
+#include <Filter/Filter.h>
 
 #define AC_ATTITUDE_HELI_RATE_INTEGRATOR_LEAK_RATE  0.02f
 #define AC_ATTITUDE_HELI_RATE_RP_FF_FILTER          10.0f
@@ -26,7 +27,7 @@ public:
         AC_AttitudeControl(ahrs, aparm, motors,
                            p_angle_roll, p_angle_pitch, p_angle_yaw,
                            pid_rate_roll, pid_rate_pitch, pid_rate_yaw),
-        _passthrough_roll(0), _passthrough_pitch(0),
+        _passthrough_roll(0), _passthrough_pitch(0), _passthrough_yaw(0),
         pitch_feedforward_filter(AC_ATTITUDE_HELI_RATE_RP_FF_FILTER),
         roll_feedforward_filter(AC_ATTITUDE_HELI_RATE_RP_FF_FILTER),
         yaw_velocity_feedforward_filter(AC_ATTITUDE_HELI_RATE_Y_VFF_FILTER),
@@ -41,6 +42,9 @@ public:
 	// rate_controller_run - run lowest level body-frame rate controller and send outputs to the motors
 	// should be called at 100hz or more
 	virtual void rate_controller_run();
+
+    // get lean angle max for pilot input that prioritises altitude hold over lean angle
+    float get_althold_lean_angle_max() const;
 
 	// use_leaky_i - controls whether we use leaky i term for body-frame to motor output stage
 	void use_leaky_i(bool leaky_i) {  _flags_heli.leaky_i = leaky_i; }

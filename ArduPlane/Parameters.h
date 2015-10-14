@@ -3,7 +3,7 @@
 #ifndef PARAMETERS_H
 #define PARAMETERS_H
 
-#include <AP_Common.h>
+#include <AP_Common/AP_Common.h>
 
 // Global parameter class.
 //
@@ -91,7 +91,7 @@ public:
         k_param_scheduler,
         k_param_relay,
         k_param_takeoff_throttle_delay,
-        k_param_skip_gyro_cal,
+        k_param_skip_gyro_cal, // unused
         k_param_auto_fbw_steer,
         k_param_waypoint_max_radius,
         k_param_ground_steer_alt,        
@@ -101,7 +101,7 @@ public:
         k_param_sonar_old, // unused
         k_param_log_bitmask,
         k_param_BoardConfig,
-        k_param_rssi_range,
+        k_param_rssi_range,     // unused, replaced by rssi_ library parameters
         k_param_flapin_channel,
         k_param_flaperon_output,
         k_param_gps,
@@ -139,7 +139,11 @@ public:
         k_param_rudder_only,
         k_param_gcs3,            // 93
         k_param_gcs_pid_mask,
-
+        k_param_crash_detection_enable,
+        k_param_land_abort_throttle_enable,
+        k_param_rssi = 97,
+        k_param_rpm_sensor,
+        
         // 100: Arming parameters
         k_param_arming = 100,
 
@@ -194,6 +198,7 @@ public:
         k_param_NavEKF,  // Extended Kalman Filter Inertial Navigation Group
         k_param_mission, // mission library
         k_param_serial_manager, // serial manager library
+        k_param_NavEKF2,  // EKF2
 
         //
         // 150: Navigation parameters
@@ -221,9 +226,9 @@ public:
         // Battery monitoring parameters
         //
         k_param_battery = 166,
-        k_param_rssi_pin,
-        k_param_battery_volt_pin,   // unused
-        k_param_battery_curr_pin,   // unused - 169
+        k_param_rssi_pin,               // unused, replaced by rssi_ library parameters - 167
+        k_param_battery_volt_pin,       // unused - 168
+        k_param_battery_curr_pin,       // unused - 169
 
         //
         // 170: Radio settings
@@ -338,6 +343,7 @@ public:
     AP_Int8  rtl_autoland;
 
     AP_Int8  trim_rc_at_start;
+    AP_Int8  crash_detection_enable;
 
     // Feed-forward gains
     //
@@ -357,8 +363,6 @@ public:
     // attitude controller type.
     AP_Int8  att_controller;
 
-    // skip gyro calibration
-    AP_Int8  skip_gyro_cal;
     AP_Int8  auto_fbw_steer;
 
     // Estimation
@@ -444,11 +448,14 @@ public:
     AP_Int32 RTL_altitude_cm;
     AP_Float land_flare_alt;
     AP_Int8 land_disarm_delay;
+    AP_Int8 land_abort_throttle_enable;
     AP_Int32 min_gndspeed_cm;
     AP_Int16 pitch_trim_cd;
     AP_Int16 FBWB_min_altitude_cm;
     AP_Int8  hil_servos;
+#if HIL_SUPPORT
     AP_Int8  hil_mode;
+#endif
 
     AP_Int8 compass_enabled;
     AP_Int8 flap_1_percent;
@@ -456,9 +463,7 @@ public:
     AP_Int8 flap_2_percent;
     AP_Int8 flap_2_speed;
     AP_Int8 land_flap_percent;
-    AP_Int8 takeoff_flap_percent;
-    AP_Int8 rssi_pin;
-    AP_Float rssi_range;             // allows to set max voltage for rssi pin such as 5.0, 3.3 etc.     
+    AP_Int8 takeoff_flap_percent;  
     AP_Int8 inverted_flight_ch;             // 0=disabled, 1-8 is channel for inverted flight trigger
     AP_Int8 stick_mixing;
     AP_Float takeoff_throttle_min_speed;

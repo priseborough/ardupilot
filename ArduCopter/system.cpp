@@ -122,9 +122,10 @@ void Copter::init_ardupilot()
 
     // initialise battery monitor
     battery.init();
-    
-    rssi_analog_source      = hal.analogin->channel(g.rssi_pin);
 
+    // Init RSSI
+    rssi.init();
+    
     barometer.init();
 
     // Register the mavlink service callback. This will run
@@ -165,6 +166,11 @@ void Copter::init_ardupilot()
     log_init();
 #endif
 
+#if FRAME_CONFIG == HELI_FRAME
+    // trad heli specific initialisation
+    heli_init();
+#endif
+    
     init_rc_in();               // sets up rc channels from radio
     init_rc_out();              // sets up motors and output to escs
 
@@ -202,6 +208,11 @@ void Copter::init_ardupilot()
     camera_mount.init(serial_manager);
 #endif
 
+#if PRECISION_LANDING == ENABLED
+    // initialise precision landing
+    init_precland();
+#endif
+
 #ifdef USERHOOK_INIT
     USERHOOK_INIT
 #endif
@@ -223,7 +234,7 @@ void Copter::init_ardupilot()
     while (barometer.get_last_update() == 0) {
         // the barometer begins updating when we get the first
         // HIL_STATE message
-        gcs_send_text_P(SEVERITY_LOW, PSTR("Waiting for first HIL_STATE message"));
+        gcs_send_text_P(MAV_SEVERITY_WARNING, PSTR("Waiting for first HIL_STATE message"));
         delay(1000);
     }
 
@@ -240,6 +251,9 @@ void Copter::init_ardupilot()
     init_sonar();
 #endif
 
+    // initialise AP_RPM library
+    rpm_sensor.init();
+
     // initialise mission library
     mission.init();
 
@@ -248,16 +262,11 @@ void Copter::init_ardupilot()
     reset_control_switch();
     init_aux_switches();
 
-#if FRAME_CONFIG == HELI_FRAME
-    // trad heli specific initialisation
-    heli_init();
-#endif
+    startup_INS_ground();
 
-    startup_ground(true);
-
-#if LOGGING_ENABLED == ENABLED
-    Log_Write_Startup();
-#endif
+    // set landed flags
+    set_land_complete(true);
+    set_land_complete_maybe(true);
 
     // we don't want writes to the serial port to cause us to pause
     // mid-flight, so set the serial ports non-blocking once we are
@@ -270,6 +279,9 @@ void Copter::init_ardupilot()
     ins.set_raw_logging(should_log(MASK_LOG_IMU_RAW));
     ins.set_dataflash(&DataFlash);
 
+    // init vehicle capabilties
+    init_capabilities();
+
     cliSerial->print_P(PSTR("\nReady to FLY "));
 
     // flag that initialisation has completed
@@ -280,30 +292,32 @@ void Copter::init_ardupilot()
 //******************************************************************************
 //This function does all the calibrations, etc. that we need during a ground start
 //******************************************************************************
-void Copter::startup_ground(bool force_gyro_cal)
+void Copter::startup_INS_ground()
 {
-    gcs_send_text_P(SEVERITY_LOW,PSTR("GROUND START"));
-
     // initialise ahrs (may push imu calibration into the mpu6000 if using that device).
     ahrs.init();
     ahrs.set_vehicle_class(AHRS_VEHICLE_COPTER);
 
-    // Warm up and read Gyro offsets
-    // -----------------------------
-    ins.init(force_gyro_cal?AP_InertialSensor::COLD_START:AP_InertialSensor::WARM_START,
-             ins_sample_rate);
- #if CLI_ENABLED == ENABLED
-    report_ins();
- #endif
+    // Warm up and calibrate gyro offsets
+    ins.init(ins_sample_rate);
+
+    // reset ahrs including gyro bias
+    ahrs.reset();
+}
+
+// calibrate gyros - returns true if succesfully calibrated
+bool Copter::calibrate_gyros()
+{
+    // gyro offset calibration
+    copter.ins.init_gyro();
 
     // reset ahrs gyro bias
-    if (force_gyro_cal) {
-        ahrs.reset_gyro_drift();
+    if (copter.ins.gyro_calibrated_ok_all()) {
+        copter.ahrs.reset_gyro_drift();
+        return true;
     }
 
-    // set landed flag
-    set_land_complete(true);
-    set_land_complete_maybe(true);
+    return false;
 }
 
 // position_ok - returns true if the horizontal absolute position is ok and home position is set
@@ -315,7 +329,7 @@ bool Copter::position_ok()
     }
 
     // check ekf position estimate
-    return ekf_position_ok();
+    return (ekf_position_ok() || optflow_position_ok());
 }
 
 // ekf_position_ok - returns true if the ekf claims it's horizontal absolute position estimate is ok and home position is set
@@ -351,7 +365,13 @@ bool Copter::optflow_position_ok()
 
     // get filter status from EKF
     nav_filter_status filt_status = inertial_nav.get_filter_status();
-    return (filt_status.flags.horiz_pos_rel || filt_status.flags.pred_horiz_pos_rel);
+
+    // if disarmed we accept a predicted horizontal relative position
+    if (!motors.armed()) {
+        return (filt_status.flags.pred_horiz_pos_rel);
+    } else {
+        return (filt_status.flags.horiz_pos_rel && !filt_status.flags.const_pos_mode);
+    }
 #endif
 }
 
@@ -424,8 +444,6 @@ bool Copter::should_log(uint32_t mask)
     }
     bool ret = motors.armed() || (g.log_bitmask & MASK_LOG_WHEN_DISARMED) != 0;
     if (ret && !DataFlash.logging_started() && !in_log_download) {
-        // we have to set in_mavlink_delay to prevent logging while
-        // writing headers
         start_logging();
     }
     return ret;

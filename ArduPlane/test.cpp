@@ -179,7 +179,7 @@ int8_t Plane::test_failsafe(uint8_t argc, const Menu::arg *argv)
             fail_test++;
         }
 
-        if(g.throttle_fs_enabled && channel_throttle->get_failsafe()) {
+        if(rc_failsafe_active()) {
             cliSerial->printf_P(PSTR("THROTTLE FAILSAFE ACTIVATED: %d, "), (int)channel_throttle->radio_in);
             print_flight_mode(cliSerial, readSwitch());
             cliSerial->println();
@@ -373,8 +373,7 @@ int8_t Plane::test_ins(uint8_t argc, const Menu::arg *argv)
     ahrs.set_fly_forward(true);
     ahrs.set_wind_estimation(true);
 
-    ins.init(AP_InertialSensor::COLD_START, 
-             ins_sample_rate);
+    ins.init(ins_sample_rate);
     ahrs.reset();
 
     print_hit_enter();
@@ -435,8 +434,7 @@ int8_t Plane::test_mag(uint8_t argc, const Menu::arg *argv)
     ahrs.set_compass(&compass);
 
     // we need the AHRS initialised for this test
-    ins.init(AP_InertialSensor::COLD_START, 
-             ins_sample_rate);
+    ins.init(ins_sample_rate);
     ahrs.reset();
 
     uint16_t counter = 0;
@@ -465,8 +463,8 @@ int8_t Plane::test_mag(uint8_t argc, const Menu::arg *argv)
             counter++;
             if (counter>20) {
                 if (compass.healthy()) {
-                    const Vector3f &mag_ofs = compass.get_offsets();
-                    const Vector3f &mag = compass.get_field();
+                    const Vector3f &mag_ofs = compass.get_offsets_milligauss();
+                    const Vector3f &mag = compass.get_field_milligauss();
                     cliSerial->printf_P(PSTR("Heading: %ld, XYZ: %.0f, %.0f, %.0f,\tXYZoff: %6.2f, %6.2f, %6.2f\n"),
                                         (wrap_360_cd(ToDeg(heading) * 100)) /100,
                                         (double)mag.x, (double)mag.y, (double)mag.z,

@@ -95,12 +95,14 @@ void Plane::init_ardupilot()
     //
     load_parameters();
 
+#if HIL_SUPPORT
     if (g.hil_mode == 1) {
         // set sensors to HIL mode
         ins.set_hil_mode();
         compass.set_hil_mode();
         barometer.set_hil_mode();
     }
+#endif
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_PX4
     // this must be before BoardConfig.init() so if
@@ -135,6 +137,8 @@ void Plane::init_ardupilot()
 
     // initialise battery monitoring
     battery.init();
+
+    rpm_sensor.init();
 
     // init the GCS
     gcs[0].setup_uart(serial_manager, AP_SerialManager::SerialProtocol_Console, 0);
@@ -176,7 +180,11 @@ void Plane::init_ardupilot()
     airspeed.init();
 
     if (g.compass_enabled==true) {
-        if (!compass.init() || !compass.read()) {
+        bool compass_ok = compass.init() && compass.read();
+#if HIL_SUPPORT
+        compass_ok = true;
+#endif
+        if (!compass_ok) {
             cliSerial->println_P(PSTR("Compass initialisation failed!"));
             g.compass_enabled = false;
         } else {
@@ -184,8 +192,10 @@ void Plane::init_ardupilot()
         }
     }
     
+#if OPTFLOW == ENABLED
     // make optflow available to libraries
     ahrs.set_optflow(&optflow);
+#endif
 
     // Register mavlink_delay_cb, which will run anytime you have
     // more than 5ms remaining in your call to hal.scheduler->delay
@@ -231,8 +241,9 @@ void Plane::init_ardupilot()
     }
 #endif // CLI_ENABLED
 
+    init_capabilities();
+
     startup_ground();
-    Log_Write_Startup(TYPE_GROUNDSTART_MSG);
 
     // choose the nav controller
     set_nav_controller();
@@ -257,17 +268,17 @@ void Plane::startup_ground(void)
 {
     set_mode(INITIALISING);
 
-    gcs_send_text_P(SEVERITY_LOW,PSTR("<startup_ground> GROUND START"));
+    gcs_send_text_P(MAV_SEVERITY_WARNING,PSTR("<startup_ground> GROUND START"));
 
 #if (GROUND_START_DELAY > 0)
-    gcs_send_text_P(SEVERITY_LOW,PSTR("<startup_ground> With Delay"));
+    gcs_send_text_P(MAV_SEVERITY_WARNING,PSTR("<startup_ground> With Delay"));
     delay(GROUND_START_DELAY * 1000);
 #endif
 
     // Makes the servos wiggle
     // step 1 = 1 wiggle
     // -----------------------
-    if (!g.skip_gyro_cal) {
+    if (ins.gyro_calibration_timing() != AP_InertialSensor::GYRO_CAL_NEVER) {
         demo_servos(1);
     }
 
@@ -291,7 +302,7 @@ void Plane::startup_ground(void)
 
     // Makes the servos wiggle - 3 times signals ready to fly
     // -----------------------
-    if (!g.skip_gyro_cal) {
+    if (ins.gyro_calibration_timing() != AP_InertialSensor::GYRO_CAL_NEVER) {
         demo_servos(3);
     }
 
@@ -307,7 +318,7 @@ void Plane::startup_ground(void)
     ins.set_raw_logging(should_log(MASK_LOG_IMU_RAW));
     ins.set_dataflash(&DataFlash);    
 
-    gcs_send_text_P(SEVERITY_LOW,PSTR("\n\n Ready to FLY."));
+    gcs_send_text_P(MAV_SEVERITY_WARNING,PSTR("\n\n Ready to FLY."));
 }
 
 enum FlightMode Plane::get_previous_mode() {
@@ -341,6 +352,9 @@ void Plane::set_mode(enum FlightMode mode)
     // zero locked course
     steer_state.locked_course_err = 0;
 
+    // reset crash detection
+    crash_state.is_crashed = false;
+
     // set mode
     previous_mode = control_mode;
     control_mode = mode;
@@ -356,6 +370,9 @@ void Plane::set_mode(enum FlightMode mode)
 
     // disable taildrag takeoff on mode change
     auto_state.fbwa_tdrag_takeoff_mode = false;
+
+    // start with previous WP at current location
+    prev_WP_loc = current_loc;
 
     switch(control_mode)
     {
@@ -474,7 +491,13 @@ void Plane::exit_mode(enum FlightMode mode)
     if (mode == AUTO) {
         if (mission.state() == AP_Mission::MISSION_RUNNING) {
             mission.stop();
+
+            if (mission.get_current_nav_cmd().id == MAV_CMD_NAV_LAND)
+            {
+                restart_landing_sequence();
+            }
         }
+        auto_state.started_flying_in_auto_ms = 0;
     }
 }
 
@@ -534,25 +557,19 @@ void Plane::check_short_failsafe()
 
 void Plane::startup_INS_ground(void)
 {
+#if HIL_SUPPORT
     if (g.hil_mode == 1) {
         while (barometer.get_last_update() == 0) {
             // the barometer begins updating when we get the first
             // HIL_STATE message
-            gcs_send_text_P(SEVERITY_LOW, PSTR("Waiting for first HIL_STATE message"));
+            gcs_send_text_P(MAV_SEVERITY_WARNING, PSTR("Waiting for first HIL_STATE message"));
             hal.scheduler->delay(1000);
         }
     }
+#endif
 
-    AP_InertialSensor::Start_style style;
-    if (g.skip_gyro_cal) {
-        style = AP_InertialSensor::WARM_START;
-        arming.set_skip_gyro_cal(true);
-    } else {
-        style = AP_InertialSensor::COLD_START;
-    }
-
-    if (style == AP_InertialSensor::COLD_START) {
-        gcs_send_text_P(SEVERITY_MEDIUM, PSTR("Beginning INS calibration; do not move plane"));
+    if (ins.gyro_calibration_timing() != AP_InertialSensor::GYRO_CAL_NEVER) {
+        gcs_send_text_P(MAV_SEVERITY_ALERT, PSTR("Beginning INS calibration; do not move plane"));
         hal.scheduler->delay(100);
     }
 
@@ -561,7 +578,7 @@ void Plane::startup_INS_ground(void)
     ahrs.set_vehicle_class(AHRS_VEHICLE_FIXED_WING);
     ahrs.set_wind_estimation(true);
 
-    ins.init(style, ins_sample_rate);
+    ins.init(ins_sample_rate);
     ahrs.reset();
 
     // read Baro pressure at ground
@@ -573,7 +590,7 @@ void Plane::startup_INS_ground(void)
         // --------------------------
         zero_airspeed(true);
     } else {
-        gcs_send_text_P(SEVERITY_LOW,PSTR("NO airspeed"));
+        gcs_send_text_P(MAV_SEVERITY_WARNING,PSTR("NO airspeed"));
     }
 }
 
@@ -677,12 +694,14 @@ void Plane::print_comma(void)
  */
 void Plane::servo_write(uint8_t ch, uint16_t pwm)
 {
+#if HIL_SUPPORT
     if (g.hil_mode==1 && !g.hil_servos) {
         if (ch < 8) {
             RC_Channel::rc_channel(ch)->radio_out = pwm;
         }
         return;
     }
+#endif
     hal.rcout->enable_ch(ch);
     hal.rcout->write(ch, pwm);
 }
@@ -692,6 +711,7 @@ void Plane::servo_write(uint8_t ch, uint16_t pwm)
  */
 bool Plane::should_log(uint32_t mask)
 {
+#if LOGGING_ENABLED == ENABLED
     if (!(mask & g.log_bitmask) || in_mavlink_delay) {
         return false;
     }
@@ -699,13 +719,12 @@ bool Plane::should_log(uint32_t mask)
     if (ret && !DataFlash.logging_started() && !in_log_download) {
         // we have to set in_mavlink_delay to prevent logging while
         // writing headers
-        in_mavlink_delay = true;
-        #if LOGGING_ENABLED == ENABLED
         start_logging();
-        #endif
-        in_mavlink_delay = false;
     }
     return ret;
+#else
+    return false;
+#endif
 }
 
 /*
@@ -737,11 +756,6 @@ void Plane::change_arm_state(void)
     Log_Arm_Disarm();
     hal.util->set_soft_armed(arming.is_armed() &&
                              hal.util->safety_switch_state() != AP_HAL::Util::SAFETY_DISARMED);
-
-    // log the mode, so the following log is recorded as the correct mode
-    if (should_log(MASK_LOG_MODE)) {
-        DataFlash.Log_Write_Mode(control_mode);
-    }
 }
 
 /*

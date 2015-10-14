@@ -215,7 +215,8 @@ struct PACKED log_Startup {
     uint16_t command_total;
 };
 
-void Rover::Log_Write_Startup(uint8_t type)
+// do not add any extra log writes to this function; see LogStartup.cpp
+bool Rover::Log_Write_Startup(uint8_t type)
 {
     struct log_Startup pkt = {
         LOG_PACKET_HEADER_INIT(LOG_STARTUP_MSG),
@@ -223,12 +224,7 @@ void Rover::Log_Write_Startup(uint8_t type)
         startup_type    : type,
         command_total   : mission.num_commands()
     };
-    DataFlash.WriteBlock(&pkt, sizeof(pkt));
-
-    // write all commands to the dataflash as well
-    if (should_log(MASK_LOG_CMD)) {
-        DataFlash.Log_Write_EntireMission(mission);
-    }
+    return DataFlash.WriteBlock(&pkt, sizeof(pkt));
 }
 
 struct PACKED log_Control_Tuning {
@@ -352,6 +348,9 @@ void Rover::Log_Write_RC(void)
 {
     DataFlash.Log_Write_RCIN();
     DataFlash.Log_Write_RCOUT();
+    if (rssi.enabled()) {
+        DataFlash.Log_Write_RSSI(rssi);
+    }
 }
 
 void Rover::Log_Write_Baro(void)
@@ -396,12 +395,17 @@ void Rover::log_init(void)
 {
 	DataFlash.Init(log_structure, ARRAY_SIZE(log_structure));
     if (!DataFlash.CardInserted()) {
-        gcs_send_text_P(SEVERITY_LOW, PSTR("No dataflash card inserted"));
+        gcs_send_text_P(MAV_SEVERITY_WARNING, PSTR("No dataflash card inserted"));
         g.log_bitmask.set(0);
-    } else if (DataFlash.NeedErase()) {
-        gcs_send_text_P(SEVERITY_LOW, PSTR("ERASING LOGS"));
-		do_erase_logs();
+    } else if (DataFlash.NeedPrep()) {
+        gcs_send_text_P(MAV_SEVERITY_WARNING, PSTR("Preparing log system"));
+        DataFlash.Prep();
+        gcs_send_text_P(MAV_SEVERITY_WARNING, PSTR("Prepared log system"));
+        for (uint8_t i=0; i<num_gcs; i++) {
+            gcs[i].reset_cli_timeout();
+        }
     }
+
 	if (g.log_bitmask != 0) {
 		start_logging();
 	}
@@ -423,12 +427,22 @@ void Rover::Log_Read(uint16_t log_num, uint16_t start_page, uint16_t end_page)
 }
 #endif // CLI_ENABLED
 
+void Rover::Log_Write_Vehicle_Startup_Messages()
+{
+    // only 200(?) bytes are guaranteed by DataFlash
+    Log_Write_Startup(TYPE_GROUNDSTART_MSG);
+    DataFlash.Log_Write_Mode(control_mode);
+}
+
 // start a new log
 void Rover::start_logging() 
 {
     in_mavlink_delay = true;
+    DataFlash.set_mission(&mission);
+    DataFlash.setVehicle_Startup_Log_Writer(
+        FUNCTOR_BIND(&rover, &Rover::Log_Write_Vehicle_Startup_Messages, void)
+        );
     DataFlash.StartNewLog();
-    DataFlash.Log_Write_SysInfo(PSTR(FIRMWARE_STRING));
     in_mavlink_delay = false;
 }
 

@@ -81,7 +81,7 @@ void Tracker::init_tracker()
     ahrs.init();
     ahrs.set_fly_forward(false);
 
-    ins.init(AP_InertialSensor::WARM_START, ins_sample_rate);
+    ins.init(ins_sample_rate);
     ahrs.reset();
 
     init_barometer();
@@ -94,15 +94,21 @@ void Tracker::init_tracker()
 
     // use given start positions - useful for indoor testing, and
     // while waiting for GPS lock
-    current_loc.lat = g.start_latitude * 1.0e7f;
-    current_loc.lng = g.start_longitude * 1.0e7f;
+    // sanity check location
+    if (fabsf(current_loc.lat) <= 90.0f && fabsf(current_loc.lng) <= 180.0f) {
+        current_loc.lat = g.start_latitude * 1.0e7f;
+        current_loc.lng = g.start_longitude * 1.0e7f;
+        gcs_send_text_P(MAV_SEVERITY_WARNING, PSTR("ignoring invalid START_LATITUDE or START_LONGITUDE parameter"));
+    }
 
     // see if EEPROM has a default location as well
     if (current_loc.lat == 0 && current_loc.lng == 0) {
         get_home_eeprom(current_loc);
     }
 
-    gcs_send_text_P(SEVERITY_LOW,PSTR("\nReady to track."));
+    init_capabilities();
+
+    gcs_send_text_P(MAV_SEVERITY_WARNING,PSTR("\nReady to track."));
     hal.scheduler->delay(1000); // Why????
 
     set_mode(AUTO); // tracking
@@ -159,6 +165,7 @@ void Tracker::set_home(struct Location temp)
 {
     set_home_eeprom(temp);
     current_loc = temp;
+    GCS_MAVLINK::send_home_all(temp);
 }
 
 void Tracker::arm_servos()

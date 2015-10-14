@@ -27,11 +27,11 @@ Copter::Copter(void) :
     sonar_enabled(true),
     mission(ahrs, 
             FUNCTOR_BIND_MEMBER(&Copter::start_command, bool, const AP_Mission::Mission_Command &),
-            FUNCTOR_BIND_MEMBER(&Copter::verify_command, bool, const AP_Mission::Mission_Command &),
+            FUNCTOR_BIND_MEMBER(&Copter::verify_command_callback, bool, const AP_Mission::Mission_Command &),
             FUNCTOR_BIND_MEMBER(&Copter::exit_mission, void)),
     control_mode(STABILIZE),
 #if FRAME_CONFIG == HELI_FRAME  // helicopter constructor requires more arguments
-    motors(g.rc_7, g.rc_8, g.heli_servo_1, g.heli_servo_2, g.heli_servo_3, g.heli_servo_4, MAIN_LOOP_RATE),
+    motors(g.rc_7, g.heli_servo_rsc, g.heli_servo_1, g.heli_servo_2, g.heli_servo_3, g.heli_servo_4, MAIN_LOOP_RATE),
 #elif FRAME_CONFIG == TRI_FRAME  // tri constructor requires additional rc_7 argument to allow tail servo reversing
     motors(MAIN_LOOP_RATE),
 #elif FRAME_CONFIG == SINGLE_FRAME  // single constructor requires extra servos for flaps
@@ -50,6 +50,7 @@ Copter::Copter(void) :
     guided_mode(Guided_TakeOff),
     rtl_state(RTL_InitialClimb),
     rtl_state_complete(false),
+    rtl_alt(0.0f),
     circle_pilot_yaw_override(false),
     simple_cos_yaw(1.0f),
     simple_sin_yaw(0.0f),
@@ -101,7 +102,6 @@ Copter::Copter(void) :
 #if CAMERA == ENABLED
     camera(&relay),
 #endif
-    rssi_analog_source(NULL),
 #if MOUNT == ENABLED
     camera_mount(ahrs, current_loc),
 #endif
@@ -120,11 +120,18 @@ Copter::Copter(void) :
 #if AP_TERRAIN_AVAILABLE
     terrain(ahrs, mission, rally),
 #endif
+#if PRECISION_LANDING == ENABLED
+    precland(ahrs, inertial_nav, g.pi_precland, MAIN_LOOP_SECONDS),
+#endif
     in_mavlink_delay(false),
     gcs_out_of_time(false),
     param_loader(var_info)
 {
     memset(&current_loc, 0, sizeof(current_loc));
+
+    // init sensor error logging flags
+    sensor_health.baro = true;
+    sensor_health.compass = true;
 }
 
 Copter copter;

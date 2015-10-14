@@ -3,7 +3,7 @@
 #ifndef PARAMETERS_H
 #define PARAMETERS_H
 
-#include <AP_Common.h>
+#include <AP_Common/AP_Common.h>
 
 // Global parameter class.
 //
@@ -16,6 +16,7 @@ public:
         k_param_ahrs,
         k_param_airspeed,
         k_param_NavEKF,
+        k_param_NavEKF2,
         k_param_compass
     };
     AP_Int8 dummy;

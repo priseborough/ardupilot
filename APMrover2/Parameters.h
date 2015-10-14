@@ -3,7 +3,7 @@
 #ifndef PARAMETERS_H
 #define PARAMETERS_H
 
-#include <AP_Common.h>
+#include <AP_Common/AP_Common.h>
 
 // Global parameter class.
 //
@@ -40,7 +40,7 @@ public:
         k_param_rc_14,
 
         // IO pins
-        k_param_rssi_pin = 20,
+        k_param_rssi_pin = 20,      // unused, replaced by rssi_ library parameters
         k_param_battery_volt_pin,
         k_param_battery_curr_pin,
 
@@ -55,7 +55,9 @@ public:
         k_param_serial1_baud,   // deprecated, can be deleted
         k_param_serial2_baud,   // deprecated, can be deleted
 
-
+        // 97: RSSI
+        k_param_rssi = 97,
+                
         // 110: Telemetry control
         //
         k_param_gcs0 = 110, // stream rates for uartA
@@ -65,7 +67,7 @@ public:
         k_param_serial0_baud_old,
         k_param_serial1_baud_old,
         k_param_telem_delay,
-        k_param_skip_gyro_cal,
+        k_param_skip_gyro_cal, // unused
         k_param_gcs2,       // stream rates for uartD
         k_param_serial2_baud_old,
         k_param_serial2_protocol,   // deprecated, can be deleted
@@ -81,6 +83,7 @@ public:
         k_param_steering_learn, // unused
         k_param_NavEKF,  // Extended Kalman Filter Inertial Navigation Group
         k_param_mission, // mission library
+        k_param_NavEKF2,
 
         // 140: battery controls
         k_param_battery_monitoring = 140,   // deprecated, can be deleted
@@ -203,9 +206,6 @@ public:
     AP_Int8	    reset_switch_chan;
     AP_Int8     initial_mode;
 
-    // IO pins
-    AP_Int8     rssi_pin;
-
     // braking
     AP_Int8     braking_percent;
     AP_Float    braking_speederr;
@@ -215,7 +215,6 @@ public:
 	AP_Int16    sysid_this_mav;
 	AP_Int16    sysid_my_gcs;
     AP_Int8     telem_delay;
-    AP_Int8     skip_gyro_cal;
 #if CLI_ENABLED == ENABLED
     AP_Int8     cli_enabled;
 #endif

@@ -16,7 +16,21 @@ static int8_t heli_dynamic_flight_counter;
 // heli_init - perform any special initialisation required for the tradheli
 void Copter::heli_init()
 {
-    // Nothing in here for now.  To-Do: Eliminate this function completely?
+    // helicopters are always using motor interlock
+    set_using_interlock(true);
+
+    /*
+      automatically set H_RSC_MIN and H_RSC_MAX from RC8_MIN and
+      RC8_MAX so that when users upgrade from tradheli version 3.3 to
+      3.4 they get the same throttle range as in previous versions of
+      the code
+     */
+    if (!g.heli_servo_rsc.radio_min.load()) {
+        g.heli_servo_rsc.radio_min.set_and_save(g.rc_8.radio_min.get());
+    }
+    if (!g.heli_servo_rsc.radio_max.load()) {
+        g.heli_servo_rsc.radio_max.set_and_save(g.rc_8.radio_max.get());
+    }
 }
 
 // get_pilot_desired_collective - converts pilot input (from 0 ~ 1000) to a value that can be fed into the channel_throttle->servo_out function
@@ -54,9 +68,15 @@ void Copter::check_dynamic_flight(void)
         moving = (velocity >= HELI_DYNAMIC_FLIGHT_SPEED_MIN);
     }else{
         // with no GPS lock base it on throttle and forward lean angle
-        moving = (motors.get_throttle() > 800.0 || ahrs.pitch_sensor < -1500);
+        moving = (motors.get_throttle() > 800.0f || ahrs.pitch_sensor < -1500);
     }
 
+    if (!moving && sonar_enabled && sonar.status() == RangeFinder::RangeFinder_Good) {
+        // when we are more than 2m from the ground with good
+        // rangefinder lock consider it to be dynamic flight
+        moving = (sonar.distance_cm() > 200);
+    }
+    
     if (moving) {
         // if moving for 2 seconds, set the dynamic flight flag
         if (!heli_flags.dynamic_flight) {
@@ -137,21 +157,31 @@ void Copter::heli_update_rotor_speed_targets()
 
     // get rotor control method
     uint8_t rsc_control_mode = motors.get_rsc_mode();
-    int16_t rsc_control_deglitched = rotor_speed_deglitch_filter.apply(g.rc_8.control_in);
+
+    rsc_control_deglitched = rotor_speed_deglitch_filter.apply(g.rc_8.control_in);
+
 
     switch (rsc_control_mode) {
-        case AP_MOTORS_HELI_RSC_MODE_NONE:
-            // even though pilot passes rotors speed directly to rotor ESC via receiver, motor lib needs to know if
-            // rotor is spinning in case we are using direct drive tailrotor which must be spun up at same time
-        case AP_MOTORS_HELI_RSC_MODE_CH8_PASSTHROUGH:
-            // pass through pilot desired rotor speed
-            motors.set_desired_rotor_speed(rsc_control_deglitched);
+        case ROTOR_CONTROL_MODE_SPEED_PASSTHROUGH:
+            // pass through pilot desired rotor speed if control input is higher than 10, creating a deadband at the bottom
+            if (rsc_control_deglitched > 10) {
+                motors.set_interlock(true);
+                motors.set_desired_rotor_speed(rsc_control_deglitched);
+            } else {
+                motors.set_interlock(false);
+                motors.set_desired_rotor_speed(0);
+            }
             break;
-        case AP_MOTORS_HELI_RSC_MODE_SETPOINT:
-            // pass setpoint through as desired rotor speed
+        case ROTOR_CONTROL_MODE_SPEED_SETPOINT:
+        case ROTOR_CONTROL_MODE_OPEN_LOOP_POWER_OUTPUT:
+        case ROTOR_CONTROL_MODE_CLOSED_LOOP_POWER_OUTPUT:
+            // pass setpoint through as desired rotor speed, this is almost pointless as the Setpoint serves no function in this mode
+            // other than being used to create a crude estimate of rotor speed
             if (rsc_control_deglitched > 0) {
+                motors.set_interlock(true);
                 motors.set_desired_rotor_speed(motors.get_rsc_setpoint());
             }else{
+                motors.set_interlock(false);
                 motors.set_desired_rotor_speed(0);
             }
             break;

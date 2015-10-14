@@ -188,7 +188,12 @@ SIMOUT_PORT="127.0.0.1:"$((5501+10*$INSTANCE))
 FG_PORT="127.0.0.1:"$((5503+10*$INSTANCE))
 
 [ -z "$VEHICLE" ] && {
-    VEHICLE=$(basename $PWD)
+    CDIR="$PWD"
+    rpath=$(which realpath)
+    [ -n "$rpath" ] && {
+        CDIR=$(realpath $CDIR)
+    }
+    VEHICLE=$(basename $CDIR)
 }
 
 [ -z "$FRAME" -a "$VEHICLE" = "APMrover2" ] && {
@@ -243,12 +248,27 @@ case $FRAME in
 	BUILD_TARGET="sitl-octa"
         MODEL="$FRAME"
 	;;
-    heli)
+    heli*)
 	BUILD_TARGET="sitl-heli"
-        MODEL="heli"
+        MODEL="$FRAME"
 	;;
+    heli-dual)
+  BUILD_TARGET="sitl-heli-dual"
+        EXTRA_SIM="$EXTRA_SIM --frame=heli-dual"
+        MODEL="heli-dual"
+  ;;
+    heli-compound)
+  BUILD_TARGET="sitl-heli-compound"
+        EXTRA_SIM="$EXTRA_SIM --frame=heli-compound"
+        MODEL="heli-compound"
+  ;;
     IrisRos)
 	BUILD_TARGET="sitl"
+	;;
+    Gazebo)
+	BUILD_TARGET="sitl"
+        EXTRA_SIM="$EXTRA_SIM --frame=Gazebo"
+        MODEL="$FRAME"
 	;;
     CRRCSim-heli)
 	BUILD_TARGET="sitl-heli"
@@ -277,11 +297,17 @@ if [ -n "$OVERRIDE_BUILD_TARGET" ]; then
 fi
 
 autotest="../Tools/autotest"
-[ -d "$autotest" ] && {
+[ -d "$autotest" ] || {
+    # we are not running from one of the standard vehicle directories. Use 
+    # the location of the sim_vehicle.sh script to find the path
     autotest=$(dirname $(readlink -e $0))
 }
-pushd $autotest/../../$VEHICLE || {
-    echo "Failed to change to vehicle directory for $VEHICLE"
+VEHICLEDIR="$autotest/../../$VEHICLE"
+[ -d "$VEHICLEDIR" ] || {
+    VEHICLEDIR=$(dirname $(readlink -e $VEHICLEDIR))
+}
+pushd $VEHICLEDIR || {
+    echo "Failed to change to vehicle directory for $VEHICLEDIR"
     usage
     exit 1
 }
@@ -388,6 +414,10 @@ elif [ $USE_GDB == 1 ]; then
 else
     $autotest/run_in_terminal_window.sh "ardupilot" $cmd || exit 1
 fi
+fi
+
+if [ $START_HIL == 1 ]; then
+    $autotest/run_in_terminal_window.sh "JSBSim" $autotest/jsb_sim/runsim.py --home $SIMHOME --speedup=$SPEEDUP || exit 1
 fi
 
 trap kill_tasks SIGINT

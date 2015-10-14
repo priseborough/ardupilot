@@ -28,6 +28,10 @@ void Copter::stabilize_run()
     // if not armed or throttle at zero, set throttle to zero and exit immediately
     if(!motors.armed() || ap.throttle_zero) {
         attitude_control.set_throttle_out_unstabilized(0,true,g.throttle_filt);
+        // slow start if landed
+        if (ap.land_complete) {
+            motors.slow_start(true);
+        }
         return;
     }
 
@@ -36,7 +40,7 @@ void Copter::stabilize_run()
 
     // convert pilot input to lean angles
     // To-Do: convert get_pilot_desired_lean_angles to return angles as floats
-    get_pilot_desired_lean_angles(channel_roll->control_in, channel_pitch->control_in, target_roll, target_pitch);
+    get_pilot_desired_lean_angles(channel_roll->control_in, channel_pitch->control_in, target_roll, target_pitch, aparm.angle_max);
 
     // get pilot's desired yaw rate
     target_yaw_rate = get_pilot_desired_yaw_rate(channel_yaw->control_in);

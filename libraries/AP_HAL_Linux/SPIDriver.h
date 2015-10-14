@@ -2,7 +2,7 @@
 #ifndef __AP_HAL_EMPTY_SPIDRIVER_H__
 #define __AP_HAL_EMPTY_SPIDRIVER_H__
 
-#include <AP_HAL_Linux.h>
+#include "AP_HAL_Linux.h"
 #include "Semaphores.h"
 
 // Most platforms won't need to declare the spidev bus offset
@@ -21,7 +21,7 @@ public:
     LinuxSPIDeviceDriver(uint16_t bus, uint16_t subdev, enum AP_HAL::SPIDevice type, uint8_t mode, uint8_t bitsPerWord, int16_t cs_pin, uint32_t lowspeed, uint32_t highspeed);
     void init();
     AP_HAL::Semaphore *get_semaphore();
-    void transaction(const uint8_t *tx, uint8_t *rx, uint16_t len);
+    bool transaction(const uint8_t *tx, uint8_t *rx, uint16_t len);
 
     void cs_assert();
     void cs_release();
@@ -49,13 +49,13 @@ private:
 class Linux::LinuxSPIDeviceManager : public AP_HAL::SPIDeviceManager {
 public:
     void init(void *);
-    AP_HAL::SPIDeviceDriver* device(enum AP_HAL::SPIDevice);
+    AP_HAL::SPIDeviceDriver* device(enum AP_HAL::SPIDevice, uint8_t index = 0);
 
     static AP_HAL::Semaphore *get_semaphore(uint16_t bus);
 
     static void cs_assert(enum AP_HAL::SPIDevice type);
     static void cs_release(enum AP_HAL::SPIDevice type);
-    static void transaction(LinuxSPIDeviceDriver &driver, const uint8_t *tx, uint8_t *rx, uint16_t len);
+    static bool transaction(LinuxSPIDeviceDriver &driver, const uint8_t *tx, uint8_t *rx, uint16_t len);
 
 private:
     static LinuxSPIDeviceDriver _device[];

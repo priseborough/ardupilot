@@ -4,9 +4,9 @@
 
 void Rover::init_barometer(void)
 {
-    gcs_send_text_P(SEVERITY_LOW, PSTR("Calibrating barometer"));    
+    gcs_send_text_P(MAV_SEVERITY_WARNING, PSTR("Calibrating barometer"));    
     barometer.calibrate();
-    gcs_send_text_P(SEVERITY_LOW, PSTR("barometer calibration complete"));
+    gcs_send_text_P(MAV_SEVERITY_WARNING, PSTR("barometer calibration complete"));
 }
 
 void Rover::init_sonar(void)
@@ -25,9 +25,14 @@ void Rover::read_battery(void)
 // RC_CHANNELS_SCALED message
 void Rover::read_receiver_rssi(void)
 {
-    rssi_analog_source->set_pin(g.rssi_pin);
-    float ret = rssi_analog_source->voltage_average() * 50;
-    receiver_rssi = constrain_int16(ret, 0, 255);
+    receiver_rssi = rssi.read_receiver_rssi_uint8();
+}
+
+//Calibrate compass
+void Rover::compass_cal_update() {
+    if (!hal.util->get_soft_armed()) {
+        compass.compass_cal_update();
+    }
 }
 
 // read the sonars

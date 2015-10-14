@@ -23,10 +23,10 @@
 #include <stdlib.h>
 #include <math.h>
 
-#include <AP_HAL.h>
+#include <AP_HAL/AP_HAL.h>
 extern const AP_HAL::HAL& hal;
 
-#include <AP_Math.h>
+#include <AP_Math/AP_Math.h>
 
 #include "RC_Channel.h"
 
@@ -195,13 +195,6 @@ int16_t
 RC_Channel::control_mix(float value)
 {
     return (1 - abs(control_in / _high)) * value + control_in;
-}
-
-// are we below a threshold?
-bool
-RC_Channel::get_failsafe(void)
-{
-    return (radio_in < (radio_min - 50));
 }
 
 // returns just the PWM without the offset from radio_min
@@ -428,10 +421,16 @@ RC_Channel::norm_output()
 {
     int16_t mid = (radio_max + radio_min) / 2;
     float ret;
-    if(radio_out < mid)
+    if (mid <= radio_min) {
+        return 0;
+    }
+    if (radio_out < mid) {
         ret = (float)(radio_out - mid) / (float)(mid - radio_min);
-    else
+    } else if (radio_out > mid) {
         ret = (float)(radio_out - mid) / (float)(radio_max  - mid);
+    } else {
+        ret = 0;
+    }
     if (_reverse == -1) {
 	    ret = -ret;
     }

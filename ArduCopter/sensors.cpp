@@ -4,13 +4,13 @@
 
 void Copter::init_barometer(bool full_calibration)
 {
-    gcs_send_text_P(SEVERITY_LOW, PSTR("Calibrating barometer"));
+    gcs_send_text_P(MAV_SEVERITY_WARNING, PSTR("Calibrating barometer"));
     if (full_calibration) {
         barometer.calibrate();
     }else{
         barometer.update_calibration();
     }
-    gcs_send_text_P(SEVERITY_LOW, PSTR("barometer calibration complete"));
+    gcs_send_text_P(MAV_SEVERITY_WARNING, PSTR("barometer calibration complete"));
 }
 
 // return barometric altitude in centimeters
@@ -67,6 +67,19 @@ int16_t Copter::read_sonar(void)
 #else
     return 0;
 #endif
+}
+
+/*
+  update RPM sensors
+ */
+void Copter::rpm_update(void)
+{
+    rpm_sensor.update();
+    if (rpm_sensor.healthy(0) || rpm_sensor.healthy(1)) {
+        if (should_log(MASK_LOG_RCIN)) {
+            DataFlash.Log_Write_RPM(rpm_sensor);
+        }
+    }
 }
 
 // initialise compass
@@ -158,13 +171,13 @@ void Copter::read_battery(void)
 // RC_CHANNELS_SCALED message
 void Copter::read_receiver_rssi(void)
 {
-    // avoid divide by zero
-    if (g.rssi_range <= 0) {
-        receiver_rssi = 0;
-    }else{
-        rssi_analog_source->set_pin(g.rssi_pin);
-        float ret = rssi_analog_source->voltage_average() * 255 / g.rssi_range;
-        receiver_rssi = constrain_int16(ret, 0, 255);
+    receiver_rssi = rssi.read_receiver_rssi_uint8();
+}
+
+void Copter::compass_cal_update()
+{
+    if (!hal.util->get_soft_armed()) {
+        compass.compass_cal_update();
     }
 }
 

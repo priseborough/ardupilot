@@ -4,9 +4,9 @@
 
 void Tracker::init_barometer(void)
 {
-    gcs_send_text_P(SEVERITY_LOW, PSTR("Calibrating barometer"));    
+    gcs_send_text_P(MAV_SEVERITY_WARNING, PSTR("Calibrating barometer"));    
     barometer.calibrate();
-    gcs_send_text_P(SEVERITY_LOW, PSTR("barometer calibration complete"));
+    gcs_send_text_P(MAV_SEVERITY_WARNING, PSTR("barometer calibration complete"));
 }
 
 // read the barometer and return the updated altitude in meters
@@ -56,6 +56,14 @@ void Tracker::barometer_accumulate(void)
     barometer.accumulate();
 }
 
+/*
+ calibrate compass
+*/
+void Tracker::compass_cal_update() {
+    if (!hal.util->get_soft_armed()) {
+        compass.compass_cal_update();
+    }
+}
 
 /*
   read the GPS

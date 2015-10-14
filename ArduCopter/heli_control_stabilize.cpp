@@ -36,8 +36,11 @@ void Copter::heli_stabilize_run()
     }
     
     if(motors.armed() && heli_flags.init_targets_on_arming) {
-        heli_flags.init_targets_on_arming=false;
         attitude_control.relax_bf_rate_controller();
+        attitude_control.set_yaw_target_to_current_heading();
+        if (motors.rotor_speed_above_critical()) {
+            heli_flags.init_targets_on_arming=false;
+        }
     }
 
     // send RC inputs direct into motors library for use during manual passthrough for helicopter setup
@@ -48,7 +51,7 @@ void Copter::heli_stabilize_run()
 
     // convert pilot input to lean angles
     // To-Do: convert get_pilot_desired_lean_angles to return angles as floats
-    get_pilot_desired_lean_angles(channel_roll->control_in, channel_pitch->control_in, target_roll, target_pitch);
+    get_pilot_desired_lean_angles(channel_roll->control_in, channel_pitch->control_in, target_roll, target_pitch, aparm.angle_max);
 
     // get pilot's desired yaw rate
     target_yaw_rate = get_pilot_desired_yaw_rate(channel_yaw->control_in);

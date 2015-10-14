@@ -1,7 +1,7 @@
 // -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: t -*-
 
 #include "AC_AttitudeControl_Heli.h"
-#include <AP_HAL.h>
+#include <AP_HAL/AP_HAL.h>
 
 // table of user settable parameters
 const AP_Param::GroupInfo AC_AttitudeControl_Heli::var_info[] PROGMEM = {
@@ -94,6 +94,13 @@ void AC_AttitudeControl_Heli::rate_controller_run()
     }
 }
 
+// get lean angle max for pilot input that prioritises altitude hold over lean angle
+float AC_AttitudeControl_Heli::get_althold_lean_angle_max() const
+{
+    // calc maximum tilt angle based on throttle
+    return ToDeg(acos(constrain_float(_throttle_in_filt.get()/900.0f, 0.0f, 1000.0f) / 1000.0f)) * 100.0f;
+}
+
 //
 // private methods
 //
@@ -130,17 +137,11 @@ void AC_AttitudeControl_Heli::rate_bf_to_motor_roll_pitch(float rate_roll_target
 
     // update i term as long as we haven't breached the limits or the I term will certainly reduce
     if (!_flags_heli.limit_roll || ((roll_i>0&&rate_roll_error<0)||(roll_i<0&&rate_roll_error>0))){
-        if (((AP_MotorsHeli&)_motors).has_flybar()) {                              // Mechanical Flybars get regular integral for rate auto trim
-            if (rate_roll_target_cds > -50 && rate_roll_target_cds < 50){       // Frozen at high rates
-                roll_i = _pid_rate_roll.get_i();
-            }
-        }else{
-            if (_flags_heli.leaky_i){
-                roll_i = ((AC_HELI_PID&)_pid_rate_roll).get_leaky_i(AC_ATTITUDE_HELI_RATE_INTEGRATOR_LEAK_RATE);
-            }else{
-                roll_i = _pid_rate_roll.get_i();
-            }
-        }
+		if (_flags_heli.leaky_i){
+			roll_i = ((AC_HELI_PID&)_pid_rate_roll).get_leaky_i(AC_ATTITUDE_HELI_RATE_INTEGRATOR_LEAK_RATE);
+		}else{
+			roll_i = _pid_rate_roll.get_i();
+		}
     }
 
     // get pitch i term
@@ -148,17 +149,11 @@ void AC_AttitudeControl_Heli::rate_bf_to_motor_roll_pitch(float rate_roll_target
 
     // update i term as long as we haven't breached the limits or the I term will certainly reduce
     if (!_flags_heli.limit_pitch || ((pitch_i>0&&rate_pitch_error<0)||(pitch_i<0&&rate_pitch_error>0))){
-        if (((AP_MotorsHeli&)_motors).has_flybar()) {                              // Mechanical Flybars get regular integral for rate auto trim
-            if (rate_pitch_target_cds > -50 && rate_pitch_target_cds < 50){     // Frozen at high rates
-                pitch_i = _pid_rate_pitch.get_i();
-            }
-        }else{
-            if (_flags_heli.leaky_i) {
-                pitch_i = ((AC_HELI_PID&)_pid_rate_pitch).get_leaky_i(AC_ATTITUDE_HELI_RATE_INTEGRATOR_LEAK_RATE);
-            }else{
-                pitch_i = _pid_rate_pitch.get_i();
-            }
-        }
+		if (_flags_heli.leaky_i) {
+			pitch_i = ((AC_HELI_PID&)_pid_rate_pitch).get_leaky_i(AC_ATTITUDE_HELI_RATE_INTEGRATOR_LEAK_RATE);
+		}else{
+			pitch_i = _pid_rate_pitch.get_i();
+		}
     }
     
     roll_ff = roll_feedforward_filter.apply(((AC_HELI_PID&)_pid_rate_roll).get_vff(rate_roll_target_cds), _dt);

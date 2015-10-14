@@ -7,7 +7,7 @@
 #ifndef DataFlash_block_h
 #define DataFlash_block_h
 
-#include <DataFlash_Backend.h>
+#include "DataFlash_Backend.h"
 
 #include <stdint.h>
 
@@ -22,11 +22,13 @@ public:
     virtual bool CardInserted(void) = 0;
 
     // erase handling
-    bool NeedErase(void);
     void EraseAll();
 
+    bool NeedPrep(void);
+    void Prep();
+
     /* Write a block of data at current offset */
-    void WriteBlock(const void *pBuffer, uint16_t size);
+    bool WritePrioritisedBlock(const void *pBuffer, uint16_t size, bool is_critical);
 
     // high level interface
     uint16_t find_last_log(void);
@@ -45,6 +47,8 @@ public:
     void ShowDeviceInfo(AP_HAL::BetterStream *port);
     void ListAvailableLogs(AP_HAL::BetterStream *port);
 #endif
+
+    uint16_t bufferspace_available();
 
 private:
     struct PageHeader {
@@ -86,6 +90,9 @@ private:
     // the data fits within the page, otherwise it will wrap to the
     // start of the page
     virtual bool BlockRead(uint8_t BufferNum, uint16_t IntPageAdr, void *pBuffer, uint16_t size) = 0;
+
+    // erase handling
+    bool NeedErase(void);
 
     // internal high level functions
     void StartRead(uint16_t PageAdr);

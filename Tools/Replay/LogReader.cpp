@@ -1,13 +1,13 @@
-#include <AP_HAL.h>
-#include <AP_Common.h>
-#include <AP_Math.h>
-#include <AP_Airspeed.h>
-#include <AP_Compass.h>
-#include <AP_GPS.h>
-#include <AP_Compass.h>
-#include <AP_Baro.h>
-#include <AP_InertialSensor.h>
-#include <DataFlash.h>
+#include <AP_HAL/AP_HAL.h>
+#include <AP_Common/AP_Common.h>
+#include <AP_Math/AP_Math.h>
+#include <AP_Airspeed/AP_Airspeed.h>
+#include <AP_Compass/AP_Compass.h>
+#include <AP_GPS/AP_GPS.h>
+#include <AP_Compass/AP_Compass.h>
+#include <AP_Baro/AP_Baro.h>
+#include <AP_InertialSensor/AP_InertialSensor.h>
+#include <DataFlash/DataFlash.h>
 
 #include "LogReader.h"
 #include <stdio.h>
@@ -85,7 +85,8 @@ LR_MsgHandler_PARM *parameter_handler;
 /*
   messages which we will be generating, so should be discarded
  */
-static const char *generated_names[] = { "EKF1", "EKF2", "EKF3", "EKF4", "EKF5", 
+static const char *generated_names[] = { "EKF1", "EKF2", "EKF3", "EKF4", "EKF5",
+                                         "NKF1", "NKF2", "NKF3", "NKF4", "NKF5",
                                          "AHR2", "POS", "CHEK", NULL };
 
 /*

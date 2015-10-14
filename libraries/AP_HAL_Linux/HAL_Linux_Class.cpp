@@ -1,16 +1,16 @@
-#include <AP_HAL.h>
+#include <AP_HAL/AP_HAL.h>
 #if CONFIG_HAL_BOARD == HAL_BOARD_LINUX
 
 #include "HAL_Linux_Class.h"
 #include "AP_HAL_Linux_Private.h"
 
-#include <utility/getopt_cpp.h>
+#include <AP_HAL/utility/getopt_cpp.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
 
-#include <AP_HAL_Empty.h>
-#include <AP_HAL_Empty_Private.h>
+#include <AP_HAL_Empty/AP_HAL_Empty.h>
+#include <AP_HAL_Empty/AP_HAL_Empty_Private.h>
 
 using namespace Linux;
 
@@ -21,18 +21,32 @@ static LinuxSPIUARTDriver uartBDriver;
 #else
 static LinuxUARTDriver uartBDriver(false);
 #endif
+#if CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_RASPILOT
+static LinuxRPIOUARTDriver uartCDriver;
+#else
 static LinuxUARTDriver uartCDriver(false);
+#endif
 static LinuxUARTDriver uartEDriver(false);
 
-static LinuxSemaphore  i2cSemaphore;
-#if CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_BBBMINI
-static LinuxI2CDriver  i2cDriver(&i2cSemaphore, "/dev/i2c-2");
+#if CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_BEBOP
+static LinuxSemaphore  i2cSemaphore0;
+static LinuxI2CDriver  i2cDriver0(&i2cSemaphore0, "/dev/i2c-0");
+static LinuxSemaphore  i2cSemaphore1;
+static LinuxI2CDriver  i2cDriver1(&i2cSemaphore1, "/dev/i2c-1");
+static LinuxSemaphore  i2cSemaphore2;
+static LinuxI2CDriver  i2cDriver2(&i2cSemaphore2, "/dev/i2c-2");
+#elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_BBBMINI
+static LinuxSemaphore  i2cSemaphore0;
+static LinuxI2CDriver  i2cDriver0(&i2cSemaphore0, "/dev/i2c-2");
 #else
-static LinuxI2CDriver  i2cDriver(&i2cSemaphore, "/dev/i2c-1");
+static LinuxSemaphore  i2cSemaphore0;
+static LinuxI2CDriver  i2cDriver0(&i2cSemaphore0, "/dev/i2c-1");
 #endif
 static LinuxSPIDeviceManager spiDeviceManager;
 #if CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_NAVIO
 static NavioAnalogIn analogIn;
+#elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_RASPILOT
+static RaspilotAnalogIn analogIn;
 #else
 static LinuxAnalogIn analogIn;
 #endif
@@ -49,12 +63,12 @@ static LinuxStorage storageDriver;
 /*
   use the BBB gpio driver on ERLE, PXF and BBBMINI
  */
-#if CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_PXF || CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_ERLE || CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_BBBMINI
+#if CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_PXF || CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_ERLEBOARD || CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_BBBMINI
 static LinuxGPIO_BBB gpioDriver;
 /*
   use the RPI gpio driver on Navio
  */
-#elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_NAVIO
+#elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_NAVIO || CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_RASPILOT
 static LinuxGPIO_RPI gpioDriver;
 #else
 static Empty::EmptyGPIO gpioDriver;
@@ -63,14 +77,18 @@ static Empty::EmptyGPIO gpioDriver;
 /*
   use the PRU based RCInput driver on ERLE and PXF
  */
-#if CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_PXF || CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_ERLE
+#if CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_PXF || CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_ERLEBOARD
 static LinuxRCInput_PRU rcinDriver;
 #elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_BBBMINI
 static LinuxRCInput_AioPRU rcinDriver;
 #elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_NAVIO
 static LinuxRCInput_Navio rcinDriver;
+#elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_RASPILOT
+static LinuxRCInput_Raspilot rcinDriver;
 #elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_ZYNQ
 static LinuxRCInput_ZYNQ rcinDriver;
+#elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_BEBOP
+static LinuxRCInput_UDP  rcinDriver;
 #else
 static LinuxRCInput rcinDriver;
 #endif
@@ -78,7 +96,7 @@ static LinuxRCInput rcinDriver;
 /*
   use the PRU based RCOutput driver on ERLE and PXF
  */
-#if CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_PXF || CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_ERLE
+#if CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_PXF || CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_ERLEBOARD
 static LinuxRCOutput_PRU rcoutDriver;
 #elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_BBBMINI
 static LinuxRCOutput_AioPRU rcoutDriver;
@@ -86,15 +104,26 @@ static LinuxRCOutput_AioPRU rcoutDriver;
   use the PCA9685 based RCOutput driver on Navio
  */
 #elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_NAVIO
-static LinuxRCOutput_Navio rcoutDriver;
+static LinuxRCOutput_PCA9685 rcoutDriver(PCA9685_PRIMARY_ADDRESS, true, 3, RPI_GPIO_27);
+/*
+ use the STM32 based RCOutput driver on Raspilot
+ */
+#elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_RASPILOT
+static LinuxRCOutput_Raspilot rcoutDriver;
 #elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_ZYNQ
 static LinuxRCOutput_ZYNQ rcoutDriver;
+#elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_BEBOP
+static LinuxRCOutput_Bebop rcoutDriver;
 #else
 static Empty::EmptyRCOutput rcoutDriver;
 #endif
 
 static LinuxScheduler schedulerInstance;
+#if CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_NAVIO || CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_RASPILOT
+static LinuxUtilRPI utilInstance;
+#else
 static LinuxUtil utilInstance;
+#endif
 
 HAL_Linux::HAL_Linux() :
     AP_HAL::HAL(
@@ -103,7 +132,15 @@ HAL_Linux::HAL_Linux() :
         &uartCDriver,
         NULL,            /* no uartD */
         &uartEDriver,
-        &i2cDriver,
+#if CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_BEBOP
+        &i2cDriver0,
+        &i2cDriver1,
+        &i2cDriver2,
+#else
+        &i2cDriver0,
+        NULL,
+        NULL,
+#endif
         &spiDeviceManager,
         &analogIn,
         &storageDriver,
@@ -183,12 +220,18 @@ void HAL_Linux::init(int argc,char* const argv[]) const
 
     scheduler->init(NULL);
     gpio->init();
+#if CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_BEBOP
     i2c->begin();
+    i2c1->begin();
+    i2c2->begin();
+#else
+    i2c->begin();
+#endif
+    spi->init(NULL);
     rcout->init(NULL);
     rcin->init(NULL);
     uartA->begin(115200);    
     uartE->begin(115200);    
-    spi->init(NULL);
     analogin->init(NULL);
     utilInstance.init(argc+gopt.optind-1, &argv[gopt.optind-1]);
 }

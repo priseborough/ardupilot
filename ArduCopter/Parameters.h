@@ -3,7 +3,7 @@
 #ifndef PARAMETERS_H
 #define PARAMETERS_H
 
-#include <AP_Common.h>
+#include <AP_Common/AP_Common.h>
 
 // Global parameter class.
 //
@@ -54,6 +54,7 @@ public:
         k_param_software_type,
         k_param_ins_old,                        // *** Deprecated, remove with next eeprom number change
         k_param_ins,                            // libraries/AP_InertialSensor variables
+        k_param_NavEKF2,
 
         // simulation
         k_param_sitl = 10,
@@ -82,6 +83,9 @@ public:
         // Landing gear object
         k_param_landinggear,    // 18
 
+        // precision landing object
+        k_param_precland,   // 19
+
         // Misc
         //
         k_param_log_bitmask_old = 20,           // Deprecated
@@ -90,7 +94,7 @@ public:
                                                 // change
         k_param_toy_yaw_rate,                   // deprecated - remove
         k_param_crosstrack_min_distance,	// deprecated - remove with next eeprom number change
-        k_param_rssi_pin,
+        k_param_rssi_pin,                   // unused, replaced by rssi_ library parameters
         k_param_throttle_accel_enabled,     // deprecated - remove
         k_param_wp_yaw_behavior,
         k_param_acro_trainer,
@@ -105,7 +109,7 @@ public:
         k_param_battery,
         k_param_fs_batt_mah,
         k_param_angle_rate_max,         // remove
-        k_param_rssi_range,
+        k_param_rssi_range,             // unused, replaced by rssi_ library parameters
         k_param_rc_feel_rp,
         k_param_NavEKF,                 // Extended Kalman Filter Inertial Navigation Group
         k_param_mission,                // mission library
@@ -161,12 +165,18 @@ public:
         k_param_heli_yaw_ff,        // remove
         k_param_heli_stab_col_min,
         k_param_heli_stab_col_max,  // 88
+        k_param_heli_servo_rsc,     // 89 = full!
 
         //
-        // 90: Motors
+        // 90: misc2
         //
         k_param_motors = 90,
+        k_param_disarm_delay,
+        k_param_fs_crash_check,
 
+        // 97: RSSI
+        k_param_rssi = 97,
+                
         //
         // 100: Inertial Nav
         //
@@ -335,7 +345,11 @@ public:
         k_param_autotune_axis_bitmask,
         k_param_autotune_aggressiveness,
         k_param_pi_vel_xy,
-        k_param_fs_ekf_action, // 248
+        k_param_fs_ekf_action,
+        k_param_rtl_climb_min,
+        k_param_rpm_sensor,
+        k_param_autotune_min_d, // 251
+        k_param_pi_precland,    // 252
 
         // 254,255: reserved
     };
@@ -370,9 +384,8 @@ public:
     AP_Int8         compass_enabled;
     AP_Int8         super_simple;
     AP_Int16        rtl_alt_final;
+    AP_Int16        rtl_climb_min;              // rtl minimum climb in cm
 
-    AP_Int8         rssi_pin;
-    AP_Float        rssi_range;                 // allows to set max voltage for rssi pin such as 5.0, 3.3 etc. 
     AP_Int8         wp_yaw_behavior;            // controls how the autopilot controls yaw during missions
     AP_Int8         rc_feel_rp;                 // controls vehicle response to user input with 0 being extremely soft and 100 begin extremely crisp
 
@@ -419,15 +432,18 @@ public:
     AP_Int8         ch11_option;
     AP_Int8         ch12_option;
     AP_Int8         arming_check;
+    AP_Int8         disarm_delay;
 
     AP_Int8         land_repositioning;
     AP_Int8         fs_ekf_action;
+    AP_Int8         fs_crash_check;
     AP_Float        fs_ekf_thresh;
     AP_Int16        gcs_pid_mask;
 
 #if FRAME_CONFIG ==     HELI_FRAME
     // Heli
     RC_Channel      heli_servo_1, heli_servo_2, heli_servo_3, heli_servo_4;     // servos for swash plate and tail
+    RC_Channel      heli_servo_rsc;                                             // servo for rotor speed control output
     AP_Int16        heli_stab_col_min;                                          // min collective while pilot directly controls collective in stabilize mode
     AP_Int16        heli_stab_col_max;                                          // min collective while pilot directly controls collective in stabilize mode
 #endif
@@ -486,6 +502,10 @@ public:
     AC_P                    p_vel_z;
     AC_PID                  pid_accel_z;
 
+#if PRECISION_LANDING == ENABLED
+    AC_PI_2D                pi_precland;
+#endif
+
     AC_P                    p_pos_xy;
     AC_P                    p_stabilize_roll;
     AC_P                    p_stabilize_pitch;
@@ -495,6 +515,7 @@ public:
     // Autotune
     AP_Int8                 autotune_axis_bitmask;
     AP_Float                autotune_aggressiveness;
+    AP_Float                autotune_min_d;
 
     // Note: keep initializers here in the same order as they are declared
     // above.
@@ -505,6 +526,7 @@ public:
         heli_servo_2        (CH_2),
         heli_servo_3        (CH_3),
         heli_servo_4        (CH_4),
+        heli_servo_rsc      (CH_8),
 #endif
 #if FRAME_CONFIG ==     SINGLE_FRAME
         single_servo_1        (CH_1),
@@ -553,6 +575,10 @@ public:
 
         p_vel_z                 (VEL_Z_P),
         pid_accel_z             (ACCEL_Z_P,       ACCEL_Z_I,        ACCEL_Z_D,      ACCEL_Z_IMAX,       ACCEL_Z_FILT_HZ,    MAIN_LOOP_SECONDS),
+
+#if PRECISION_LANDING == ENABLED
+        pi_precland             (PRECLAND_P,      PRECLAND_I,                       PRECLAND_IMAX,      VEL_XY_FILT_HZ,     PRECLAND_UPDATE_TIME),
+#endif
 
         // P controller	        initial P
         //----------------------------------------------------------------------

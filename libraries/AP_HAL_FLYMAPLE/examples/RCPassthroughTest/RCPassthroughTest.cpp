@@ -1,11 +1,11 @@
 
-#include <AP_Common.h>
-#include <AP_Math.h>
-#include <AP_Param.h>
-#include <AP_Progmem.h>
+#include <AP_Common/AP_Common.h>
+#include <AP_Math/AP_Math.h>
+#include <AP_Param/AP_Param.h>
+#include <AP_Progmem/AP_Progmem.h>
 
-#include <AP_HAL.h>
-#include <AP_HAL_FLYMAPLE.h>
+#include <AP_HAL/AP_HAL.h>
+#include <AP_HAL_FLYMAPLE/AP_HAL_FLYMAPLE.h>
 
 const AP_HAL::HAL& hal = AP_HAL_BOARD_DRIVER;
 
@@ -35,12 +35,6 @@ void individualread(AP_HAL::RCInput* in, uint16_t* channels) {
 }
 
 
-void multiwrite(AP_HAL::RCOutput* out, uint16_t* channels) {
-    out->write(0, channels, 8);
-    /* Upper channels duplicate lower channels*/
-    out->write(8, channels, 8);
-}
-
 void individualwrite(AP_HAL::RCOutput* out, uint16_t* channels) {
     for (int ch = 0; ch < 8; ch++) {
         out->write(ch, channels[ch]); 
@@ -64,12 +58,7 @@ void loop (void) {
         if (ctr > 1000)  ctr = 0;
     }
 
-    /* Cycle between individual output and multichannel output */
-    if (ctr % 500 < 250) {
-        multiwrite(hal.rcout, channels);
-    } else {
-        individualwrite(hal.rcout, channels);
-    }
+    individualwrite(hal.rcout, channels);
 
 //    hal.gpio->write(13, 0);
     hal.scheduler->delay(4);

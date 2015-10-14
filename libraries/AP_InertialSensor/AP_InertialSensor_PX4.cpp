@@ -1,13 +1,13 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 
-#include <AP_HAL.h>
+#include <AP_HAL/AP_HAL.h>
 #if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
 
 #include "AP_InertialSensor_PX4.h"
 
 const extern AP_HAL::HAL& hal;
 
-#include <DataFlash.h>
+#include <DataFlash/DataFlash.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -103,6 +103,7 @@ bool AP_InertialSensor_PX4::_init_sensor(void)
 
         switch(devid) {
             case DRV_GYR_DEVTYPE_MPU6000:
+            case DRV_GYR_DEVTYPE_MPU9250:
                 // hardware LPF off
                 ioctl(fd, GYROIOCSHWLOWPASS, 256);
                 // khz sampling
@@ -140,6 +141,7 @@ bool AP_InertialSensor_PX4::_init_sensor(void)
 
         switch(devid) {
             case DRV_ACC_DEVTYPE_MPU6000:
+            case DRV_ACC_DEVTYPE_MPU9250:
                 // hardware LPF off
                 ioctl(fd, ACCELIOCSHWLOWPASS, 256);
                 // khz sampling
@@ -164,6 +166,7 @@ bool AP_InertialSensor_PX4::_init_sensor(void)
         if (samplerate < 100 || samplerate > 10000) {
             hal.scheduler->panic("Invalid accel sample rate");
         }
+        _set_accel_sample_rate(_accel_instance[i], (uint32_t) samplerate);
         _accel_sample_time[i] = 1.0f / samplerate;
     }
 
@@ -188,7 +191,7 @@ bool AP_InertialSensor_PX4::_init_sensor(void)
 void AP_InertialSensor_PX4::_set_accel_filter_frequency(uint8_t filter_hz)
 {
     for (uint8_t i=0; i<_num_accel_instances; i++) {
-        float samplerate = 1.0f / _accel_sample_time[i];
+        float samplerate = _accel_sample_rate(_accel_instance[i]);
         _accel_filter[i].set_cutoff_frequency(samplerate, filter_hz);
     }
 }
@@ -214,7 +217,7 @@ bool AP_InertialSensor_PX4::update(void)
         // calling _publish_accel sets the sensor healthy,
         // so we only want to do this if we have new data from it
         if (_last_accel_timestamp[k] != _last_accel_update_timestamp[k]) {
-            _publish_accel(_accel_instance[k], accel, false);
+            _publish_accel(_accel_instance[k], accel);
             _publish_delta_velocity(_accel_instance[k], _delta_velocity_accumulator[k], _delta_velocity_dt[k]);
             _last_accel_update_timestamp[k] = _last_accel_timestamp[k];
         }
@@ -225,7 +228,7 @@ bool AP_InertialSensor_PX4::update(void)
         // calling _publish_accel sets the sensor healthy,
         // so we only want to do this if we have new data from it
         if (_last_gyro_timestamp[k] != _last_gyro_update_timestamp[k]) {
-            _publish_gyro(_gyro_instance[k], gyro, false);
+            _publish_gyro(_gyro_instance[k], gyro);
             _publish_delta_angle(_gyro_instance[k], _delta_angle_accumulator[k]);
             _last_gyro_update_timestamp[k] = _last_gyro_timestamp[k];
         }
@@ -257,6 +260,7 @@ void AP_InertialSensor_PX4::_new_accel_sample(uint8_t i, accel_report &accel_rep
 
     // apply corrections
     _rotate_and_correct_accel(frontend_instance, accel);
+    _notify_new_accel_raw_sample(frontend_instance, accel);
 
     // apply filter for control path
     _accel_in[i] = _accel_filter[i].apply(accel);
@@ -279,9 +283,6 @@ void AP_InertialSensor_PX4::_new_accel_sample(uint8_t i, accel_report &accel_rep
 
     // publish a temperature (for logging purposed only)
     _publish_temperature(frontend_instance, accel_report.temperature);
-
-    // check noise
-    _imu.calc_vibration_and_clipping(frontend_instance, accel, dt);
 
 #ifdef AP_INERTIALSENSOR_PX4_DEBUG
     _accel_dt_max[i] = max(_accel_dt_max[i],dt);

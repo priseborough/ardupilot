@@ -20,7 +20,7 @@
  */
 
 
-#include <AP_HAL.h>
+#include <AP_HAL/AP_HAL.h>
 #include "AP_Compass_HIL.h"
 
 extern const AP_HAL::HAL& hal;
@@ -53,15 +53,21 @@ AP_Compass_HIL::init(void)
     // register two compass instances
     for (uint8_t i=0; i<HIL_NUM_COMPASSES; i++) {
         _compass_instance[i] = register_compass();
+        set_milligauss_ratio(_compass_instance[i], 1.0f);
     }
     return true;
 }
 
 void AP_Compass_HIL::read()
 {
-    for (uint8_t i=0; i<sizeof(_compass_instance)/sizeof(_compass_instance[0]); i++) {
+    for (uint8_t i=0; i < ARRAY_SIZE(_compass_instance); i++) {
         if (_compass._hil.healthy[i]) {
-            publish_field(_compass._hil.field[_compass_instance[i]], _compass_instance[i]);
+            uint8_t compass_instance = _compass_instance[i];
+            Vector3f field = _compass._hil.field[compass_instance];
+            rotate_field(field, compass_instance);
+            publish_raw_field(field, hal.scheduler->micros(), compass_instance);
+            correct_field(field, compass_instance);
+            publish_filtered_field(field, compass_instance);
         }
     }
 }

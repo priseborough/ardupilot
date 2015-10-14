@@ -20,7 +20,7 @@
  */
 
 
-#include <AP_HAL.h>
+#include <AP_HAL/AP_HAL.h>
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
 #include "AP_Compass_PX4.h"
@@ -95,6 +95,8 @@ bool AP_Compass_PX4::init(void)
         set_external(_instance[i], ioctl(_mag_fd[i], MAGIOCGEXTERNAL, 0) > 0);
         _count[i] = 0;
         _sum[i].zero();
+
+        set_milligauss_ratio(_instance[i], 1.0f);
     }
 
     // give the driver a chance to run, and gather one sample
@@ -113,13 +115,13 @@ void AP_Compass_PX4::read(void)
     accumulate();
 
     for (uint8_t i=0; i<_num_sensors; i++) {
+        uint8_t frontend_instance = _instance[i];
         // avoid division by zero if we haven't received any mag reports
         if (_count[i] == 0) continue;
 
         _sum[i] /= _count[i];
-        _sum[i] *= 1000;
 
-        publish_field(_sum[i], _instance[i]);
+        publish_filtered_field(_sum[i], frontend_instance);
     
         _sum[i].zero();
         _count[i] = 0;
@@ -130,10 +132,30 @@ void AP_Compass_PX4::accumulate(void)
 {
     struct mag_report mag_report;
     for (uint8_t i=0; i<_num_sensors; i++) {
+        uint8_t frontend_instance = _instance[i];
         while (::read(_mag_fd[i], &mag_report, sizeof(mag_report)) == sizeof(mag_report) &&
                mag_report.timestamp != _last_timestamp[i]) {
-            _sum[i] += Vector3f(mag_report.x, mag_report.y, mag_report.z);
+
+            uint32_t time_us = (uint32_t)mag_report.timestamp;
+            // get raw_field - sensor frame, uncorrected
+            Vector3f raw_field = Vector3f(mag_report.x, mag_report.y, mag_report.z)*1.0e3f;
+
+            // rotate raw_field from sensor frame to body frame
+            rotate_field(raw_field, frontend_instance);
+
+            // publish raw_field (uncorrected point sample) for calibration use
+            publish_raw_field(raw_field, time_us, frontend_instance);
+
+            // correct raw_field for known errors
+            correct_field(raw_field, frontend_instance);
+
+            // publish raw_field (corrected point sample) for EKF use
+            publish_unfiltered_field(raw_field, time_us, frontend_instance);
+
+            // accumulate into averaging filter
+            _sum[i] += raw_field;
             _count[i]++;
+
             _last_timestamp[i] = mag_report.timestamp;
         }
     }

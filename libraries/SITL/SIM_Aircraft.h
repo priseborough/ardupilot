@@ -21,8 +21,8 @@
 #define _SIM_AIRCRAFT_H
 
 #include "SITL.h"
-#include <AP_Common.h>
-#include <AP_Math.h>
+#include <AP_Common/AP_Common.h>
+#include <AP_Math/AP_Math.h>
 
 /*
   parent class for all simulator types
@@ -98,6 +98,7 @@ protected:
     uint64_t last_wall_time_us;
     uint8_t instance;
     const char *autotest_dir;
+    const char *frame;
 
     bool on_ground(const Vector3f &pos) const;
 

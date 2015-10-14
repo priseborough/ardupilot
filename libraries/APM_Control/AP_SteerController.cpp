@@ -18,8 +18,8 @@
 //  Based upon the roll controller by Paul Riseborough and Jon Challinger
 //
 
-#include <AP_Math.h>
-#include <AP_HAL.h>
+#include <AP_Math/AP_Math.h>
+#include <AP_HAL/AP_HAL.h>
 #include "AP_SteerController.h"
 
 extern const AP_HAL::HAL& hal;
@@ -68,7 +68,7 @@ const AP_Param::GroupInfo AP_SteerController::var_info[] PROGMEM = {
 
 	// @Param: MINSPD
 	// @DisplayName: Minimum speed
-	// @Description: This is the minimum assumed ground speed in meters/second for steering. Having a minimum speed prevents oscillations when the vehicle first starts moving. The vehicle can still driver slower than this limit, but the steering calculations will be done based on this minimum speed.
+	// @Description: This is the minimum assumed ground speed in meters/second for steering. Having a minimum speed prevents oscillations when the vehicle first starts moving. The vehicle can still drive slower than this limit, but the steering calculations will be done based on this minimum speed.
 	// @Range: 0 5
 	// @Increment: 0.1
     // @Units: m/s

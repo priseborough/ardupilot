@@ -29,9 +29,9 @@
 /// TinyGPS parser by Mikal Hart.
 ///
 
-#include <AP_Common.h>
+#include <AP_Common/AP_Common.h>
 
-#include <AP_Progmem.h>
+#include <AP_Progmem/AP_Progmem.h>
 #include <ctype.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -39,6 +39,13 @@
 #include "AP_GPS_NMEA.h"
 
 extern const AP_HAL::HAL& hal;
+
+// optionally log all NMEA data for debug purposes
+// #define NMEA_LOG_PATH "nmea.log"
+
+#ifdef NMEA_LOG_PATH
+#include <stdio.h>
+#endif
 
 // SiRF init messages //////////////////////////////////////////////////////////
 //
@@ -117,7 +124,17 @@ bool AP_GPS_NMEA::read(void)
 
     numc = port->available();
     while (numc--) {
-        if (_decode(port->read())) {
+        char c = port->read();
+#ifdef NMEA_LOG_PATH
+        static FILE *logf = NULL;
+        if (logf == NULL) {
+            logf = fopen(NMEA_LOG_PATH, "wb");
+        }
+        if (logf != NULL) {
+            ::fwrite(&c, 1, 1, logf);
+        }
+#endif
+        if (_decode(c)) {
             parsed = true;
         }
     }
@@ -131,6 +148,7 @@ bool AP_GPS_NMEA::_decode(char c)
     switch (c) {
     case ',': // term terminators
         _parity ^= c;
+        /* no break */
     case '\r':
     case '\n':
     case '*':
@@ -278,13 +296,12 @@ bool AP_GPS_NMEA::_term_complete()
                     state.location.lat     = _new_latitude;
                     state.location.lng     = _new_longitude;
                     state.ground_speed     = _new_speed*0.01f;
-                    state.ground_course_cd = _new_course;
+                    state.ground_course_cd = wrap_360_cd(_new_course);
                     make_gps_time(_new_date, _new_time * 10);
                     state.last_gps_time_ms = hal.scheduler->millis();
                     // To-Do: add support for proper reporting of 2D and 3D fix
                     state.status           = AP_GPS::GPS_OK_FIX_3D;
                     fill_3d_velocity();
-                    _last_GPRMC_ms = state.last_gps_time_ms;
                     break;
                 case _GPS_SENTENCE_GPGGA:
                     state.location.alt  = _new_altitude;
@@ -294,12 +311,10 @@ bool AP_GPS_NMEA::_term_complete()
                     state.hdop          = _new_hdop;
                     // To-Do: add support for proper reporting of 2D and 3D fix
                     state.status        = AP_GPS::GPS_OK_FIX_3D;
-                    _last_GPGGA_ms = hal.scheduler->millis();
                     break;
                 case _GPS_SENTENCE_GPVTG:
                     state.ground_speed     = _new_speed*0.01f;
-                    state.ground_course_cd = _new_course;
-                    _last_GPVTG_ms = hal.scheduler->millis();
+                    state.ground_course_cd = wrap_360_cd(_new_course);
                     // VTG has no fix indicator, can't change fix status
                     break;
                 }
@@ -323,12 +338,15 @@ bool AP_GPS_NMEA::_term_complete()
     if (_term_number == 0) {
         if (!strcmp_P(_term, _gprmc_string)) {
             _sentence_type = _GPS_SENTENCE_GPRMC;
+            _last_GPRMC_ms = hal.scheduler->millis();
         } else if (!strcmp_P(_term, _gpgga_string)) {
             _sentence_type = _GPS_SENTENCE_GPGGA;
+            _last_GPGGA_ms = hal.scheduler->millis();
         } else if (!strcmp_P(_term, _gpvtg_string)) {
             _sentence_type = _GPS_SENTENCE_GPVTG;
             // VTG may not contain a data qualifier, presume the solution is good
             // unless it tells us otherwise.
+            _last_GPVTG_ms = hal.scheduler->millis();
             _gps_data_good = true;
         } else {
             _sentence_type = _GPS_SENTENCE_OTHER;

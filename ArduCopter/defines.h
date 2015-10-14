@@ -3,7 +3,7 @@
 #ifndef _DEFINES_H
 #define _DEFINES_H
 
-#include <AP_HAL_Boards.h>
+#include <AP_HAL/AP_HAL_Boards.h>
 
 // Just so that it's completely clear...
 #define ENABLED                 1
@@ -184,7 +184,8 @@ enum GuidedMode {
     Guided_TakeOff,
     Guided_WP,
     Guided_Velocity,
-    Guided_PosVel
+    Guided_PosVel,
+    Guided_Angle,
 };
 
 // RTL states
@@ -250,6 +251,7 @@ enum FlipState {
 #define LOG_MOTBATT_MSG                 0x1E
 #define LOG_PARAMTUNE_MSG               0x1F
 #define LOG_HELI_MSG                    0x20
+#define LOG_PRECLAND_MSG                0x21
 
 #define MASK_LOG_ATTITUDE_FAST          (1<<0)
 #define MASK_LOG_ATTITUDE_MED           (1<<1)
@@ -353,6 +355,7 @@ enum FlipState {
 // general error codes
 #define ERROR_CODE_ERROR_RESOLVED           0
 #define ERROR_CODE_FAILED_TO_INITIALISE     1
+#define ERROR_CODE_UNHEALTHY                4
 // subsystem specific error codes -- radio
 #define ERROR_CODE_RADIO_LATE_FRAME         2
 // subsystem specific error codes -- failsafe_thr, batt, gps

@@ -87,7 +87,7 @@ const AP_Param::Info Copter::var_info[] PROGMEM = {
     // @DisplayName: Takeoff trigger deadzone
     // @Description: Offset from mid stick at which takeoff is triggered
     // @User: Standard
-    // @Range 0.0 500.0
+    // @Range: 0.0 500.0
     // @Increment: 10
     GSCALAR(takeoff_trigger_dz, "PILOT_TKOFF_DZ", THR_DZ_DEFAULT),
 
@@ -196,20 +196,14 @@ const AP_Param::Info Copter::var_info[] PROGMEM = {
     // @User: Standard
     GSCALAR(rtl_alt_final,  "RTL_ALT_FINAL", RTL_ALT_FINAL),
 
-    // @Param: RSSI_PIN
-    // @DisplayName: Receiver RSSI sensing pin
-    // @Description: This selects an analog pin for the receiver RSSI voltage. It assumes the voltage is RSSI_RANGE for max rssi, 0V for minimum
-    // @Values: -1:Disabled, 0:APM2 A0, 1:APM2 A1, 2:APM2 A2, 13:APM2 A13, 103:Pixhawk SBUS
+    // @Param: RTL_CLIMB_MIN
+    // @DisplayName: RTL minimum climb
+    // @Description: The vehicle will climb this many cm during the initial climb portion of the RTL
+    // @Units: Centimeters
+    // @Range: 0 3000
+    // @Increment: 10
     // @User: Standard
-    GSCALAR(rssi_pin,            "RSSI_PIN",         -1),
-
-    // @Param: RSSI_RANGE
-    // @DisplayName: Receiver RSSI voltage range
-    // @Description: Receiver RSSI voltage range
-    // @Units: Volt
-    // @Values: 3.3:3.3V, 5:5V
-    // @User: Standard
-    GSCALAR(rssi_range,          "RSSI_RANGE",         5.0f),
+    GSCALAR(rtl_climb_min,  "RTL_CLIMB_MIN",    RTL_CLIMB_MIN_DEFAULT),
 
     // @Param: WP_YAW_BEHAVIOR
     // @DisplayName: Yaw behaviour during missions
@@ -220,7 +214,7 @@ const AP_Param::Info Copter::var_info[] PROGMEM = {
 
     // @Param: RTL_LOIT_TIME
     // @DisplayName: RTL loiter time
-    // @Description: Time (in milliseconds) to loiter above home before begining final descent
+    // @Description: Time (in milliseconds) to loiter above home before beginning final descent
     // @Units: ms
     // @Range: 0 60000
     // @Increment: 1000
@@ -353,12 +347,12 @@ const AP_Param::Info Copter::var_info[] PROGMEM = {
     // @User: Standard
     GSCALAR(log_bitmask,    "LOG_BITMASK",          DEFAULT_LOG_BITMASK),
 
-    // @Param: ESC
+    // @Param: ESC_CALIBRATION
     // @DisplayName: ESC Calibration
     // @Description: Controls whether ArduCopter will enter ESC calibration on the next restart.  Do not adjust this parameter manually.
     // @User: Advanced
-    // @Values: 0:Normal Start-up, 1:Start-up in ESC Calibration mode if throttle high, 2:Start-up in ESC Calibration mode regardless of throttle
-    GSCALAR(esc_calibrate, "ESC",                   0),
+    // @Values: 0:Normal Start-up, 1:Start-up in ESC Calibration mode if throttle high, 2:Start-up in ESC Calibration mode regardless of throttle, 9:Disabled
+    GSCALAR(esc_calibrate, "ESC_CALIBRATION",       0),
 
     // @Param: TUNE
     // @DisplayName: Channel 6 Tuning
@@ -438,11 +432,19 @@ const AP_Param::Info Copter::var_info[] PROGMEM = {
     // @User: Standard
     GSCALAR(arming_check, "ARMING_CHECK",           ARMING_CHECK_ALL),
 
+    // @Param: DISARM_DELAY
+    // @DisplayName: Disarm delay
+    // @Description: Delay before automatic disarm in seconds. A value of zero disables auto disarm.
+    // @Units: Seconds
+    // @Range: 0 127
+    // @User: Advanced
+    GSCALAR(disarm_delay, "DISARM_DELAY",           AUTO_DISARMING_DELAY),
+    
     // @Param: ANGLE_MAX
     // @DisplayName: Angle Max
     // @Description: Maximum lean angle in all flight modes
     // @Units: Centi-degrees
-    // @Range 1000 8000
+    // @Range: 1000 8000
     // @User: Advanced
     ASCALAR(angle_max, "ANGLE_MAX",                 DEFAULT_ANGLE_MAX),
 
@@ -494,6 +496,13 @@ const AP_Param::Info Copter::var_info[] PROGMEM = {
     // @User: Advanced
     GSCALAR(fs_ekf_thresh, "FS_EKF_THRESH",    FS_EKF_THRESHOLD_DEFAULT),
 
+    // @Param: FS_CRASH_CHECK
+    // @DisplayName: Crash check enable
+    // @Description: This enables automatic crash checking. When enabled the motors will disarm if a crash is detected.
+    // @Values: 0:Disabled, 1:Enabled
+    // @User: Advanced
+    GSCALAR(fs_crash_check, "FS_CRASH_CHECK",    1),
+    
 #if FRAME_CONFIG ==     HELI_FRAME
     // @Group: HS1_
     // @Path: ../libraries/RC_Channel/RC_Channel.cpp
@@ -507,6 +516,9 @@ const AP_Param::Info Copter::var_info[] PROGMEM = {
     // @Group: HS4_
     // @Path: ../libraries/RC_Channel/RC_Channel.cpp
     GGROUP(heli_servo_4,    "HS4_", RC_Channel),
+    // @Group: H_RSC_
+    // @Path: ../libraries/RC_Channel/RC_Channel.cpp
+    GGROUP(heli_servo_rsc,    "H_RSC_", RC_Channel),
 
     // @Param: H_STAB_COL_MIN
     // @DisplayName: Heli Stabilize Throttle Collective Minimum
@@ -793,6 +805,13 @@ const AP_Param::Info Copter::var_info[] PROGMEM = {
     // @Description: Throttle acceleration controller D gain.  Compensates for short-term change in desired vertical acceleration vs actual acceleration
     // @Range: 0.000 0.400
     // @User: Standard
+
+    // @Param: ACCEL_Z_FILT_HZ
+    // @DisplayName: Throttle acceleration filter
+    // @Description: Filter applied to acceleration to reduce noise.  Lower values reduce noise but add delay.
+    // @Range: 1.000 100.000
+    // @Units: Hz
+    // @User: Standard
     GGROUP(pid_accel_z, "ACCEL_Z_", AC_PID),
 
     // P controllers
@@ -831,6 +850,28 @@ const AP_Param::Info Copter::var_info[] PROGMEM = {
     // @Range: 0.500 2.000
     // @User: Standard
     GGROUP(p_pos_xy,                "POS_XY_", AC_P),
+
+#if PRECISION_LANDING == ENABLED
+     // @Param: PRECLNDVEL_P
+     // @DisplayName: Precision landing velocity controller P gain
+     // @Description: Precision landing velocity controller P gain
+     // @Range: 0.100 5.000
+     // @User: Advanced
+
+     // @Param: PRECLNDVEL_I
+     // @DisplayName: Precision landing velocity controller I gain
+     // @Description: Precision landing velocity controller I gain
+     // @Range: 0.100 5.000
+     // @User: Advanced
+
+     // @Param: PRECLNDVEL_IMAX
+     // @DisplayName: Precision landing velocity controller I gain maximum
+     // @Description: Precision landing velocity controller I gain maximum
+     // @Range: 0 1000
+     // @Units: cm/s
+     // @User: Standard
+     GGROUP(pi_precland,            "PLAND_", AC_PI_2D),
+#endif
 
     // variables not in the g class which contain EEPROM saved variables
 
@@ -877,8 +918,6 @@ const AP_Param::Info Copter::var_info[] PROGMEM = {
     GOBJECT(circle_nav, "CIRCLE_",  AC_Circle),
 
 #if FRAME_CONFIG == HELI_FRAME
-    // @Group: ATC_
-    // @Path: ../libraries/AC_AttitudeControl/AC_AttitudeControl_Heli.cpp
     GOBJECT(attitude_control, "ATC_", AC_AttitudeControl_Heli),
 #else
     // @Group: ATC_
@@ -920,7 +959,7 @@ const AP_Param::Info Copter::var_info[] PROGMEM = {
     GOBJECT(camera_mount,           "MNT",  AP_Mount),
 #endif
 
-    // @Group: BATT_
+    // @Group: BATT
     // @Path: ../libraries/AP_BattMonitor/AP_BattMonitor.cpp
     GOBJECT(battery,                "BATT",         AP_BattMonitor),
 
@@ -965,8 +1004,8 @@ const AP_Param::Info Copter::var_info[] PROGMEM = {
 
 #if FRAME_CONFIG ==     HELI_FRAME
     // @Group: H_
-    // @Path: ../libraries/AP_Motors/AP_MotorsHeli.cpp
-    GOBJECT(motors, "H_",           AP_MotorsHeli),
+    // @Path: ../libraries/AP_Motors/AP_MotorsHeli_Single.cpp
+    GOBJECT(motors, "H_",           AP_MotorsHeli_Single),
 
 #elif FRAME_CONFIG == SINGLE_FRAME
     // @Group: SS1_
@@ -1003,8 +1042,8 @@ const AP_Param::Info Copter::var_info[] PROGMEM = {
 
 #else
     // @Group: MOT_
-    // @Path: ../libraries/AP_Motors/AP_Motors_Class.cpp
-    GOBJECT(motors, "MOT_",         AP_Motors),
+    // @Path: ../libraries/AP_Motors/AP_MotorsMulticopter.cpp
+    GOBJECT(motors, "MOT_",         AP_MotorsMulticopter),
 #endif
 
     // @Group: RCMAP_
@@ -1015,10 +1054,18 @@ const AP_Param::Info Copter::var_info[] PROGMEM = {
     // @Path: ../libraries/AP_NavEKF/AP_NavEKF.cpp
     GOBJECTN(EKF, NavEKF, "EKF_", NavEKF),
 
+    // @Group: EK2_
+    // @Path: ../libraries/AP_NavEKF2/AP_NavEKF2.cpp
+    GOBJECTN(EKF2, NavEKF2, "EK2_", NavEKF2),
+    
     // @Group: MIS_
     // @Path: ../libraries/AP_Mission/AP_Mission.cpp
     GOBJECT(mission, "MIS_",       AP_Mission),
 
+    // @Group: RSSI_
+    // @Path: ../libraries/AP_RSSI/AP_RSSI.cpp
+    GOBJECT(rssi, "RSSI_",  AP_RSSI),      
+    
 #if CONFIG_SONAR == ENABLED
     // @Group: RNGFND
     // @Path: ../libraries/AP_RangeFinder/RangeFinder.cpp
@@ -1037,7 +1084,17 @@ const AP_Param::Info Copter::var_info[] PROGMEM = {
     GOBJECT(optflow,   "FLOW", OpticalFlow),
 #endif
 
-    // @Param: AUTOTUNE_AXIS_BITMASK
+#if PRECISION_LANDING == ENABLED
+    // @Group: PRECLAND_
+    // @Path: ../libraries/AC_PrecLand/AC_PrecLand.cpp
+    GOBJECT(precland, "PLAND_", AC_PrecLand),
+#endif
+
+    // @Group: RPM
+    // @Path: ../libraries/AP_RPM/AP_RPM.cpp
+    GOBJECT(rpm_sensor, "RPM", AP_RPM),
+
+    // @Param: AUTOTUNE_AXES
     // @DisplayName: Autotune axis bitmask
     // @Description: 1-byte bitmap of axes to autotune
     // @Values: 7:All,1:Roll Only,2:Pitch Only,4:Yaw Only,3:Roll and Pitch,5:Roll and Yaw,6:Pitch and Yaw
@@ -1045,12 +1102,19 @@ const AP_Param::Info Copter::var_info[] PROGMEM = {
     // @User: Standard
     GSCALAR(autotune_axis_bitmask, "AUTOTUNE_AXES", 7),  // AUTOTUNE_AXIS_BITMASK_DEFAULT
 
-    // @Param: AUTOTUNE_AGGRESSIVENESS
-    // @DisplayName: autotune_aggressiveness
-    // @Description: autotune_aggressiveness. Defines the bounce back used to detect size of the D term.
+    // @Param: AUTOTUNE_AGGR
+    // @DisplayName: Autotune aggressiveness
+    // @Description: Autotune aggressiveness. Defines the bounce back used to detect size of the D term.
     // @Range: 0.05 0.10
     // @User: Standard
     GSCALAR(autotune_aggressiveness, "AUTOTUNE_AGGR", 0.1f),
+
+    // @Param: AUTOTUNE_MIN_D
+    // @DisplayName: AutoTune minimum D
+    // @Description: Defines the minimum D gain
+    // @Range: 0.001 0.006
+    // @User: Standard
+    GSCALAR(autotune_min_d, "AUTOTUNE_MIN_D", 0.004f),
 
     AP_VAREND
 };

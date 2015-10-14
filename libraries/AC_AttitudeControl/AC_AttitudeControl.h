@@ -6,14 +6,14 @@
 #ifndef AC_AttitudeControl_H
 #define AC_AttitudeControl_H
 
-#include <AP_Common.h>
-#include <AP_Param.h>
-#include <AP_Math.h>
-#include <AP_InertialSensor.h>
-#include <AP_AHRS.h>
-#include <AP_Motors.h>
-#include <AC_PID.h>
-#include <AC_P.h>
+#include <AP_Common/AP_Common.h>
+#include <AP_Param/AP_Param.h>
+#include <AP_Math/AP_Math.h>
+#include <AP_InertialSensor/AP_InertialSensor.h>
+#include <AP_AHRS/AP_AHRS.h>
+#include <AP_Motors/AP_Motors.h>
+#include <AC_PID/AC_PID.h>
+#include <AC_PID/AC_P.h>
 
 // To-Do: change the name or move to AP_Math?
 #define AC_ATTITUDE_CONTROL_DEGX100 5729.57795f                   // constant to convert from radians to centi-degrees
@@ -41,6 +41,8 @@
 
 #define AC_ATTITUDE_CONTROL_RATE_BF_FF_DEFAULT          1       // body-frame rate feedforward enabled by default
 
+#define AC_ATTITUDE_CONTROL_ALTHOLD_LEANANGLE_FILT_HZ   1.0f    // filter (in hz) of throttle filter used to limit lean angle so that vehicle does not lose altitude
+
 class AC_AttitudeControl {
 public:
 	AC_AttitudeControl( AP_AHRS &ahrs,
@@ -60,7 +62,8 @@ public:
         _pid_rate_yaw(pid_rate_yaw),
         _dt(AC_ATTITUDE_100HZ_DT),
         _angle_boost(0),
-        _acro_angle_switch(0)
+        _acro_angle_switch(0),
+	    _throttle_in_filt(AC_ATTITUDE_CONTROL_ALTHOLD_LEANANGLE_FILT_HZ)
 		{
 			AP_Param::setup_object_defaults(this, var_info);
 
@@ -203,13 +206,16 @@ public:
     //
 
      // set_throttle_out - to be called by upper throttle controllers when they wish to provide throttle output directly to motors
-     void set_throttle_out(float throttle_pwm, bool apply_angle_boost, float filt_cutoff);
+     void set_throttle_out(float throttle_in, bool apply_angle_boost, float filt_cutoff);
 
      // outputs a throttle to all motors evenly with no stabilization
      void set_throttle_out_unstabilized(float throttle_in, bool reset_attitude_control, float filt_cutoff);
 
      // angle_boost - accessor for angle boost so it can be logged
      int16_t angle_boost() const { return _angle_boost; }
+
+     // get lean angle max for pilot input that prioritises altitude hold over lean angle
+     virtual float get_althold_lean_angle_max() const = 0;
 
     //
     // helper functions
@@ -263,7 +269,7 @@ protected:
     //
 
     // calculate total body frame throttle required to produce the given earth frame throttle
-    virtual float get_boosted_throttle(float throttle_in);
+    virtual float get_boosted_throttle(float throttle_in) = 0;
 
     // references to external libraries
     const AP_AHRS&      _ahrs;
@@ -293,6 +299,9 @@ protected:
     Vector3f            _rate_bf_desired;       // body-frame feed forward rates
     int16_t             _angle_boost;           // used only for logging
     int16_t             _acro_angle_switch;           // used only for logging
+
+    // throttle based angle limits
+    LowPassFilterFloat  _throttle_in_filt;      // throttle input from pilot or alt hold controller
 };
 
 #define AC_ATTITUDE_CONTROL_LOG_FORMAT(msg) { msg, sizeof(AC_AttitudeControl::log_Attitude),	\

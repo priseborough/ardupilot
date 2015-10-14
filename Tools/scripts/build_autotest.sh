@@ -88,6 +88,9 @@ report_pull_failure() {
 oldhash=$(cd APM && git rev-parse HEAD)
 
 pushd APM
+git checkout -f master
+git fetch origin
+git reset --hard origin/master
 git pull || report_pull_failure
 git clean -f -f -x -d -d
 git tag autotest-$(date '+%Y-%m-%d-%H%M%S') -m "test tag `date`"
@@ -148,7 +151,7 @@ popd
 githash=$(cd APM && git rev-parse HEAD)
 hdate=$(date +"%Y-%m-%d-%H:%m")
 
-for d in ArduPlane ArduCopter APMrover2; do
+for d in ArduPlane ArduCopter APMrover2 AntennaTracker; do
     pushd APM/$d
     rm -rf ../../buildlogs/$d.build
     (date && TMPDIR=../../buildlogs make) > ../../buildlogs/$d.txt 2>&1

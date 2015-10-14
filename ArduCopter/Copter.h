@@ -1,6 +1,11 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 
+#ifndef _COPTER_H
+#define _COPTER_H
+
 #define THISFIRMWARE "APM:Copter V3.4-dev"
+#define FIRMWARE_VERSION 3,4,0,FIRMWARE_VERSION_TYPE_DEV
+
 /*
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -28,80 +33,87 @@
 #include <stdarg.h>
 
 // Common dependencies
-#include <AP_Common.h>
-#include <AP_Progmem.h>
-#include <AP_Menu.h>
-#include <AP_Param.h>
-#include <StorageManager.h>
+#include <AP_Common/AP_Common.h>
+#include <AP_Progmem/AP_Progmem.h>
+#include <AP_Menu/AP_Menu.h>
+#include <AP_Param/AP_Param.h>
+#include <StorageManager/StorageManager.h>
 // AP_HAL
-#include <AP_HAL.h>
-#include <AP_HAL_AVR.h>
-#include <AP_HAL_SITL.h>
-#include <AP_HAL_PX4.h>
-#include <AP_HAL_VRBRAIN.h>
-#include <AP_HAL_FLYMAPLE.h>
-#include <AP_HAL_Linux.h>
-#include <AP_HAL_Empty.h>
+#include <AP_HAL/AP_HAL.h>
+#include <AP_HAL_AVR/AP_HAL_AVR.h>
+#include <AP_HAL_SITL/AP_HAL_SITL.h>
+#include <AP_HAL_PX4/AP_HAL_PX4.h>
+#include <AP_HAL_VRBRAIN/AP_HAL_VRBRAIN.h>
+#include <AP_HAL_FLYMAPLE/AP_HAL_FLYMAPLE.h>
+#include <AP_HAL_Linux/AP_HAL_Linux.h>
+#include <AP_HAL_Empty/AP_HAL_Empty.h>
 
 // Application dependencies
-#include <GCS.h>
-#include <GCS_MAVLink.h>        // MAVLink GCS definitions
-#include <AP_SerialManager.h>   // Serial manager library
-#include <AP_GPS.h>             // ArduPilot GPS library
-#include <DataFlash.h>          // ArduPilot Mega Flash Memory Library
-#include <AP_ADC.h>             // ArduPilot Mega Analog to Digital Converter Library
-#include <AP_ADC_AnalogSource.h>
-#include <AP_Baro.h>
-#include <AP_Compass.h>         // ArduPilot Mega Magnetometer Library
-#include <AP_Math.h>            // ArduPilot Mega Vector/Matrix math Library
-#include <AP_Curve.h>           // Curve used to linearlise throttle pwm to thrust
-#include <AP_InertialSensor.h>  // ArduPilot Mega Inertial Sensor (accel & gyro) Library
-#include <AP_AHRS.h>
-#include <AP_NavEKF.h>
-#include <AP_Mission.h>         // Mission command library
-#include <AP_Rally.h>           // Rally point library
-#include <AC_PID.h>             // PID library
-#include <AC_PI_2D.h>           // PID library (2-axis)
-#include <AC_HELI_PID.h>        // Heli specific Rate PID library
-#include <AC_P.h>               // P library
-#include <AC_AttitudeControl.h> // Attitude control library
-#include <AC_AttitudeControl_Heli.h> // Attitude control library for traditional helicopter
-#include <AC_PosControl.h>      // Position control library
-#include <RC_Channel.h>         // RC Channel Library
-#include <AP_Motors.h>          // AP Motors library
-#include <AP_RangeFinder.h>     // Range finder library
-#include <AP_OpticalFlow.h>     // Optical Flow library
-#include <Filter.h>             // Filter library
-#include <AP_Buffer.h>          // APM FIFO Buffer
-#include <AP_Relay.h>           // APM relay
-#include <AP_ServoRelayEvents.h>
-#include <AP_Camera.h>          // Photo or video camera
-#include <AP_Mount.h>           // Camera/Antenna mount
-#include <AP_Airspeed.h>        // needed for AHRS build
-#include <AP_Vehicle.h>         // needed for AHRS build
-#include <AP_InertialNav.h>     // ArduPilot Mega inertial navigation library
-#include <AC_WPNav.h>     		// ArduCopter waypoint navigation library
-#include <AC_Circle.h>          // circle navigation library
-#include <AP_Declination.h>     // ArduPilot Mega Declination Helper Library
-#include <AC_Fence.h>           // Arducopter Fence library
-#include <SITL.h>               // software in the loop support
-#include <AP_Scheduler.h>       // main loop scheduler
-#include <AP_RCMapper.h>        // RC input mapping library
-#include <AP_Notify.h>          // Notify library
-#include <AP_BattMonitor.h>     // Battery monitor library
-#include <AP_BoardConfig.h>     // board configuration library
-#include <AP_Frsky_Telem.h>
+#include <GCS_MAVLink/GCS.h>
+#include <GCS_MAVLink/GCS_MAVLink.h>        // MAVLink GCS definitions
+#include <AP_SerialManager/AP_SerialManager.h>   // Serial manager library
+#include <AP_GPS/AP_GPS.h>             // ArduPilot GPS library
+#include <DataFlash/DataFlash.h>          // ArduPilot Mega Flash Memory Library
+#include <AP_ADC/AP_ADC.h>             // ArduPilot Mega Analog to Digital Converter Library
+#include <AP_ADC_AnalogSource/AP_ADC_AnalogSource.h>
+#include <AP_Baro/AP_Baro.h>
+#include <AP_Compass/AP_Compass.h>         // ArduPilot Mega Magnetometer Library
+#include <AP_Math/AP_Math.h>            // ArduPilot Mega Vector/Matrix math Library
+#include <AP_Curve/AP_Curve.h>           // Curve used to linearlise throttle pwm to thrust
+#include <AP_InertialSensor/AP_InertialSensor.h>  // ArduPilot Mega Inertial Sensor (accel & gyro) Library
+#include <AP_AHRS/AP_AHRS.h>
+#include <AP_NavEKF/AP_NavEKF.h>
+#include <AP_NavEKF2/AP_NavEKF2.h>
+#include <AP_Mission/AP_Mission.h>         // Mission command library
+#include <AP_Rally/AP_Rally.h>           // Rally point library
+#include <AC_PID/AC_PID.h>             // PID library
+#include <AC_PID/AC_PI_2D.h>           // PID library (2-axis)
+#include <AC_PID/AC_HELI_PID.h>        // Heli specific Rate PID library
+#include <AC_PID/AC_P.h>               // P library
+#include <AC_AttitudeControl/AC_AttitudeControl_Multi.h> // Attitude control library
+#include <AC_AttitudeControl/AC_AttitudeControl_Heli.h> // Attitude control library for traditional helicopter
+#include <AC_AttitudeControl/AC_PosControl.h>      // Position control library
+#include <RC_Channel/RC_Channel.h>         // RC Channel Library
+#include <AP_Motors/AP_Motors.h>          // AP Motors library
+#include <AP_RangeFinder/AP_RangeFinder.h>     // Range finder library
+#include <AP_OpticalFlow/AP_OpticalFlow.h>     // Optical Flow library
+#include <AP_RSSI/AP_RSSI.h>                   // RSSI Library
+#include <Filter/Filter.h>             // Filter library
+#include <AP_Buffer/AP_Buffer.h>          // APM FIFO Buffer
+#include <AP_Relay/AP_Relay.h>           // APM relay
+#include <AP_ServoRelayEvents/AP_ServoRelayEvents.h>
+#include <AP_Camera/AP_Camera.h>          // Photo or video camera
+#include <AP_Mount/AP_Mount.h>           // Camera/Antenna mount
+#include <AP_Airspeed/AP_Airspeed.h>        // needed for AHRS build
+#include <AP_Vehicle/AP_Vehicle.h>         // needed for AHRS build
+#include <AP_InertialNav/AP_InertialNav.h>     // ArduPilot Mega inertial navigation library
+#include <AC_WPNav/AC_WPNav.h>           // ArduCopter waypoint navigation library
+#include <AC_WPNav/AC_Circle.h>          // circle navigation library
+#include <AP_Declination/AP_Declination.h>     // ArduPilot Mega Declination Helper Library
+#include <AC_Fence/AC_Fence.h>           // Arducopter Fence library
+#include <SITL/SITL.h>               // software in the loop support
+#include <AP_Scheduler/AP_Scheduler.h>       // main loop scheduler
+#include <AP_RCMapper/AP_RCMapper.h>        // RC input mapping library
+#include <AP_Notify/AP_Notify.h>          // Notify library
+#include <AP_BattMonitor/AP_BattMonitor.h>     // Battery monitor library
+#include <AP_BoardConfig/AP_BoardConfig.h>     // board configuration library
+#include <AP_Frsky_Telem/AP_Frsky_Telem.h>
 #if SPRAYER == ENABLED
-#include <AC_Sprayer.h>         // crop sprayer library
+#include <AC_Sprayer/AC_Sprayer.h>         // crop sprayer library
 #endif
 #if EPM_ENABLED == ENABLED
-#include <AP_EPM.h>				// EPM cargo gripper stuff
+#include <AP_EPM/AP_EPM.h>             // EPM cargo gripper stuff
 #endif
 #if PARACHUTE == ENABLED
-#include <AP_Parachute.h>		// Parachute release library
+#include <AP_Parachute/AP_Parachute.h>       // Parachute release library
 #endif
-#include <AP_LandingGear.h>     // Landing Gear library
-#include <AP_Terrain.h>
+#include <AP_LandingGear/AP_LandingGear.h>     // Landing Gear library
+#include <AP_Terrain/AP_Terrain.h>
+#include <AP_RPM/AP_RPM.h>
+#if PRECISION_LANDING == ENABLED
+#include <AC_PrecLand/AC_PrecLand.h>
+#include <AP_IRLock/AP_IRLock.h>
+#endif
 
 // AP_HAL to Arduino compatibility layer
 // Configuration
@@ -122,7 +134,6 @@ class Copter {
     void loop();
 
 private:
-
     // key aircraft parameters passed to multiple libraries
     AP_Vehicle::MultiCopter aparm;
 
@@ -153,7 +164,7 @@ private:
     RC_Channel *channel_yaw;
 
     // Dataflash
-    DataFlash_Class DataFlash;
+    DataFlash_Class DataFlash{FIRMWARE_STRING};
 
     // the rate we run the main loop at
     const AP_InertialSensor::Sample_rate ins_sample_rate;
@@ -168,13 +179,16 @@ private:
     AP_InertialSensor ins;
 
 #if CONFIG_SONAR == ENABLED
-    RangeFinder sonar;
+    RangeFinder sonar {serial_manager};
     bool sonar_enabled; // enable user switch for sonar
 #endif
 
+    AP_RPM rpm_sensor;
+
     // Inertial Navigation EKF
     NavEKF EKF{&ahrs, barometer, sonar};
-    AP_AHRS_NavEKF ahrs{ins, barometer, gps, sonar, EKF};
+    NavEKF2 EKF2{&ahrs, barometer, sonar};
+    AP_AHRS_NavEKF ahrs{ins, barometer, gps, sonar, EKF, EKF2};
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
     SITL sitl;
@@ -193,6 +207,9 @@ private:
 
     // scale factor applied to velocity controller gain to prevent optical flow noise causing excessive angle demand noise
     float ekfNavVelGainScaler;
+
+    // system time in milliseconds of last recorded yaw reset from ekf
+    uint32_t ekfYawReset_ms = 0;
 
     // GCS selection
     AP_SerialManager serial_manager;
@@ -228,6 +245,7 @@ private:
             enum HomeState home_state   : 2; // 18,19   // home status (unset, set, locked)
             uint8_t using_interlock     : 1; // 20      // aux switch motor interlock function is in use
             uint8_t motor_emergency_stop: 1; // 21      // motor estop switch, shuts off motors when enabled
+            uint8_t land_repo_active    : 1; // 22      // true if the pilot is overriding the landing position
         };
         uint32_t value;
     } ap;
@@ -271,6 +289,12 @@ private:
         uint32_t last_heartbeat_ms;      // the time when the last HEARTBEAT message arrived from a GCS - used for triggering gcs failsafe
     } failsafe;
 
+    // sensor health for logging
+    struct {
+        uint8_t baro        : 1;    // true if baro is healthy
+        uint8_t compass     : 1;    // true if compass is healthy
+    } sensor_health;
+
     // Motor Output
 #if FRAME_CONFIG == QUAD_FRAME
  #define MOTOR_CLASS AP_MotorsQuad
@@ -285,7 +309,7 @@ private:
 #elif FRAME_CONFIG == OCTA_QUAD_FRAME
  #define MOTOR_CLASS AP_MotorsOctaQuad
 #elif FRAME_CONFIG == HELI_FRAME
- #define MOTOR_CLASS AP_MotorsHeli
+ #define MOTOR_CLASS AP_MotorsHeli_Single
 #elif FRAME_CONFIG == SINGLE_FRAME
  #define MOTOR_CLASS AP_MotorsSingle
 #elif FRAME_CONFIG == COAX_FRAME
@@ -319,6 +343,7 @@ private:
     // RTL
     RTLState rtl_state;  // records state of rtl (initial climb, returning home, etc)
     bool rtl_state_complete; // set to true if the current state is completed
+    float rtl_alt;     // altitude the vehicle is returning at
 
     // Circle
     bool circle_pilot_yaw_override; // true if pilot is overriding yaw
@@ -405,7 +430,7 @@ private:
 #if FRAME_CONFIG == HELI_FRAME
     AC_AttitudeControl_Heli attitude_control;
 #else
-    AC_AttitudeControl attitude_control;
+    AC_AttitudeControl_Multi attitude_control;
 #endif
     AC_PosControl pos_control;
     AC_WPNav wp_nav;
@@ -437,9 +462,6 @@ private:
     AP_Camera camera;
 #endif
 
-    // a pin for reading the receiver RSSI voltage.
-    AP_HAL::AnalogSource* rssi_analog_source;
-
     // Camera/Antenna mount tracking and stabilisation stuff
 #if MOUNT == ENABLED
     // current_loc uses the baro/gps soloution for altitude rather than gps only.
@@ -455,6 +477,9 @@ private:
 #if AC_RALLY == ENABLED
     AP_Rally rally;
 #endif
+
+    // RSSI 
+    AP_RSSI rssi;      
 
     // Crop Sprayer
 #if SPRAYER == ENABLED
@@ -479,6 +504,11 @@ private:
     AP_Terrain terrain;
 #endif
 
+    // Precision Landing
+#if PRECISION_LANDING == ENABLED
+    AC_PrecLand precland;
+#endif
+
     // use this to prevent recursion during sensor init
     bool in_mavlink_delay;
 
@@ -495,6 +525,8 @@ private:
     // governor.  Even a single "off" frame can cause the rotor to slow dramatically and take a long time to restart.
     ModeFilterInt16_Size5 rotor_speed_deglitch_filter {4};
 
+    int16_t rsc_control_deglitched;
+
     // Tradheli flags
     struct {
         uint8_t dynamic_flight          : 1;    // 0   // true if we are moving at a significant speed (used to turn on/off leaky I terms)
@@ -507,6 +539,7 @@ private:
     static const struct LogStructure log_structure[];
 
     void compass_accumulate(void);
+    void compass_cal_update(void);
     void barometer_accumulate(void);
     void perf_update(void);
     void fast_loop();
@@ -539,7 +572,7 @@ private:
     void set_using_interlock(bool b);
     void set_motor_emergency_stop(bool b);
     float get_smoothing_gain();
-    void get_pilot_desired_lean_angles(float roll_in, float pitch_in, float &roll_out, float &pitch_out);
+    void get_pilot_desired_lean_angles(float roll_in, float pitch_in, float &roll_out, float &pitch_out, float angle_max);
     float get_pilot_desired_yaw_rate(int16_t stick_angle);
     void check_ekf_yaw_reset();
     float get_roi_yaw();
@@ -554,6 +587,7 @@ private:
     float get_surface_tracking_climb_rate(int16_t target_rate, float current_alt_target, float dt);
     void set_accel_throttle_I_from_pilot_throttle(int16_t pilot_throttle);
     void update_poscon_alt_max();
+    void rotate_body_frame_to_NE(float &x, float &y);
     void gcs_send_heartbeat(void);
     void gcs_send_deferred(void);
     void send_heartbeat(mavlink_channel_t chan);
@@ -569,13 +603,16 @@ private:
     void send_vfr_hud(mavlink_channel_t chan);
     void send_current_waypoint(mavlink_channel_t chan);
     void send_rangefinder(mavlink_channel_t chan);
+    void send_rpm(mavlink_channel_t chan);
+    void rpm_update();
     void send_pid_tuning(mavlink_channel_t chan);
     void send_statustext(mavlink_channel_t chan);
     bool telemetry_delayed(mavlink_channel_t chan);
     void gcs_send_message(enum ap_message id);
+    void gcs_send_mission_item_reached_message(uint16_t mission_index);
     void gcs_data_stream_send(void);
     void gcs_check_input(void);
-    void gcs_send_text_P(gcs_severity severity, const prog_char_t *str);
+    void gcs_send_text_P(MAV_SEVERITY severity, const prog_char_t *str);
     void do_erase_logs(void);
     void Log_Write_AutoTune(uint8_t axis, uint8_t tune_step, float meas_target, float meas_min, float meas_max, float new_gain_rp, float new_gain_rd, float new_gain_sp, float new_ddt);
     void Log_Write_AutoTuneDetails(float angle_cd, float rate_cds);
@@ -598,9 +635,12 @@ private:
     void Log_Write_Baro(void);
     void Log_Write_Parameter_Tuning(uint8_t param, float tuning_val, int16_t control_in, int16_t tune_low, int16_t tune_high);
     void Log_Write_Home_And_Origin();
+    void Log_Sensor_Health();
 #if FRAME_CONFIG == HELI_FRAME
     void Log_Write_Heli(void);
 #endif
+    void Log_Write_Precland();
+    void Log_Write_Vehicle_Startup_Messages();
     void Log_Read(uint16_t log_num, uint16_t start_page, uint16_t end_page);
     void start_logging() ;
     void load_parameters(void);
@@ -700,14 +740,17 @@ private:
     void guided_pos_control_start();
     void guided_vel_control_start();
     void guided_posvel_control_start();
+    void guided_angle_control_start();
     void guided_set_destination(const Vector3f& destination);
     void guided_set_velocity(const Vector3f& velocity);
     void guided_set_destination_posvel(const Vector3f& destination, const Vector3f& velocity);
+    void guided_set_angle(const Quaternion &q, float climb_rate_cms);
     void guided_run();
     void guided_takeoff_run();
     void guided_pos_control_run();
     void guided_vel_control_run();
     void guided_posvel_control_run();
+    void guided_angle_control_run();
     void guided_limit_clear();
     void guided_limit_set(uint32_t timeout_ms, float alt_min_cm, float alt_max_cm, float horiz_max_cm);
     void guided_limit_init_time_and_pos();
@@ -786,7 +829,6 @@ private:
     void heli_radio_passthrough();
     bool heli_acro_init(bool ignore_checks);
     void heli_acro_run();
-    void get_pilot_desired_yaw_rate(int16_t yaw_in, float &yaw_out);
     bool heli_stabilize_init(bool ignore_checks);
     void heli_stabilize_run();
     void read_inertia();
@@ -807,6 +849,7 @@ private:
     bool pre_arm_checks(bool display_failure);
     void pre_arm_rc_checks();
     bool pre_arm_gps_checks(bool display_failure);
+    bool pre_arm_ekf_attitude_check();
     bool arm_checks(bool display_failure, bool arming_from_gcs);
     void init_disarm_motors();
     void motors_output();
@@ -845,6 +888,8 @@ private:
     void init_compass();
     void init_optflow();
     void update_optical_flow(void);
+    void init_precland();
+    void update_precland();
     void read_battery(void);
     void read_receiver_rssi(void);
     void epm_update();
@@ -875,7 +920,8 @@ private:
     void save_trim();
     void auto_trim();
     void init_ardupilot();
-    void startup_ground(bool force_gyro_cal);
+    void startup_INS_ground();
+    bool calibrate_gyros();
     bool position_ok();
     bool ekf_position_ok();
     bool optflow_position_ok();
@@ -893,6 +939,7 @@ private:
     void gcs_send_text_fmt(const prog_char_t *fmt, ...);
     bool start_command(const AP_Mission::Mission_Command& cmd);
     bool verify_command(const AP_Mission::Mission_Command& cmd);
+    bool verify_command_callback(const AP_Mission::Mission_Command& cmd);
 
     bool do_guided(const AP_Mission::Mission_Command& cmd);
     void do_takeoff(const AP_Mission::Mission_Command& cmd);
@@ -935,6 +982,8 @@ private:
     void print_flight_mode(AP_HAL::BetterStream *port, uint8_t mode);
     void log_init(void);
     void run_cli(AP_HAL::UARTDriver *port);
+    void init_capabilities(void);
+    void dataflash_periodic(void);
 
 public:
     void mavlink_delay_cb();
@@ -968,3 +1017,5 @@ public:
 
 extern const AP_HAL::HAL& hal;
 extern Copter copter;
+
+#endif // _COPTER_H_

@@ -2,13 +2,18 @@
 #ifndef __AP_HAL_LINUX_RCINPUT_H__
 #define __AP_HAL_LINUX_RCINPUT_H__
 
-#include <AP_HAL_Linux.h>
+#include "AP_HAL_Linux.h"
 
 #define LINUX_RC_INPUT_NUM_CHANNELS 16
 
 class Linux::LinuxRCInput : public AP_HAL::RCInput {
 public:
     LinuxRCInput();
+
+    static LinuxRCInput *from(AP_HAL::RCInput *rcinput) {
+        return static_cast<LinuxRCInput*>(rcinput);
+    }
+
     virtual void init(void* machtnichts);
     bool new_input();
     uint8_t num_channels();
@@ -25,6 +30,7 @@ public:
 
  protected:
     void _process_rc_pulse(uint16_t width_s0, uint16_t width_s1);
+    void _update_periods(uint16_t *periods, uint8_t len);
 
  private:
     volatile bool new_rc_input;

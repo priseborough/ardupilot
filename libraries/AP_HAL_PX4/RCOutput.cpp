@@ -1,6 +1,6 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 
-#include <AP_HAL.h>
+#include <AP_HAL/AP_HAL.h>
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_PX4
 #include "RCOutput.h"
@@ -232,13 +232,6 @@ void PX4RCOutput::write(uint8_t ch, uint16_t period_us)
     if (period_us != _period[ch]) {
         _period[ch] = period_us;
         _need_update = true;
-    }
-}
-
-void PX4RCOutput::write(uint8_t ch, uint16_t* period_us, uint8_t len)
-{
-    for (uint8_t i=0; i<len; i++) {
-        write(i, period_us[i]);
     }
 }
 

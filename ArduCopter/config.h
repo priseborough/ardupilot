@@ -139,6 +139,12 @@
   # define RATE_YAW_I                   0.015f
 #endif
 
+/////////////////////////////////////////////////////////////////////////////////
+// Tri defaults
+#if FRAME_CONFIG == TRI_FRAME
+  # define RATE_YAW_FILT_HZ             100.0f
+#endif
+
 //////////////////////////////////////////////////////////////////////////////
 // PWM control
 // default RC speed in Hz
@@ -227,7 +233,7 @@
 
 // prearm GPS hdop check
 #ifndef GPS_HDOP_GOOD_DEFAULT
- # define GPS_HDOP_GOOD_DEFAULT         230     // minimum hdop that represents a good position.  used during pre-arm checks if fence is enabled
+ # define GPS_HDOP_GOOD_DEFAULT         140     // minimum hdop that represents a good position.  used during pre-arm checks if fence is enabled
 #endif
 
 // GCS failsafe
@@ -237,6 +243,11 @@
 #ifndef FS_GCS_TIMEOUT_MS
  # define FS_GCS_TIMEOUT_MS             5000    // gcs failsafe triggers after 5 seconds with no GCS heartbeat
 #endif
+
+// possible values for FS_GCS parameter
+#define FS_GCS_DISABLED                     0
+#define FS_GCS_ENABLED_ALWAYS_RTL           1
+#define FS_GCS_ENABLED_CONTINUE_MISSION     2
 
 // Radio failsafe while using RC_override
 #ifndef FS_RADIO_RC_OVERRIDE_TIMEOUT_MS
@@ -248,10 +259,9 @@
  #define FS_RADIO_TIMEOUT_MS            500     // RC Radio Failsafe triggers after 500 miliseconds with No RC Input
 #endif
 
-// possible values for FS_GCS parameter
-#define FS_GCS_DISABLED                     0
-#define FS_GCS_ENABLED_ALWAYS_RTL           1
-#define FS_GCS_ENABLED_CONTINUE_MISSION     2
+#ifndef FS_CLOSE_TO_HOME_CM
+ # define FS_CLOSE_TO_HOME_CM               500 // if vehicle within 5m of home, vehicle will LAND instead of RTL during some failsafes
+#endif
 
 // pre-arm baro vs inertial nav max alt disparity
 #ifndef PREARM_MAX_ALT_DISPARITY_CM
@@ -303,11 +313,6 @@
  #endif
 #endif
 
-// arming check's maximum acceptable vector difference between internal and external compass after vectors are normalized to field length of 1.0
-#ifndef COMPASS_ACCEPTABLE_VECTOR_DIFF
-  #define COMPASS_ACCEPTABLE_VECTOR_DIFF    0.75f    // pre arm compass check will fail if internal vs external compass direction differ by more than 45 degrees
- #endif
-
 //////////////////////////////////////////////////////////////////////////////
 //  OPTICAL_FLOW
 #ifndef OPTFLOW
@@ -324,6 +329,12 @@
 //  Crop Sprayer
 #ifndef SPRAYER
  # define SPRAYER  DISABLED
+#endif
+
+//////////////////////////////////////////////////////////////////////////////
+// Precision Landing with companion computer or IRLock sensor
+#ifndef PRECISION_LANDING
+ # define PRECISION_LANDING DISABLED
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -492,6 +503,10 @@
 
 #ifndef RTL_ALT_MIN
  # define RTL_ALT_MIN               200     // min height above ground for RTL (i.e 2m)
+#endif
+
+#ifndef RTL_CLIMB_MIN_DEFAULT
+ # define RTL_CLIMB_MIN_DEFAULT     0       // vehicle will always climb this many cm as first stage of RTL
 #endif
 
 #ifndef RTL_LOITER_TIME
@@ -685,6 +700,10 @@
 // the acceleration used to define the distance-velocity curve
 #ifndef ALT_HOLD_ACCEL_MAX
  # define ALT_HOLD_ACCEL_MAX 250    // if you change this you must also update the duplicate declaration in AC_WPNav.h
+#endif
+
+#ifndef AUTO_DISARMING_DELAY
+# define AUTO_DISARMING_DELAY  10
 #endif
 
 //////////////////////////////////////////////////////////////////////////////

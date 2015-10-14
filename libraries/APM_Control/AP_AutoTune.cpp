@@ -33,9 +33,9 @@
    just need to be able to enter and exit AUTOTUNE mode
 */
 
-#include <AP_HAL.h>
-#include <AP_Common.h>
-#include <AP_Math.h>
+#include <AP_HAL/AP_HAL.h>
+#include <AP_Common/AP_Common.h>
+#include <AP_Math/AP_Math.h>
 #include "AP_AutoTune.h"
 
 extern const AP_HAL::HAL& hal;
@@ -125,8 +125,8 @@ void AP_AutoTune::start(void)
     restore = current;
 
     uint8_t level = aparm.autotune_level;
-    if (level > sizeof(tuning_table)/sizeof(tuning_table[0])) {
-        level = sizeof(tuning_table)/sizeof(tuning_table[0]);
+    if (level > ARRAY_SIZE(tuning_table)) {
+        level = ARRAY_SIZE(tuning_table);
     }
     if (level < 1) {
         level = 1;

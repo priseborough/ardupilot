@@ -55,8 +55,13 @@ void Rover::read_radio()
 
 	channel_throttle->servo_out = channel_throttle->control_in;
 
-	if (abs(channel_throttle->servo_out) > 50) {
-        throttle_nudge = (g.throttle_max - g.throttle_cruise) * ((fabsf(channel_throttle->norm_input())-0.5f) / 0.5f);
+    // Check if the throttle value is above 50% and we need to nudge
+    // Make sure its above 50% in the direction we are travelling
+	if ((abs(channel_throttle->servo_out) > 50) &&
+        (((channel_throttle->servo_out < 0) && in_reverse) ||
+         ((channel_throttle->servo_out > 0) && !in_reverse))) {
+            throttle_nudge = (g.throttle_max - g.throttle_cruise) *
+                ((fabsf(channel_throttle->norm_input())-0.5f) / 0.5f);
 	} else {
 		throttle_nudge = 0;
 	}
@@ -109,6 +114,25 @@ void Rover::control_failsafe(uint16_t pwm)
         }
         failsafe_trigger(FAILSAFE_EVENT_THROTTLE, failed);
 	}
+}
+
+/*
+  return true if throttle level is below throttle failsafe threshold
+  or RC input is invalid
+ */
+bool Rover::throttle_failsafe_active(void)
+{
+    if (!g.fs_throttle_enabled) {
+        return false;
+    }
+    if (millis() - failsafe.last_valid_rc_ms > 1000) {
+        // we haven't had a valid RC frame for 1 seconds
+        return true;
+    }
+    if (channel_throttle->get_reverse()) {
+        return channel_throttle->radio_in >= g.fs_throttle_value;
+    }
+    return channel_throttle->radio_in <= g.fs_throttle_value;
 }
 
 void Rover::trim_control_surfaces()

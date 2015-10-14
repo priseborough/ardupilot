@@ -4,9 +4,9 @@
 // Simple commandline menu system.
 //
 
-#include <AP_Common.h>
-#include <AP_Progmem.h>
-#include <AP_HAL.h>
+#include <AP_Common/AP_Common.h>
+#include <AP_Progmem/AP_Progmem.h>
+#include <AP_HAL/AP_HAL.h>
 
 #include <stdlib.h>
 #include <ctype.h>
@@ -84,7 +84,7 @@ Menu::_check_for_input(void)
 void
 Menu::_display_prompt(void)
 {
-    _port->printf_P(PSTR("%S] "), FPSTR(_prompt));    
+    _port->printf_P(PSTR("%S] "), _prompt);
 }
 
 // run the menu
@@ -106,7 +106,7 @@ Menu::_run_command(bool prompt_on_enter)
     // XXX should an empty line by itself back out of the current menu?
     while (argc <= _args_max) {
         _argv[argc].str = strtok_r(NULL, " ", &s);
-        if ('\0' == _argv[argc].str[0])
+        if (_argv[argc].str == NULL || '\0' == _argv[argc].str[0])
             break;
         _argv[argc].i = atol(_argv[argc].str);
         _argv[argc].f = atof(_argv[argc].str);      // calls strtod, > 700B !
@@ -231,7 +231,7 @@ Menu::_help(void)
     _port->println_P(PSTR("Commands:"));
     for (i = 0; i < _entries; i++) {
 		hal.scheduler->delay(10);
-        _port->printf_P(PSTR("  %S\n"), FPSTR(_commands[i].command));
+        _port->printf_P(PSTR("  %S\n"), _commands[i].command);
 	}
 }
 

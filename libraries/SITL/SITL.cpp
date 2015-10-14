@@ -18,10 +18,10 @@
     SITL.cpp - software in the loop state
 */
 
-#include <AP_Common.h>
-#include <AP_HAL.h>
-#include <GCS_MAVLink.h>
-#include <SITL.h>
+#include <AP_Common/AP_Common.h>
+#include <AP_HAL/AP_HAL.h>
+#include <GCS_MAVLink/GCS_MAVLink.h>
+#include "SITL.h"
 
 extern const AP_HAL::HAL& hal;
 
@@ -69,6 +69,8 @@ const AP_Param::GroupInfo SITL::var_info[] PROGMEM = {
     AP_GROUPINFO("MAG_DELAY",     39, SITL,  mag_delay, 0),
     AP_GROUPINFO("WIND_DELAY",    40, SITL,  wind_delay, 0),
     AP_GROUPINFO("MAG_OFS",       41, SITL,  mag_ofs, 0),
+    AP_GROUPINFO("ACC2_RND",      42, SITL,  accel2_noise, 0),
+    AP_GROUPINFO("ARSP_FAIL",     43, SITL,  aspd_fail, 0),
     AP_GROUPEND
 };
 

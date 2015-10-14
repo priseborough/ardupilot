@@ -20,12 +20,9 @@
 /*
  *  this module deals with calculations involving struct Location
  */
-#include <AP_HAL.h>
+#include <AP_HAL/AP_HAL.h>
 #include <stdlib.h>
 #include "AP_Math.h"
-
-// radius of earth in meters
-#define RADIUS_OF_EARTH 6378100
 
 // scaling factor from 1e-7 degrees to meters at equater
 // == 1.0e-7 * DEG_TO_RAD * RADIUS_OF_EARTH
@@ -220,6 +217,13 @@ float wrap_PI(float angle_in_radians)
     while (angle_in_radians > PI) angle_in_radians -= 2*PI;
     while (angle_in_radians < -PI) angle_in_radians += 2*PI;
     return angle_in_radians;
+}
+
+/*
+  return true if lat and lng match. Ignores altitude and options
+ */
+bool locations_are_same(const struct Location &loc1, const struct Location &loc2) {
+    return (loc1.lat == loc2.lat) && (loc1.lng == loc2.lng);
 }
 
 /*

@@ -19,14 +19,13 @@
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_PX4
 
-#include <AP_HAL.h>
+#include <AP_HAL/AP_HAL.h>
 #include "NotifyDevice.h"
 #include <drivers/drv_oreoled.h>
 
 #define OREOLED_NUM_LEDS        4       // maximum number of individual LEDs connected to the oreo led cpu
 #define OREOLED_INSTANCE_ALL    0xff    // instance number to indicate all LEDs (used for set_rgb and set_macro)
 #define OREOLED_BRIGHT          0xff    // maximum brightness when flying (disconnected from usb)
-#define OREOLED_DIM             0x0f    // dim when connected to USB
 
 class OreoLED_PX4 : public NotifyDevice
 {
@@ -54,17 +53,18 @@ private:
     // set_rgb - set color as a combination of red, green and blue values for one or all LEDs
     void set_rgb(uint8_t instance, uint8_t red, uint8_t green, uint8_t blue);
 
-    // set_macrxo - set macro for one or all LEDs
+    // set_macro - set macro for one or all LEDs
     void set_macro(uint8_t instance, enum oreoled_macro macro);
 
-    // send_bytes - send bytes to one or all LEDs
-    void send_bytes(uint8_t instance, uint8_t num_bytes, uint8_t bytes[OREOLED_CMD_LENGTH_MAX]);
+    // send_sync - force a syncronisation of the LEDs
+    void send_sync(void);
 
     // oreo led modes (pattern, macro or rgb)
     enum oreoled_mode {
         OREOLED_MODE_PATTERN,
         OREOLED_MODE_MACRO,
-        OREOLED_MODE_RGB
+        OREOLED_MODE_RGB,
+        OREOLED_MODE_SYNC
     };
 
     // oreo_state structure holds possible state of an led

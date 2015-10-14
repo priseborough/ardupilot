@@ -17,10 +17,10 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <GCS.h>
-#include <AP_AHRS.h>
-#include <AP_HAL.h>
-#include <AP_Vehicle.h>
+#include "GCS.h"
+#include <AP_AHRS/AP_AHRS.h>
+#include <AP_HAL/AP_HAL.h>
+#include <AP_Vehicle/AP_Vehicle.h>
 
 extern const AP_HAL::HAL& hal;
 
@@ -89,6 +89,9 @@ GCS_MAVLINK::setup_uart(const AP_SerialManager& serial_manager, AP_SerialManager
         uart->write(0x30);
         uart->write(0x20);
     }
+    // since tcdrain() and TCSADRAIN may not be implemented...
+    hal.scheduler->delay(1);
+    
     uart->set_flow_control(old_flow_control);
 
     // now change back to desired baudrate
@@ -218,8 +221,8 @@ void GCS_MAVLINK::send_ahrs2(AP_AHRS &ahrs)
 {
 #if AP_AHRS_NAVEKF_AVAILABLE
     Vector3f euler;
-    struct Location loc;
-    if (ahrs.get_secondary_attitude(euler) && ahrs.get_secondary_position(loc)) {
+    struct Location loc {};
+    if (ahrs.get_secondary_attitude(euler)) {
         mavlink_msg_ahrs2_send(chan,
                                euler.x,
                                euler.y,
@@ -227,6 +230,19 @@ void GCS_MAVLINK::send_ahrs2(AP_AHRS &ahrs)
                                loc.alt*1.0e-2f,
                                loc.lat,
                                loc.lng);
+    }
+    AP_AHRS_NavEKF &_ahrs = reinterpret_cast<AP_AHRS_NavEKF&>(ahrs);
+    if (_ahrs.get_NavEKF2().enabled()) {
+        _ahrs.get_NavEKF2().getLLH(loc);
+        _ahrs.get_NavEKF2().getEulerAngles(euler);
+        mavlink_msg_ahrs3_send(chan,
+                               euler.x,
+                               euler.y,
+                               euler.z,
+                               loc.alt*1.0e-2f,
+                               loc.lat,
+                               loc.lng,
+                               0, 0, 0, 0);
     }
 #endif
 }
@@ -377,7 +393,7 @@ void GCS_MAVLINK::handle_mission_write_partial_list(AP_Mission &mission, mavlink
     if ((unsigned)packet.start_index > mission.num_commands() ||
         (unsigned)packet.end_index > mission.num_commands() ||
         packet.end_index < packet.start_index) {
-        send_text_P(SEVERITY_LOW,PSTR("flight plan update rejected"));
+        send_text_P(MAV_SEVERITY_WARNING,PSTR("flight plan update rejected"));
         return;
     }
 
@@ -498,7 +514,7 @@ void GCS_MAVLINK::handle_param_request_list(mavlink_message_t *msg)
     // send system ID if we can
     char sysid[40];
     if (hal.util->get_system_id(sysid)) {
-        send_text(SEVERITY_LOW, sysid);
+        send_text(MAV_SEVERITY_WARNING, sysid);
     }
 #endif
 
@@ -556,13 +572,27 @@ void GCS_MAVLINK::handle_param_set(mavlink_message_t *msg, DataFlash_Class *Data
     strncpy(key, (char *)packet.param_id, AP_MAX_NAME_SIZE);
     key[AP_MAX_NAME_SIZE] = 0;
 
-    vp = AP_Param::set_param_by_name(key, packet.param_value, &var_type);
+    // find existing param so we can get the old value
+    vp = AP_Param::find(key, &var_type);
     if (vp == NULL) {
         return;
     }
+    float old_value = vp->cast_to_float(var_type);
+
+    // set the value
+    vp->set_float(packet.param_value, var_type);
+
+    /*
+      we force the save if the value is not equal to the old
+      value. This copes with the use of override values in
+      constructors, such as PID elements. Otherwise a set to the
+      default value which differs from the constructor value doesn't
+      save the change
+     */
+    bool force_save = !is_equal(packet.param_value, old_value);
 
     // save the change
-    vp->save();
+    vp->save(force_save);
 
     // Report back the new value if we accepted the change
     // we send the value we actually set, which could be
@@ -584,9 +614,9 @@ void GCS_MAVLINK::handle_param_set(mavlink_message_t *msg, DataFlash_Class *Data
 
 
 void
-GCS_MAVLINK::send_text(gcs_severity severity, const char *str)
+GCS_MAVLINK::send_text(MAV_SEVERITY severity, const char *str)
 {
-    if (severity != SEVERITY_LOW && 
+    if (severity < MAV_SEVERITY_WARNING && 
         comm_get_txspace(chan) >= 
         MAVLINK_NUM_NON_PAYLOAD_BYTES+MAVLINK_MSG_ID_STATUSTEXT_LEN) {
         // send immediately
@@ -601,7 +631,7 @@ GCS_MAVLINK::send_text(gcs_severity severity, const char *str)
 }
 
 void
-GCS_MAVLINK::send_text_P(gcs_severity severity, const prog_char_t *str)
+GCS_MAVLINK::send_text_P(MAV_SEVERITY severity, const prog_char_t *str)
 {
     mavlink_statustext_t m;
     uint8_t i;
@@ -737,7 +767,7 @@ bool GCS_MAVLINK::handle_mission_item(mavlink_message_t *msg, AP_Mission &missio
             msg->compid,
             MAV_MISSION_ACCEPTED);
         
-        send_text_P(SEVERITY_LOW,PSTR("flight plan received"));
+        send_text_P(MAV_SEVERITY_WARNING,PSTR("flight plan received"));
         waypoint_receiving = false;
         mission_is_complete = true;
         // XXX ignores waypoint radius for individual waypoints, can
@@ -1012,7 +1042,7 @@ void GCS_MAVLINK::send_raw_imu(const AP_InertialSensor &ins, const Compass &comp
     const Vector3f &gyro = ins.get_gyro(0);
     Vector3f mag;
     if (compass.get_count() >= 1) {
-        mag = compass.get_field(0);
+        mag = compass.get_field_milligauss(0);
     } else {
         mag.zero();
     }
@@ -1038,7 +1068,7 @@ void GCS_MAVLINK::send_raw_imu(const AP_InertialSensor &ins, const Compass &comp
     const Vector3f &accel2 = ins.get_accel(1);
     const Vector3f &gyro2 = ins.get_gyro(1);
     if (compass.get_count() >= 2) {
-        mag = compass.get_field(1);
+        mag = compass.get_field_milligauss(1);
     } else {
         mag.zero();
     }
@@ -1064,7 +1094,7 @@ void GCS_MAVLINK::send_raw_imu(const AP_InertialSensor &ins, const Compass &comp
     const Vector3f &accel3 = ins.get_accel(2);
     const Vector3f &gyro3 = ins.get_gyro(2);
     if (compass.get_count() >= 3) {
-        mag = compass.get_field(2);
+        mag = compass.get_field_milligauss(2);
     } else {
         mag.zero();
     }
@@ -1102,6 +1132,17 @@ void GCS_MAVLINK::send_scaled_pressure(AP_Baro &barometer)
             pressure*0.01f, // hectopascal
             (pressure - barometer.get_ground_pressure(1))*0.01f, // hectopascal
             barometer.get_temperature(1)*100); // 0.01 degrees C        
+    }
+#endif
+#if BARO_MAX_INSTANCES > 2
+    if (barometer.num_instances() > 2) {
+        pressure = barometer.get_pressure(2);
+        mavlink_msg_scaled_pressure3_send(
+            chan,
+            now,
+            pressure*0.01f, // hectopascal
+            (pressure - barometer.get_ground_pressure(2))*0.01f, // hectopascal
+            barometer.get_temperature(2)*100); // 0.01 degrees C        
     }
 #endif
 }
@@ -1152,16 +1193,19 @@ void GCS_MAVLINK::send_ahrs(AP_AHRS &ahrs)
 /*
   send a statustext message to all active MAVLink connections
  */
-void GCS_MAVLINK::send_statustext_all(const prog_char_t *msg)
+void GCS_MAVLINK::send_statustext_all(MAV_SEVERITY severity, const prog_char_t *fmt, ...)
 {
     for (uint8_t i=0; i<MAVLINK_COMM_NUM_BUFFERS; i++) {
         if ((1U<<i) & mavlink_active) {
             mavlink_channel_t chan = (mavlink_channel_t)(MAVLINK_COMM_0+i);
             if (comm_get_txspace(chan) >= MAVLINK_NUM_NON_PAYLOAD_BYTES + MAVLINK_MSG_ID_STATUSTEXT_LEN) {
                 char msg2[50];
-                strncpy_P(msg2, msg, sizeof(msg2));
+                va_list arg_list;
+                va_start(arg_list, fmt);
+                hal.util->vsnprintf_P((char *)msg2, sizeof(msg2), fmt, arg_list);
+                va_end(arg_list);
                 mavlink_msg_statustext_send(chan,
-                                            SEVERITY_HIGH,
+                                            severity,
                                             msg2);
             }
         }
@@ -1245,9 +1289,8 @@ void GCS_MAVLINK::send_opticalflow(AP_AHRS_NavEKF &ahrs, const OpticalFlow &optf
 /*
   send AUTOPILOT_VERSION packet
  */
-void GCS_MAVLINK::send_autopilot_version(void) const
+void GCS_MAVLINK::send_autopilot_version(uint8_t major_version, uint8_t minor_version, uint8_t patch_version, uint8_t version_type) const
 {
-    uint16_t capabilities = 0;
     uint32_t flight_sw_version = 0;
     uint32_t middleware_sw_version = 0;
     uint32_t os_sw_version = 0;
@@ -1259,6 +1302,11 @@ void GCS_MAVLINK::send_autopilot_version(void) const
     uint16_t product_id = 0;
     uint64_t uid = 0;
     
+    flight_sw_version = major_version << (8*3) | \
+                        minor_version << (8*2) | \
+                        patch_version << (8*1) | \
+                        version_type  << (8*0);
+
 #if defined(GIT_VERSION)
     strncpy((char *)flight_custom_version, GIT_VERSION, 8);
 #else
@@ -1279,7 +1327,7 @@ void GCS_MAVLINK::send_autopilot_version(void) const
     
     mavlink_msg_autopilot_version_send(
         chan,
-        capabilities,
+        hal.util->get_capabilities(),
         flight_sw_version,
         middleware_sw_version,
         os_sw_version,
@@ -1335,4 +1383,39 @@ void GCS_MAVLINK::send_vibration(const AP_InertialSensor &ins) const
         ins.get_accel_clip_count(1),
         ins.get_accel_clip_count(2));
 #endif
+}
+
+void GCS_MAVLINK::send_home(const Location &home) const
+{
+    if (comm_get_txspace(chan) >= MAVLINK_NUM_NON_PAYLOAD_BYTES + MAVLINK_MSG_ID_HOME_POSITION_LEN) {
+        const float q[4] = {1.0f, 0.0f, 0.0f, 0.0f};
+        mavlink_msg_home_position_send(
+            chan,
+            home.lat,
+            home.lng,
+            home.alt / 100,
+            0.0f, 0.0f, 0.0f,
+            q,
+            0.0f, 0.0f, 0.0f);
+    }
+}
+
+void GCS_MAVLINK::send_home_all(const Location &home)
+{
+    const float q[4] = {1.0f, 0.0f, 0.0f, 0.0f};
+    for (uint8_t i=0; i<MAVLINK_COMM_NUM_BUFFERS; i++) {
+        if ((1U<<i) & mavlink_active) {
+            mavlink_channel_t chan = (mavlink_channel_t)(MAVLINK_COMM_0+i);
+            if (comm_get_txspace(chan) >= MAVLINK_NUM_NON_PAYLOAD_BYTES + MAVLINK_MSG_ID_HOME_POSITION_LEN) {
+                mavlink_msg_home_position_send(
+                    chan,
+                    home.lat,
+                    home.lng,
+                    home.alt / 100,
+                    0.0f, 0.0f, 0.0f,
+                    q,
+                    0.0f, 0.0f, 0.0f);
+            }
+        }
+    }
 }

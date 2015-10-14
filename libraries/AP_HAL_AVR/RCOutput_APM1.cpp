@@ -1,10 +1,10 @@
-#include <AP_HAL.h>
+#include <AP_HAL/AP_HAL.h>
 #if CONFIG_HAL_BOARD == HAL_BOARD_APM1
 
 #include <avr/interrupt.h>
 
-#include <AP_HAL.h>
-#include <AP_HAL_AVR.h>
+#include <AP_HAL/AP_HAL.h>
+#include "AP_HAL_AVR.h"
 #include "RCOutput.h"
 using namespace AP_HAL_AVR;
 
@@ -173,13 +173,6 @@ void APM1RCOutput::write(uint8_t ch, uint16_t period_us) {
     case 10: OCR3A=pwm; break;  //ch11, PE3
     }
 }
-
-void APM1RCOutput::write(uint8_t ch, uint16_t* period_us, uint8_t len) {
-    for (int i = 0; i < len; i++) {
-        write(i + ch, period_us[i]); 
-    }
-}
-
 
 /* Read back current output state, as either single channel or
  * array of channels. */

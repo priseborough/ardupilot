@@ -23,7 +23,9 @@
 #ifndef AP_SCHEDULER_H
 #define AP_SCHEDULER_H
 
-#include <AP_Param.h>
+#include <AP_Param/AP_Param.h>
+
+#define AP_SCHEDULER_NAME_INITIALIZER(_name) .name = #_name,
 
 /*
   A task scheduler for APM main loops
@@ -35,8 +37,8 @@
   the scheduler is allowed to use before it must return
  */
 
-#include <AP_HAL.h>
-#include <AP_Vehicle.h>
+#include <AP_HAL/AP_HAL.h>
+#include <AP_Vehicle/AP_Vehicle.h>
 
 class AP_Scheduler
 {
@@ -45,6 +47,7 @@ public:
 
     struct Task {
         task_fn_t function;
+        const char *name;
         uint16_t interval_ticks;
         uint16_t max_time_micros;
     };

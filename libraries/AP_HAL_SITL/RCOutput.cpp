@@ -1,4 +1,4 @@
-#include <AP_HAL.h>
+#include <AP_HAL/AP_HAL.h>
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
 
 #include "RCOutput.h"
@@ -26,11 +26,6 @@ void SITLRCOutput::write(uint8_t ch, uint16_t period_us)
     if (ch < SITL_NUM_CHANNELS) {
         _sitlState->pwm_output[ch] = period_us;
     }
-}
-
-void SITLRCOutput::write(uint8_t ch, uint16_t* period_us, uint8_t len)
-{
-    memcpy(_sitlState->pwm_output+ch, period_us, len*sizeof(uint16_t));
 }
 
 uint16_t SITLRCOutput::read(uint8_t ch)

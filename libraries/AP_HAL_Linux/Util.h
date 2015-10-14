@@ -2,18 +2,17 @@
 #ifndef __AP_HAL_LINUX_UTIL_H__
 #define __AP_HAL_LINUX_UTIL_H__
 
-#include <AP_HAL.h>
+#include <AP_HAL/AP_HAL.h>
 #include "AP_HAL_Linux_Namespace.h"
 #include "ToneAlarmDriver.h"
 
 class Linux::LinuxUtil : public AP_HAL::Util {
 public:
-    void init(int argc, char * const *argv) {
-        saved_argc = argc;
-        saved_argv = argv;
+    static LinuxUtil *from(AP_HAL::Util *util) {
+        return static_cast<LinuxUtil*>(util);
     }
 
-
+    void init(int argc, char * const *argv);
     bool run_debug_shell(AP_HAL::BetterStream *stream) { return false; }
 
     /**
@@ -37,9 +36,11 @@ public:
     void set_custom_terrain_directory(const char *_custom_terrain_directory) { custom_terrain_directory = _custom_terrain_directory; }
 
     bool is_chardev_node(const char *path);
+    void set_imu_temp(float current);
 
 private:
     static Linux::ToneAlarm _toneAlarm;
+    Linux::LinuxHeat *_heat;
     int saved_argc;
     char* const *saved_argv;
     const char* custom_log_directory = NULL;

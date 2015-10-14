@@ -21,24 +21,33 @@
 #ifndef AP_NavEKF
 #define AP_NavEKF
 
-#include <AP_Math.h>
-#include <AP_InertialSensor.h>
-#include <AP_Baro.h>
-#include <AP_Airspeed.h>
-#include <AP_Compass.h>
-#include <AP_Param.h>
-#include <AP_Nav_Common.h>
-#include <GCS_MAVLink.h>
-#include <AP_RangeFinder.h>
+#include <AP_Math/AP_Math.h>
+#include <AP_InertialSensor/AP_InertialSensor.h>
+#include <AP_Baro/AP_Baro.h>
+#include <AP_Airspeed/AP_Airspeed.h>
+#include <AP_Compass/AP_Compass.h>
+#include <AP_Param/AP_Param.h>
+#include "AP_Nav_Common.h"
+#include <GCS_MAVLink/GCS_MAVLink.h>
+#include <AP_RangeFinder/AP_RangeFinder.h>
 
 // #define MATH_CHECK_INDEXES 1
 
-#include <vectorN.h>
+#include <AP_Math/vectorN.h>
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
 #include <systemlib/perf_counter.h>
 #endif
 
+// GPS pre-flight check bit locations
+#define MASK_GPS_NSATS      (1<<0)
+#define MASK_GPS_HDOP       (1<<1)
+#define MASK_GPS_SPD_ERR    (1<<2)
+#define MASK_GPS_POS_ERR    (1<<3)
+#define MASK_GPS_YAW_ERR 	(1<<4)
+#define MASK_GPS_POS_DRIFT  (1<<5)
+#define MASK_GPS_VERT_SPD   (1<<6)
+#define MASK_GPS_HORIZ_SPD  (1<<7)
 
 class AP_AHRS;
 
@@ -225,9 +234,9 @@ public:
      1 = velocities are NaN
      2 = badly conditioned X magnetometer fusion
      3 = badly conditioned Y magnetometer fusion
-     5 = badly conditioned Z magnetometer fusion
-     6 = badly conditioned airspeed fusion
-     7 = badly conditioned synthetic sideslip fusion
+     4 = badly conditioned Z magnetometer fusion
+     5 = badly conditioned airspeed fusion
+     6 = badly conditioned synthetic sideslip fusion
      7 = filter is not initialised
     */
     void  getFilterFaults(uint8_t &faults) const;
@@ -238,9 +247,9 @@ public:
      1 = velocity measurement timeout
      2 = height measurement timeout
      3 = magnetometer measurement timeout
+     4 = true airspeed measurement timeout
      5 = unassigned
      6 = unassigned
-     7 = unassigned
      7 = unassigned
     */
     void  getFilterTimeouts(uint8_t &timeouts) const;
@@ -250,6 +259,11 @@ public:
     */
     void  getFilterStatus(nav_filter_status &status) const;
 
+    /*
+    return filter gps quality check status
+    */
+    void  getFilterGpsStatus(nav_gps_status &status) const;
+
     // send an EKF_STATUS_REPORT message to GCS
     void send_status_report(mavlink_channel_t chan);
 
@@ -258,14 +272,15 @@ public:
     // this is needed to ensure the vehicle does not fly too high when using optical flow navigation
     bool getHeightControlLimit(float &height) const;
 
-    // provides the quaternion that was used by the INS calculation to rotate from the previous orientation to the orientaion at the current time step
-    // returns a zero rotation quaternion if the INS calculation was not performed on that time step.
-    Quaternion getDeltaQuaternion(void) const;
+    // returns true of the EKF thinks the GPS is glitching
+    bool getGpsGlitchStatus(void) const;
 
     // return the amount of yaw angle change due to the last yaw angle reset in radians
-    // returns true if a reset yaw angle has been updated and not queried
-    // this function should not have more than one client
-    bool getLastYawResetAngle(float &yawAng);
+    // returns the time of the last yaw angle reset or 0 if no reset has ever occurred
+    uint32_t getLastYawResetAngle(float &yawAng);
+
+    // report any reason for why the backend is refusing to initialise    
+    const char *prearm_failure_reason(void) const;
 
     static const struct AP_Param::GroupInfo var_info[];
 
@@ -468,6 +483,12 @@ private:
     // align the NE earth magnetic field states with the published declination
     void alignMagStateDeclination();
 
+    // Check for signs of bad gyro health before flight
+    bool checkGyroHealthPreFlight(void) const;
+
+    // update inflight calculaton that determines if GPS data is good enough for reliable navigation
+    void calcGpsGoodForFlight(void);
+
     // EKF Mavlink Tuneable Parameters
     AP_Float _gpsHorizVelNoise;     // GPS horizontal velocity measurement noise : m/s
     AP_Float _gpsVertVelNoise;      // GPS vertical velocity measurement noise : m/s
@@ -502,6 +523,7 @@ private:
     AP_Float _maxFlowRate;          // Maximum flow rate magnitude that will be accepted by the filter
     AP_Int8 _fallback;              // EKF-to-DCM fallback strictness. 0 = trust EKF more, 1 = fallback more conservatively.
     AP_Int8 _altSource;             // Primary alt source during optical flow navigation. 0 = use Baro, 1 = use range finder.
+    AP_Int8 _gpsCheck;              // Bitmask controlling which preflight GPS checks are bypassed
 
     // Tuning parameters
     const float gpsNEVelVarAccScale;    // Scale factor applied to NE velocity measurement variance due to manoeuvre acceleration
@@ -681,7 +703,16 @@ private:
     float yawRateFilt;              // filtered yaw rate used to determine when the vehicle is doing rapid yaw rotation where gyro scel factor errors could cause loss of heading reference
     bool useGpsVertVel;             // true if GPS vertical velocity should be used
     float yawResetAngle;            // Change in yaw angle due to last in-flight yaw reset in radians. A positive value means the yaw angle has increased.
-    bool yawResetAngleWaiting;      // true when the yaw reset angle has been updated and has not been retrieved via the getLastYawResetAngle() function
+    uint32_t lastYawReset_ms;       // System time at which the last yaw reset occurred. Returned by getLastYawResetAngle
+    uint32_t magYawResetTimer_ms;   // timer in msec used to track how long good magnetometer data is failing innovation consistency checks
+    bool consistentMagData;         // true when the magnetometers are passing consistency checks
+    bool gpsAccuracyGood;           // true when the GPS accuracy is considered to be good enough for safe flight.
+    uint32_t timeAtDisarm_ms;       // time of last disarm event in msec
+    float gpsDriftNE;               // amount of drift detected in the GPS position during pre-flight GPs checks
+    float gpsVertVelFilt;           // amount of filterred vertical GPS velocity detected durng pre-flight GPS checks
+    float gpsHorizVelFilt;          // amount of filtered horizontal GPS velocity detected during pre-flight GPS checks
+    bool gpsGoodToAlign;            // true when GPS quality is good enough to set an EKF origin and commence GPS navigation
+    uint32_t lastConstPosFuseTime_ms;   // last time in msec the constant position constraint was applied
 
     // Used by smoothing of state corrections
     Vector10 gpsIncrStateDelta;    // vector of corrections to attitude, velocity and position to be applied over the period between the current and next GPS measurement
@@ -769,6 +800,17 @@ private:
     uint32_t touchdownExpectedSet_ms; // system time at which expectGndEffectTouchdown was set
     float meaHgtAtTakeOff;            // height measured at commencement of takeoff
 
+    // monitoring IMU quality
+    float imuNoiseFiltState1;       // peak hold noise estimate for IMU 1
+    float imuNoiseFiltState2;       // peak hold noise estimate for IMU 2
+    Vector3f accelDiffFilt;         // filtered difference between IMU 1 and 2
+    enum ImuSwitchState {
+        IMUSWITCH_MIXED=0,          // IMU 0 & 1 are mixed
+        IMUSWITCH_IMU0,             // only IMU 0 is used
+        IMUSWITCH_IMU1              // only IMU 1 is used
+    };
+    ImuSwitchState lastImuSwitchState;  // last switch state (see imuSwitchState enum)
+
     // states held by optical flow fusion across time steps
     // optical flow X,Y motion compensated rate measurements are fused across two time steps
     // to level computational load as this can be an expensive operation
@@ -795,6 +837,20 @@ private:
         bool bad_sideslip:1;
     } faultStatus;
 
+    // flags indicating which GPS quality checks are failing
+    struct {
+        bool bad_sAcc:1;
+        bool bad_hAcc:1;
+        bool bad_yaw:1;
+        bool bad_sats:1;
+        bool bad_VZ:1;
+        bool bad_horiz_drift:1;
+        bool bad_hdop:1;
+        bool bad_vert_vel:1;
+        bool bad_fix:1;
+        bool bad_horiz_vel:1;
+    } gpsCheckStatus;
+
     // states held by magnetomter fusion across time steps
     // magnetometer X,Y,Z measurements are fused across three time steps
     // to level computational load as this is an expensive operation
@@ -816,6 +872,8 @@ private:
         Vector9 SH_MAG;
 	} mag_state;
 
+    // string representing last reason for prearm failure
+    char prearm_fail_string[40];
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
     // performance counters

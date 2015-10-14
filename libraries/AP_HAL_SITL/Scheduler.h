@@ -2,7 +2,7 @@
 #ifndef __AP_HAL_SITL_SCHEDULER_H__
 #define __AP_HAL_SITL_SCHEDULER_H__
 
-#include <AP_HAL.h>
+#include <AP_HAL/AP_HAL.h>
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
 #include "AP_HAL_SITL_Namespace.h"
 #include <sys/time.h>
@@ -13,6 +13,10 @@
 class HALSITL::SITLScheduler : public AP_HAL::Scheduler {
 public:
     SITLScheduler(SITL_State *sitlState);
+    static SITLScheduler *from(AP_HAL::Scheduler *scheduler) {
+        return static_cast<SITLScheduler*>(scheduler);
+    }
+
     /* AP_HAL::Scheduler methods */
 
     void     init(void *unused);

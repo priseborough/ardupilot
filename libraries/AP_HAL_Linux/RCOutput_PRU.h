@@ -2,7 +2,7 @@
 #ifndef __AP_HAL_LINUX_RCOUTPUT_PRU_H__
 #define __AP_HAL_LINUX_RCOUTPUT_PRU_H__
 
-#include <AP_HAL_Linux.h>
+#include "AP_HAL_Linux.h"
 #define RCOUT_PRUSS_SHAREDRAM_BASE     0x4a310000
 #define MAX_PWMS                 12
 #define PWM_CMD_MAGIC            0xf00fbaaf
@@ -22,7 +22,6 @@ class Linux::LinuxRCOutput_PRU : public AP_HAL::RCOutput {
     void     enable_ch(uint8_t ch);
     void     disable_ch(uint8_t ch);
     void     write(uint8_t ch, uint16_t period_us);
-    void     write(uint8_t ch, uint16_t* period_us, uint8_t len);
     uint16_t read(uint8_t ch);
     void     read(uint16_t* period_us, uint8_t len);
 
