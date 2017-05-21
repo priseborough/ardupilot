@@ -34,7 +34,8 @@ def build(bld):
             'AP_Landing',
             'AP_Beacon',
             'PID',
-            'AP_Soaring'
+            'AP_Soaring',
+            'ADAP_Control'
         ],
     )
 

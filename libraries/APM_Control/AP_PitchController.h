@@ -6,16 +6,11 @@
 #include "AP_AutoTune.h"
 #include <DataFlash/DataFlash.h>
 #include <AP_Math/AP_Math.h>
+#include <ADAP_Control/ADAP_Control.h>
 
 class AP_PitchController {
 public:
-	AP_PitchController(AP_AHRS &ahrs, const AP_Vehicle::FixedWing &parms, DataFlash_Class &_dataflash) :
-		aparm(parms),
-        autotune(gains, AP_AutoTune::AUTOTUNE_PITCH, parms, _dataflash),
-        _ahrs(ahrs)
-    { 
-		AP_Param::setup_object_defaults(this, var_info);
-	}
+	AP_PitchController(AP_AHRS &ahrs, const AP_Vehicle::FixedWing &parms, DataFlash_Class &_dataflash);
 
 	int32_t get_rate_out(float desired_rate, float scaler);
 	int32_t get_servo_out(int32_t angle_err, float scaler, bool disable_integrator);
@@ -33,6 +28,8 @@ public:
     AP_Float &kI(void) { return gains.I; }
     AP_Float &kD(void) { return gains.D; }
     AP_Float &kFF(void) { return gains.FF; }
+
+    void adaptive_tuning_send(mavlink_channel_t chan);
     
 private:
 	const AP_Vehicle::FixedWing &aparm;
@@ -49,5 +46,6 @@ private:
     float   _get_coordination_rate_offset(float &aspeed, bool &inverted) const;
 	
 	AP_AHRS &_ahrs;
-	
+
+    ADAP_Control adap_control{"ADAP"};
 };

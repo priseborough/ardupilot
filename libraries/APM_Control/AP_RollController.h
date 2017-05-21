@@ -6,6 +6,7 @@
 #include "AP_AutoTune.h"
 #include <DataFlash/DataFlash.h>
 #include <AP_Math/AP_Math.h>
+#include <ADAP_Control/ADAP_Control.h>
 
 class AP_RollController {
 public:
@@ -40,6 +41,8 @@ public:
     AP_Float &kI(void) { return gains.I; }
     AP_Float &kD(void) { return gains.D; }
     AP_Float &kFF(void) { return gains.FF; }
+
+    void adaptive_tuning_send(mavlink_channel_t chan);
     
 private:
 	const AP_Vehicle::FixedWing &aparm;
@@ -54,4 +57,5 @@ private:
 
 	AP_AHRS &_ahrs;
 
+    ADAP_Control adap_control{"ADAR"};    
 };

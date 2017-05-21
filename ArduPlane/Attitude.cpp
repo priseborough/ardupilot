@@ -1,4 +1,7 @@
 #include "Plane.h"
+#include <AP_HAL/AP_HAL.h>
+
+extern const AP_HAL::HAL& hal;
 
 /*
   get a speed scaling number for control surfaces. This is applied to
@@ -259,7 +262,12 @@ void Plane::stabilize_yaw(float speed_scaler)
 void Plane::stabilize_training(float speed_scaler)
 {
     if (training_manual_roll) {
-        SRV_Channels::set_output_scaled(SRV_Channel::k_aileron, channel_roll->get_control_in());
+        if (hal.rcin->read(7-1) >= 1700) {
+            // the user has enabled chirp control test code
+            SRV_Channels::set_output_scaled(SRV_Channel::k_aileron, control_chirp(50));
+        } else {
+            SRV_Channels::set_output_scaled(SRV_Channel::k_aileron, channel_roll->get_control_in());
+        }
     } else {
         // calculate what is needed to hold
         stabilize_roll(speed_scaler);
@@ -271,7 +279,12 @@ void Plane::stabilize_training(float speed_scaler)
     }
 
     if (training_manual_pitch) {
-        SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, channel_pitch->get_control_in());
+        if (hal.rcin->read(6-1) >= 1700) {
+            // the user has enabled chirp control test code
+            SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, control_chirp(50));
+        } else {
+            SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, channel_pitch->get_control_in());
+        }
     } else {
         stabilize_pitch(speed_scaler);
         if ((nav_pitch_cd > 0 && channel_pitch->get_control_in() < SRV_Channels::get_output_scaled(SRV_Channel::k_elevator)) ||
@@ -697,4 +710,33 @@ void Plane::update_load_factor(void)
         nav_roll_cd = constrain_int32(nav_roll_cd, -roll_limit, roll_limit);
         roll_limit_cd = constrain_int32(roll_limit_cd, -roll_limit, roll_limit);
     }    
+}
+
+
+int16_t Plane::control_chirp(float max_command)
+{
+  float dt;
+  uint64_t now = AP_HAL::micros64();
+
+   if (chirp.last_run_us == 0 || now - chirp.last_run_us > 200000UL) {
+        // reset after not running for 0.2s
+    chirp.t = 0;
+    chirp.last_run_us = now;
+    //return 0;
+    }
+  
+   dt = (now - chirp.last_run_us) * 1.0e-6f;
+   chirp.last_run_us = now;
+
+  float f0 = 0.01;
+  float f1 = 10;
+  float pi = 3.14159;
+  float k = (f1-f0)/7; //chirp for 5 seconds
+
+  float out = sinf(2*pi*(f0*(7-chirp.t)+(k/2)*(7-chirp.t)*(7-chirp.t)));
+  int16_t servo_out = max_command*out*10;
+
+  chirp.t += dt;
+
+  return (servo_out);
 }

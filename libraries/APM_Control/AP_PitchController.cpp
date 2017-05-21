@@ -98,8 +98,23 @@ const AP_Param::GroupInfo AP_PitchController::var_info[] = {
 	// @User: User
 	AP_GROUPINFO("FF",        8, AP_PitchController, gains.FF,       0.0f),
 
-	AP_GROUPEND
+    // @Group: _A_
+    // @Path: ../libraries/ADAP_Control/ADAP_Control.cpp
+    AP_SUBGROUPINFO(adap_control, "A_", 9, AP_PitchController, ADAP_Control),
+
+    AP_GROUPEND
 };
+
+
+// constructor
+AP_PitchController::AP_PitchController(AP_AHRS &ahrs, const AP_Vehicle::FixedWing &parms, DataFlash_Class &_dataflash) :
+    aparm(parms),
+    autotune(gains, AP_AutoTune::AUTOTUNE_PITCH, parms, _dataflash),
+    _ahrs(ahrs)
+{ 
+    AP_Param::setup_object_defaults(this, var_info);
+    adap_control.set_pid_info(&_pid_info);
+}
 
 /*
  Function returns an equivalent elevator deflection in centi-degrees in the range from -4500 to 4500
@@ -330,10 +345,24 @@ int32_t AP_PitchController::get_servo_out(int32_t angle_err, float scaler, bool 
 	// Apply the turn correction offset
 	desired_rate = desired_rate + rate_offset;
 
+	if (adap_control.enabled()) {
+        return adap_control.update(_ahrs.get_ins().get_sample_rate(), radians(desired_rate), _ahrs.get_gyro().y, scaler, aspeed) * 4500;
+	}
+
     return _get_rate_out(desired_rate, scaler, disable_integrator, aspeed);
 }
+
 
 void AP_PitchController::reset_I()
 {
 	_pid_info.I = 0;
+}
+
+
+/*
+  send ADAP_TUNING message
+*/
+void AP_PitchController::adaptive_tuning_send(mavlink_channel_t chan)
+{
+    adap_control.adaptive_tuning_send(chan, PID_TUNING_PITCH);
 }
