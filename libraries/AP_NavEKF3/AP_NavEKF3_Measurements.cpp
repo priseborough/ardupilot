@@ -133,6 +133,26 @@ void NavEKF3_core::writeBodyFrameOdom(float quality, const Vector3f &delPos, con
 
 }
 
+void NavEKF3_core::writeExtNavData(bool frameIsNED, const Vector3f &sensOffset, const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms)
+{
+    // limit update rate to maximum allowed by sensor buffers and fusion process
+    // don't try to write to buffer until the filter has been initialised
+    if ((timeStamp_ms - extNavMeasTime_ms) < frontend->sensorIntervalMin_ms) {
+        return;
+    }
+
+    extNavDataNew.frameIsNED = frameIsNED;
+    extNavDataNew.pos = pos;
+    extNavDataNew.quat = quat;
+    extNavDataNew.posErr = posErr;
+    extNavDataNew.angErr = angErr;
+    extNavDataNew.body_offset = &sensOffset;
+    extNavDataNew.time_ms = timeStamp_ms;
+
+    storedExtNav.push(extNavDataNew);
+
+}
+
 void NavEKF3_core::writeWheelOdom(float delAng, float delTime, uint32_t timeStamp_ms, const Vector3f &posOffset, float radius)
 {
     // This is a simple hack to get wheel encoder data into the EKF and verify the interface sign conventions and units

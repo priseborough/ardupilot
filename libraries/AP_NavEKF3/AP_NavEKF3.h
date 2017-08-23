@@ -221,6 +221,18 @@ public:
     void writeBodyFrameOdom(float quality, const Vector3f &delPos, const Vector3f &delAng, float delTime, uint32_t timeStamp_ms, const Vector3f &posOffset);
 
     /*
+     * Write position and quaternion data from an external navigation system
+     *
+     * frameIsNED : Boolean set to true if the eternal mavigaton system is using a NED coordinate frame
+     * pos        : position in the RH navigation frame. Frame is assumed to be NED if frameIsNED is true. (m)
+     * quat       : quaternion desribing the the rotation from navigation frame to body frame
+     * posErr     : 1-sigma spherical position error (m)
+     * angErr     : 1-sigma spherical angle error (rad)
+     *
+    */
+    void writeExtNavData(bool frameIsNED, const Vector3f &sensOffset, const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms);
+
+    /*
      * Write odometry data from a wheel encoder. The axis of rotation is assumed to be parallel to the vehicle body axis
      *
      * delAng is the measured change in angular position from the previous measurement where a positive rotation is produced by forward motion of the vehicle (rad)

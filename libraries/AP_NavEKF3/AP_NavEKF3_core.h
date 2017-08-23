@@ -224,6 +224,20 @@ public:
     void writeBodyFrameOdom(float quality, const Vector3f &delPos, const Vector3f &delAng, float delTime, uint32_t timeStamp_ms, const Vector3f &posOffset);
 
     /*
+     * Write position and quaternion data from an external navigation system
+     *
+     * frameIsNED : Boolean set to true if the eternal mavigaton system is using a NED coordinate frame
+     * sensOffset : position of the external navigatoin sensor in body frame (m)
+     * pos        : position in the RH navigation frame. Frame is assumed to be NED if frameIsNED is true. (m)
+     * quat       : quaternion desribing the the rotation from navigation frame to body frame
+     * posErr     : 1-sigma spherical position error (m)
+     * angErr     : 1-sigma spherical angle error (rad)
+     * timeStamp_ms : system time the measurement was taken, not the time it was received (mSec)
+     *
+    */
+    void writeExtNavData(bool frameIsNED, const Vector3f &sensOffset, const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms);
+
+    /*
      * Write odometry data from a wheel encoder. The axis of rotation is assumed to be parallel to the vehicle body axis
      *
      * delAng is the measured change in angular position from the previous measurement where a positive rotation is produced by forward motion of the vehicle (rad)
@@ -495,6 +509,16 @@ private:
         float           velErr;     // velocity measurement error 1-std (m/s)
         const Vector3f *body_offset;// pointer to XYZ position of the velocity sensor in body frame (m)
         Vector3f        angRate;    // angular rate estimated from odometry (rad/sec)
+        uint32_t        time_ms;    // measurement timestamp (msec)
+    };
+
+    struct ext_nav_elements {
+        bool            frameIsNED; // true if the data is in a NED navigation frame
+        Vector3f        pos;        // XYZ position measured in a RH navigation frame (m)
+        Quaternion      quat;       // quaternion describing the rotation from navigation to body frame
+        float           posErr;     // spherical poition measurement error 1-std (m)
+        float           angErr;     // spherical angular measurement error 1-std (rad)
+        const Vector3f *body_offset;// pointer to XYZ position of the sensor in body frame (m)
         uint32_t        time_ms;    // measurement timestamp (msec)
     };
 
@@ -1071,12 +1095,22 @@ private:
     vel_odm_elements bodyOdmDataDelayed;  // Body  frame odometry data at the fusion time horizon
     uint32_t lastbodyVelPassTime_ms;    // time stamp when the body velocity measurement last passed innovation consistency checks (msec)
     Vector3 bodyVelTestRatio;           // Innovation test ratios for body velocity XYZ measurements
-    Vector3 varInnovBodyVel;            // Body velocity XYZ innovation variances (rad/sec)^2
-    Vector3 innovBodyVel;               // Body velocity XYZ innovations (rad/sec)
+    Vector3 varInnovBodyVel;            // Body velocity XYZ innovation variances (m/sec)^2
+    Vector3 innovBodyVel;               // Body velocity XYZ innovations (m/sec)
     uint32_t prevBodyVelFuseTime_ms;    // previous time all body velocity measurement components passed their innovation consistency checks (msec)
     uint32_t bodyOdmMeasTime_ms;        // time body velocity measurements were accepted for input to the data buffer (msec)
     bool bodyVelFusionDelayed;          // true when body frame velocity fusion has been delayed
     bool bodyVelFusionActive;           // true when body frame velocity fusion is active
+
+    // external navigation fusion
+    obs_ring_buffer_t<ext_nav_elements> storedExtNav; // external navigation data buffer
+    ext_nav_elements extNavDataNew;     // External nav data at the current time horizon
+    ext_nav_elements extNavDataDelayed; // External nav at the fusion time horizon
+    uint32_t lastExtNavPosFuseTime_ms;  // time stamp when the nav measurements last passed innovation consistency checks and were fused (msec)
+    Vector3 extNavPosTestRatio;         // Innovation test ratios for external nav position measurements
+    Vector3 varInnovExtNavPos;          // External nav position XYZ innovation variances (m)^2
+    Vector3 innovExtNavPos;             // External nav position XYZ innovations (m)
+    uint32_t extNavMeasTime_ms;         // time external measurements were accepted for input to the data buffer (msec)
 
     // wheel sensor fusion
     uint32_t wheelOdmMeasTime_ms;       // time wheel odometry measurements were accepted for input to the data buffer (msec)

@@ -128,6 +128,9 @@ bool NavEKF3_core::setup_core(NavEKF3 *_frontend, uint8_t _imu_index, uint8_t _c
     if(!storedWheelOdm.init(imu_buffer_length)) { // initialise to same length of IMU to allow for multiple wheel sensors
         return false;
     }
+    if(!storedExtNav.init(obs_buffer_length)) {
+        return false;
+    }
     // Note: the use of dual range finders potentially doubles the amount of data to be stored
     if(!storedRange.init(MIN(2*obs_buffer_length , imu_buffer_length))) {
         return false;
@@ -379,6 +382,15 @@ void NavEKF3_core::InitialiseVariables()
     usingWheelSensors = false;
     wheelOdmMeasTime_ms = 0;
 
+    // external nav data fusion
+    memset(&extNavDataNew, 0, sizeof(extNavDataNew));
+    memset(&extNavDataDelayed, 0, sizeof(extNavDataDelayed));
+    lastExtNavPosFuseTime_ms = 0;
+    memset(&extNavPosTestRatio, 0, sizeof(extNavPosTestRatio));
+    memset(&varInnovExtNavPos, 0, sizeof(varInnovExtNavPos));
+    memset(&innovExtNavPos, 0, sizeof(innovExtNavPos));
+    extNavMeasTime_ms = 0;
+
     // zero data buffers
     storedIMU.reset();
     storedGPS.reset();
@@ -390,6 +402,7 @@ void NavEKF3_core::InitialiseVariables()
     storedRangeBeacon.reset();
     storedBodyOdm.reset();
     storedWheelOdm.reset();
+    storedExtNav.reset();
 }
 
 // Initialise the states from accelerometer and magnetometer data (if present)
