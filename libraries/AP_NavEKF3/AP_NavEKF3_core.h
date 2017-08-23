@@ -818,6 +818,10 @@ private:
 
     // Update the state index limit based on which states are active
     void updateStateIndexLim(void);
+
+    // update the estimated misalignment between the EV naigration frame and the EKF navigation frame
+    // and calculate a rotation matrix which transforms EV navigation frame measurements into NED
+    void calcExtVisRotMat();
     
     // Variables
     bool statesInitialised;         // boolean true when filter states have been initialised
@@ -1111,6 +1115,9 @@ private:
     Vector3 varInnovExtNavPos;          // External nav position XYZ innovation variances (m)^2
     Vector3 innovExtNavPos;             // External nav position XYZ innovations (m)
     uint32_t extNavMeasTime_ms;         // time external measurements were accepted for input to the data buffer (msec)
+    Vector3f ekfToExtNavRotVecFilt;     // filtered rotation vector defining the rotation from EKF to external nav reference frme (rad)
+    Matrix3f extNavToEkfRotMat;         // transformation matrix that rotates observations from the external nav to the EKF reference frame
+
 
     // wheel sensor fusion
     uint32_t wheelOdmMeasTime_ms;       // time wheel odometry measurements were accepted for input to the data buffer (msec)
