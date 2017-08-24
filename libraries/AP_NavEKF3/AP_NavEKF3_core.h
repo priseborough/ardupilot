@@ -1117,7 +1117,7 @@ private:
     uint32_t extNavMeasTime_ms;         // time external measurements were accepted for input to the data buffer (msec)
     Vector3f ekfToExtNavRotVecFilt;     // filtered rotation vector defining the rotation from EKF to external nav reference frme (rad)
     Matrix3f extNavToEkfRotMat;         // transformation matrix that rotates observations from the external nav to the EKF reference frame
-
+    uint32_t ekfToExtNavRotTime_ms;     // previous time that the calculation of the ext nav to EKF rotation matrix was updated (mSec)
 
     // wheel sensor fusion
     uint32_t wheelOdmMeasTime_ms;       // time wheel odometry measurements were accepted for input to the data buffer (msec)

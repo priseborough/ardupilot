@@ -200,7 +200,10 @@ void NavEKF3_core::calcExtVisRotMat()
         }
 
         // Apply a first order IIR low pass filter
-        ekfToExtNavRotVecFilt = ekfToExtNavRotVecFilt * 0.95f + rotVec * 0.05f;
+        const float omega = 0.2e-3f; // cutoff frequency in rad/mSec
+        float alpha = constrain_float(omega * (float)(imuDataDelayed.time_ms - ekfToExtNavRotTime_ms) , 0.0f , 1.0f);
+        ekfToExtNavRotTime_ms = imuDataDelayed.time_ms;
+        ekfToExtNavRotVecFilt = ekfToExtNavRotVecFilt * (1.0f - alpha) + rotVec * alpha;
 
     }
 

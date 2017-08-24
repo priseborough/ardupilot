@@ -392,6 +392,7 @@ void NavEKF3_core::InitialiseVariables()
     extNavMeasTime_ms = 0;
     ekfToExtNavRotVecFilt.zero();
     memset(&extNavToEkfRotMat, 0, sizeof(extNavToEkfRotMat));
+    ekfToExtNavRotTime_ms = 0;
 
     // zero data buffers
     storedIMU.reset();
