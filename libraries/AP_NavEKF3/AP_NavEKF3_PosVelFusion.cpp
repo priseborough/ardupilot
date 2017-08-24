@@ -1625,10 +1625,9 @@ void NavEKF3_core::SelectExtNavFusion()
     // Check for data at the fusion time horizon
     if (storedExtNav.recall(extNavDataDelayed, imuDataDelayed.time_ms)) {
 
-        // rotate position into EKF reference frame
+        // If external nav is not using NED, calculate the rotation required to convert measurements
         if (!extNavDataDelayed.frameIsNED) {
             calcExtVisRotMat();
-            extNavDataDelayed.pos = extNavToEkfRotMat * extNavDataDelayed.pos;
         }
 
         // Fuse data into the main filter
