@@ -368,6 +368,9 @@ public:
     // get timing statistics structure
     void getTimingStatistics(struct ekf_timing &timing);
     
+    // return the quaternion defining the rotation from the EKF to the external nav reference frame
+    void getEkfToExtNavQuat(Quaternion &ret) const;
+
 private:
     // Reference to the global EKF frontend for parameters
     NavEKF3 *frontend;

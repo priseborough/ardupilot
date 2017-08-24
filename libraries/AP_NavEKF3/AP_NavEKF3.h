@@ -181,6 +181,9 @@ public:
     // return the quaternions defining the rotation from NED to XYZ (body) axes
     void getQuaternion(int8_t instance, Quaternion &quat) const;
 
+    // return the quaternions defining the rotation from the EKF to the external nav reference frame
+    void getEkfToExtNavQuat(int8_t instance, Quaternion &quat) const;
+
     // return the innovations for the specified instance
     // An out of range instance (eg -1) returns data for the the primary instance
     void getInnovations(int8_t index, Vector3f &velInnov, Vector3f &posInnov, Vector3f &magInnov, float &tasInnov, float &yawInnov);

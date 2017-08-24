@@ -626,4 +626,12 @@ void NavEKF3_core::getOutputTrackingError(Vector3f &error) const
     error = outputTrackError;
 }
 
+// return the quaternion defining the rotation from the EKF to the external nav reference frame
+void NavEKF3_core::getEkfToExtNavQuat(Quaternion& ret) const
+{
+    Quaternion quat;
+    quat.from_axis_angle(ekfToExtNavRotVecFilt);
+    ret = quat;
+}
+
 #endif // HAL_CPU_CLASS

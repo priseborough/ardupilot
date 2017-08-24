@@ -1584,4 +1584,13 @@ void NavEKF3::getTimingStatistics(int8_t instance, struct ekf_timing &timing)
     }
 }
 
+// return the quaternions defining the rotation from the EKF to the external nav reference frame
+void NavEKF3::getEkfToExtNavQuat(int8_t instance, Quaternion &quat) const
+{
+    if (instance < 0 || instance >= num_cores) instance = primary;
+    if (core) {
+        core[instance].getEkfToExtNavQuat(quat);
+    }
+}
+
 #endif //HAL_CPU_CLASS
