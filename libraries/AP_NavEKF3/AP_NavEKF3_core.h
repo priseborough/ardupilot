@@ -873,8 +873,8 @@ private:
     Vector6 innovVelPos;            // innovation output for a group of measurements
     Vector6 varInnovVelPos;         // innovation variance output for a group of measurements
     bool fuseVelData;               // this boolean causes the velNED measurements to be fused
-    bool fusePosData;               // this boolean causes the posNE measurements to be fused
-    bool fuseHgtData;               // this boolean causes the hgtMea measurements to be fused
+    bool fusePosData;               // this boolean causes the horizPosMea measurements to be fused
+    bool fuseHgtData;               // this boolean causes the hgtMea measurement to be fused
     Vector3f innovMag;              // innovation output from fusion of X,Y,Z compass measurements
     Vector3f varInnovMag;           // innovation variance output from fusion of X,Y,Z compass measurements
     ftype innovVtas;                // innovation output from fusion of airspeed measurements
@@ -983,7 +983,7 @@ private:
     uint32_t framesSincePredict;    // number of frames lapsed since EKF instance did a state prediction
     bool startPredictEnabled;       // boolean true when the frontend has given permission to start a new state prediciton cycle
     uint8_t localFilterTimeStep_ms; // average number of msec between filter updates
-    float posDownObsNoise;          // observation noise variance on the vertical position used by the state and covariance update step (m^2)
+    float posDownObsVar;          // observation noise variance on the vertical position used by the state and covariance update step (m^2)
     Vector3f delAngCorrected;       // corrected IMU delta angle vector at the EKF time horizon (rad)
     Vector3f delVelCorrected;       // corrected IMU delta velocity vector at the EKF time horizon (m/s)
     bool magFieldLearned;           // true when the magnetic field has been learned
@@ -1063,6 +1063,8 @@ private:
     float varInnovRng;              // range finder observation innovation variance (m^2)
     float innovRng;                 // range finder observation innovation (m)
     float hgtMea;                   // height measurement derived from either baro, gps or range finder data (m)
+    Vector2f horizPosMea;           // horizontal position observation (m)
+    float horizPosObsVar;           // horizontal position observation variance (m^2)
     bool inhibitGndState;           // true when the terrain position state is to remain constant
     uint32_t prevFlowFuseTime_ms;   // time both flow measurement components passed their innovation consistency checks
     Vector2 flowTestRatio;          // square of optical flow innovations divided by fail threshold used by main filter where >1.0 is a fail
@@ -1125,6 +1127,10 @@ private:
     Matrix3f extNavToEkfRotMat;         // transformation matrix that rotates observations from the external nav to the EKF reference frame
     uint32_t ekfToExtNavRotTime_ms;     // previous time that the calculation of the ext nav to EKF rotation matrix was updated (mSec)
     bool extNavFusionDelayed;           // true when external nav fusion has been delayed
+    bool useExtNavRelPosMethod;         // true when the position data is being fused using an odometry assumption
+    Vector3f extNavPosMeasPrev;         // previous value of NED position measurement fused using odometry assumption (m)
+    Vector3f extNavPosEstPrev;          // value of NED position state used by the last odometry fusion (m)
+    bool extNavPrevAvailable;           // true when previous values of the estimate and measurement are available for use
 
     // wheel sensor fusion
     uint32_t wheelOdmMeasTime_ms;       // time wheel odometry measurements were accepted for input to the data buffer (msec)
