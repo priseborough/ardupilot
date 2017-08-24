@@ -444,6 +444,12 @@ bool NavEKF3_core::readyToUseRangeBeacon(void) const
     return tiltAlignComplete && yawAlignComplete && delAngBiasLearned && rngBcnGoodToAlign && rngBcnDataToFuse;
 }
 
+// return true if the filter to be ready to use the external nav estimates
+bool NavEKF3_core::readyToUseExtNav(void) const
+{
+    return tiltAlignComplete && yawAlignComplete && delAngBiasLearned && extNavDataToFuse;
+}
+
 // return true if we should use the compass
 bool NavEKF3_core::use_compass(void) const
 {

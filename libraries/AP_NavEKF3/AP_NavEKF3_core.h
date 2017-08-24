@@ -703,6 +703,9 @@ private:
     // return true if the filter to be ready to use the beacon range measurements
     bool readyToUseRangeBeacon(void) const;
 
+    // return true if the filter to be ready to use external nav system estimates
+    bool readyToUseExtNav(void) const;
+
     // Check for filter divergence
     void checkDivergence(void);
 
@@ -1131,6 +1134,7 @@ private:
     Vector3f extNavPosMeasPrev;         // previous value of NED position measurement fused using odometry assumption (m)
     Vector3f extNavPosEstPrev;          // value of NED position state used by the last odometry fusion (m)
     bool extNavPrevAvailable;           // true when previous values of the estimate and measurement are available for use
+    bool extNavDataToFuse;              // true when there is new external nav data to fuse
 
     // wheel sensor fusion
     uint32_t wheelOdmMeasTime_ms;       // time wheel odometry measurements were accepted for input to the data buffer (msec)
