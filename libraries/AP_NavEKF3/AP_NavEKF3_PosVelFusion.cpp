@@ -1609,4 +1609,33 @@ void NavEKF3_core::SelectBodyOdomFusion()
     }
 }
 
+// select fusion of external navigation measurements
+void NavEKF3_core::SelectExtNavFusion()
+{
+    // Check if the magnetometer has been fused on that time step and the filter is running at faster than 200 Hz
+    // If so, don't fuse measurements on this time step to reduce frame over-runs
+    // Only allow one time slip to prevent high rate magnetometer data preventing fusion of other measurements
+    if (magFusePerformed && (dtIMUavg < 0.005f) && !extNavFusionDelayed) {
+        extNavFusionDelayed = true;
+        return;
+    } else {
+        extNavFusionDelayed = false;
+    }
+
+    // Check for data at the fusion time horizon
+    if (storedExtNav.recall(extNavDataDelayed, imuDataDelayed.time_ms)) {
+
+        // rotate position into EKF reference frame
+        if (!extNavDataDelayed.frameIsNED) {
+            calcExtVisRotMat();
+            extNavDataDelayed.pos = extNavToEkfRotMat * extNavDataDelayed.pos;
+        }
+
+        // Fuse data into the main filter
+        //FuseVelPosNED();
+
+    }
+
+}
+
 #endif // HAL_CPU_CLASS

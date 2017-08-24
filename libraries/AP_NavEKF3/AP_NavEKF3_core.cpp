@@ -393,6 +393,7 @@ void NavEKF3_core::InitialiseVariables()
     ekfToExtNavRotVecFilt.zero();
     memset(&extNavToEkfRotMat, 0, sizeof(extNavToEkfRotMat));
     ekfToExtNavRotTime_ms = 0;
+    extNavFusionDelayed = false;
 
     // zero data buffers
     storedIMU.reset();
@@ -593,6 +594,9 @@ void NavEKF3_core::UpdateFilter(bool predict)
 
         // Update states using body frame odometry data
         SelectBodyOdomFusion();
+
+        // Update states external nav system data
+        SelectExtNavFusion();
 
         // Update states using airspeed data
         SelectTasFusion();
