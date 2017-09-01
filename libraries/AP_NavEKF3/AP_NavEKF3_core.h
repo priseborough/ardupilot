@@ -1125,7 +1125,7 @@ private:
     uint32_t lastExtNavPosFuseTime_ms;  // time stamp when the nav measurements last passed innovation consistency checks and were fused (msec)
     Vector3 extNavPosTestRatio;         // Innovation test ratios for external nav position measurements
     Vector3 varInnovExtNavPos;          // External nav position XYZ innovation variances (m)^2
-    Vector3 innovExtNavPos;             // External nav position XYZ innovations (m)
+    Vector3f innovExtNavPos;            // External nav position XYZ innovations (m)
     uint32_t extNavMeasTime_ms;         // time external measurements were accepted for input to the data buffer (msec)
     Vector3f ekfToExtNavRotVecFilt;     // filtered rotation vector defining the rotation from EKF to external nav reference frme (rad)
     Matrix3f extNavToEkfRotMat;         // transformation matrix that rotates observations from the external nav to the EKF reference frame

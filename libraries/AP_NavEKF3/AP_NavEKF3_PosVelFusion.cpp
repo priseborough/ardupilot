@@ -461,8 +461,13 @@ void NavEKF3_core::FuseVelPosNED()
         // test position measurements
         if (fusePosData) {
             // test horizontal position measurements
-            innovVelPos[3] = stateStruct.position.x - horizPosMea.x;
-            innovVelPos[4] = stateStruct.position.y - horizPosMea.y;
+            if (!useExtNavRelPosMethod) {
+                innovVelPos[3] = stateStruct.position.x - horizPosMea.x;
+                innovVelPos[4] = stateStruct.position.y - horizPosMea.y;
+            } else {
+                innovVelPos[3] = innovExtNavPos.x;
+                innovVelPos[4] = innovExtNavPos.y;
+            }
             varInnovVelPos[3] = P[7][7] + R_OBS_DATA_CHECKS[3];
             varInnovVelPos[4] = P[8][8] + R_OBS_DATA_CHECKS[4];
             // apply an innovation consistency threshold test, but don't fail if bad IMU data
@@ -547,7 +552,11 @@ void NavEKF3_core::FuseVelPosNED()
         // test height measurements
         if (fuseHgtData) {
             // calculate height innovations
-            innovVelPos[5] = stateStruct.position.z - observation[5];
+            if (!useExtNavRelPosMethod) {
+                innovVelPos[5] = stateStruct.position.z - observation[5];
+            } else {
+                innovVelPos[5] = innovExtNavPos.z;
+            }
             varInnovVelPos[5] = P[9][9] + R_OBS_DATA_CHECKS[5];
             // calculate the innovation consistency test ratio
             hgtTestRatio = sq(innovVelPos[5]) / (sq(MAX(0.01f * (float)frontend->_hgtInnovGate, 1.0f)) * varInnovVelPos[5]);
@@ -1629,6 +1638,8 @@ void NavEKF3_core::SelectExtNavFusion()
     // Check for data at the fusion time horizon
     if (storedExtNav.recall(extNavDataDelayed, imuDataDelayed.time_ms)) {
 
+        useExtNavRelPosMethod = !(extNavDataDelayed.frameIsNED || filterStatus.flags.using_gps);
+
         // If external nav is not using NED, calculate the rotation required to convert measurements
         if (!extNavDataDelayed.frameIsNED) {
             calcExtVisRotMat();
@@ -1647,11 +1658,25 @@ void NavEKF3_core::SelectExtNavFusion()
         fuseHgtData = true;
         fuseVelData = false;
 
-        // Fuse data into the main filter
-        FuseVelPosNED();
-
+        if (useExtNavRelPosMethod) {
+            if ((imuDataDelayed.time_ms - ekfToExtNavRotTime_ms) > 1000) {
+                // Need to reiniitalise the previous values used to calculate odometry delta
+                extNavPosMeasPrev = extNavDataDelayed.pos;
+                extNavPosEstPrev = stateStruct.position;
+            } else {
+                Vector3f relPosMea = extNavDataDelayed.pos - extNavPosMeasPrev;
+                if (!extNavDataDelayed.frameIsNED) {
+                    relPosMea = extNavToEkfRotMat * relPosMea;
+                }
+                innovExtNavPos = (stateStruct.position - extNavPosEstPrev) - (extNavDataDelayed.pos - extNavPosMeasPrev);
+                extNavPosMeasPrev = extNavDataDelayed.pos;
+                extNavPosEstPrev = stateStruct.position;
+                FuseVelPosNED();
+            }
+        } else {
+            FuseVelPosNED();
+        }
     }
-
 }
 
 #endif // HAL_CPU_CLASS

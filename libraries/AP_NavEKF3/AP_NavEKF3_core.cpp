@@ -388,7 +388,7 @@ void NavEKF3_core::InitialiseVariables()
     lastExtNavPosFuseTime_ms = 0;
     memset(&extNavPosTestRatio, 0, sizeof(extNavPosTestRatio));
     memset(&varInnovExtNavPos, 0, sizeof(varInnovExtNavPos));
-    memset(&innovExtNavPos, 0, sizeof(innovExtNavPos));
+    innovExtNavPos.zero();
     extNavMeasTime_ms = 0;
     ekfToExtNavRotVecFilt.zero();
     memset(&extNavToEkfRotMat, 0, sizeof(extNavToEkfRotMat));
