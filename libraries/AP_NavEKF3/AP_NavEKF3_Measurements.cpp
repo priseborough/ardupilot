@@ -133,7 +133,7 @@ void NavEKF3_core::writeBodyFrameOdom(float quality, const Vector3f &delPos, con
 
 }
 
-void NavEKF3_core::writeExtNavData(bool frameIsNED, const Vector3f &sensOffset, const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint32_t resetTime_ms)
+void NavEKF3_core::writeExtNavData(bool scaleUnknown ,bool frameIsNED, const Vector3f &sensOffset, const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint32_t resetTime_ms)
 {
     // limit update rate to maximum allowed by sensor buffers and fusion process
     // don't try to write to buffer until the filter has been initialised
@@ -141,6 +141,7 @@ void NavEKF3_core::writeExtNavData(bool frameIsNED, const Vector3f &sensOffset, 
         return;
     }
 
+    estimateScaleFactor = scaleUnknown;
     extNavDataNew.frameIsNED = frameIsNED;
     extNavDataNew.pos = pos;
     extNavDataNew.quat = quat;

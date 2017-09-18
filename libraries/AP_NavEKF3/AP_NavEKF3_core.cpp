@@ -13,6 +13,7 @@ extern const AP_HAL::HAL& hal;
 // constructor
 NavEKF3_core::NavEKF3_core(void) :
     stateStruct(*reinterpret_cast<struct state_elements *>(&statesArray)),
+    extNavStateStruct(*reinterpret_cast<struct extNavStateElements *>(&extNavStateArray)),
 
     _perf_UpdateFilter(hal.util->perf_alloc(AP_HAL::Util::PC_ELAPSED, "EK3_UpdateFilter")),
     _perf_CovariancePrediction(hal.util->perf_alloc(AP_HAL::Util::PC_ELAPSED, "EK3_CovariancePrediction")),
@@ -399,6 +400,15 @@ void NavEKF3_core::InitialiseVariables()
     extNavPosEstPrev.zero();
     extNavPrevAvailable = false;
 
+    // external nav scale factor estimation
+    estimateScaleFactor = false;
+    memset(&extNavStateArray, 0, sizeof(extNavStateArray));
+    extNavStateStruct.scaleFactor = 1.0f;
+    memset(&extNavP, 0, sizeof(extNavP));
+    memset(&extNavScaleInnovVar, 0, sizeof(extNavScaleInnovVar));
+    memset(&extNavScaleInnov, 0, sizeof(extNavScaleInnov));
+    extNavScaleFuseTime_ms = 0;
+
     // zero data buffers
     storedIMU.reset();
     storedGPS.reset();
@@ -684,6 +694,11 @@ void NavEKF3_core::UpdateStrapdownEquationsNED()
     // sum delta velocities to get velocity
     stateStruct.velocity += delVelNav;
 
+    // update external nav world frame states and covariance
+    if (estimateScaleFactor) {
+        extNavScalePrediction(delVelNav);
+    }
+
     // apply a trapezoidal integration to velocities to calculate position
     stateStruct.position += (stateStruct.velocity + lastVelocity) * (imuDataDelayed.delVelDT*0.5f);
 
@@ -698,6 +713,148 @@ void NavEKF3_core::UpdateStrapdownEquationsNED()
     if (filterStatus.flags.horiz_vel) {
         receiverPos += (stateStruct.velocity + lastVelocity) * (imuDataDelayed.delVelDT*0.5f);
     }
+
+}
+
+void NavEKF3_core::extNavScalePrediction(Vector3f delVelNED)
+{
+    if (imuDataDelayed.time_ms - extNavScaleFuseTime_ms > 1000) {
+        extNavStateStruct.position = extNavDataDelayed.pos;
+        extNavStateStruct.velocity = extNavToEkfRotMat.transposed()*stateStruct.velocity;
+    }
+
+    // predict states
+    Vector3f delVelWorld = extNavToEkfRotMat.mul_transpose(delVelNED);
+    Vector3f lastExtNavVelocity = extNavStateStruct.velocity;
+    extNavStateStruct.velocity += delVelWorld * extNavStateStruct.scaleFactor;
+    extNavStateStruct.position += (extNavStateStruct.velocity + lastExtNavVelocity) * (imuDataDelayed.delVelDT*0.5f);
+
+    // constrain scale factor state
+    extNavStateStruct.scaleFactor = constrain_float(extNavStateStruct.scaleFactor, 1e-3f, 1e3f);
+
+    // predict covariance
+    float delT = imuDataDelayed.delVelDT;
+    float SQ = sq(frontend->_accNoise * imuDataDelayed.delVelDT * extNavStateStruct.scaleFactor);
+
+    float SPP[6];
+    SPP[0] = extNavP[5][6] + delT*extNavP[2][6];
+    SPP[1] = extNavP[4][6] + delT*extNavP[1][6];
+    SPP[2] = extNavP[3][6] + delT*extNavP[0][6];
+    SPP[3] = extNavP[2][6] + delVelWorld.z*extNavP[6][6];
+    SPP[4] = extNavP[1][6] + delVelWorld.y*extNavP[6][6];
+    SPP[5] = extNavP[0][6] + delVelWorld.x*extNavP[6][6];
+
+    Matrix7 Pnew;
+    Pnew[0][0] = extNavP[0][0] + SQ + delVelWorld.x*SPP[5] + delVelWorld.x*extNavP[6][0];
+    Pnew[0][1] = extNavP[0][1] + delVelWorld.y*SPP[5] + delVelWorld.x*extNavP[6][1];
+    Pnew[1][1] = extNavP[1][1] + SQ + delVelWorld.y*SPP[4] + delVelWorld.y*extNavP[6][1];
+    Pnew[0][2] = extNavP[0][2] + delVelWorld.z*SPP[5] + delVelWorld.x*extNavP[6][2];
+    Pnew[1][2] = extNavP[1][2] + delVelWorld.z*SPP[4] + delVelWorld.y*extNavP[6][2];
+    Pnew[2][2] = extNavP[2][2] + SQ + delVelWorld.z*SPP[3] + delVelWorld.z*extNavP[6][2];
+    Pnew[0][3] = extNavP[0][3] + delVelWorld.x*extNavP[6][3] + delT*(extNavP[0][0] + delVelWorld.x*extNavP[6][0]);
+    Pnew[1][3] = extNavP[1][3] + delVelWorld.y*extNavP[6][3] + delT*(extNavP[1][0] + delVelWorld.y*extNavP[6][0]);
+    Pnew[2][3] = extNavP[2][3] + delVelWorld.z*extNavP[6][3] + delT*(extNavP[2][0] + delVelWorld.z*extNavP[6][0]);
+    Pnew[3][3] = extNavP[3][3] + delT*extNavP[0][3] + delT*(extNavP[3][0] + delT*extNavP[0][0]);
+    Pnew[0][4] = extNavP[0][4] + delVelWorld.x*extNavP[6][4] + delT*(extNavP[0][1] + delVelWorld.x*extNavP[6][1]);
+    Pnew[1][4] = extNavP[1][4] + delVelWorld.y*extNavP[6][4] + delT*(extNavP[1][1] + delVelWorld.y*extNavP[6][1]);
+    Pnew[2][4] = extNavP[2][4] + delVelWorld.z*extNavP[6][4] + delT*(extNavP[2][1] + delVelWorld.z*extNavP[6][1]);
+    Pnew[3][4] = extNavP[3][4] + delT*extNavP[0][4] + delT*(extNavP[3][1] + delT*extNavP[0][1]);
+    Pnew[4][4] = extNavP[4][4] + delT*extNavP[1][4] + delT*(extNavP[4][1] + delT*extNavP[1][1]);
+    Pnew[0][5] = extNavP[0][5] + delVelWorld.x*extNavP[6][5] + delT*(extNavP[0][2] + delVelWorld.x*extNavP[6][2]);
+    Pnew[1][5] = extNavP[1][5] + delVelWorld.y*extNavP[6][5] + delT*(extNavP[1][2] + delVelWorld.y*extNavP[6][2]);
+    Pnew[2][5] = extNavP[2][5] + delVelWorld.z*extNavP[6][5] + delT*(extNavP[2][2] + delVelWorld.z*extNavP[6][2]);
+    Pnew[3][5] = extNavP[3][5] + delT*extNavP[0][5] + delT*(extNavP[3][2] + delT*extNavP[0][2]);
+    Pnew[4][5] = extNavP[4][5] + delT*extNavP[1][5] + delT*(extNavP[4][2] + delT*extNavP[1][2]);
+    Pnew[5][5] = extNavP[5][5] + delT*extNavP[2][5] + delT*(extNavP[5][2] + delT*extNavP[2][2]);
+    Pnew[0][6] = SPP[5];
+    Pnew[1][6] = SPP[4];
+    Pnew[2][6] = SPP[3];
+    Pnew[3][6] = SPP[2];
+    Pnew[4][6] = SPP[1];
+    Pnew[5][6] = SPP[0];
+    Pnew[6][6] = extNavP[6][6];
+
+    // covariance matrix is symmetrical, so copy diagonals and copy lower half in Pnew
+    // to lower and upper half in extNavP
+    for (uint8_t row = 0; row <= 6; row++) {
+        // copy diagonals and constrain
+        extNavP[row][row] = MAX(Pnew[row][row] , 1e-12f);
+        // copy off diagonals
+        for (uint8_t column = 0 ; column < row; column++) {
+            extNavP[row][column] = extNavP[column][row] = Pnew[column][row];
+        }
+    }
+}
+
+void NavEKF3_core::extNavScaleObservation()
+{
+    // calculate innovation and innovation variances and exit if innovations are too large
+    for (uint8_t obsIndex=0; obsIndex<=2; obsIndex++) {
+        uint8_t stateIndex = obsIndex + 3;
+
+        // calculate innovation
+        extNavScaleInnov[obsIndex] = extNavStateStruct.position[obsIndex] - extNavDataDelayed.pos[obsIndex];
+
+        // calculate the innovation variance
+        extNavScaleInnovVar[obsIndex] = sq(extNavDataDelayed.posErr) + extNavP[stateIndex][stateIndex];
+
+        // perform a 5-sigma innovation coinsistency check and exit if failed
+        if (sq(extNavScaleInnov[obsIndex]) > 25.0f * extNavScaleInnovVar[obsIndex]) {
+            return;
+        }
+    }
+
+    // fuse observations sequentially
+    for (uint8_t obsIndex=0; obsIndex<=2; obsIndex++) {
+        uint8_t stateIndex = obsIndex + 3;
+
+        // calculate the Kalman gain vector and update the states
+        float varInnovInv = 1.0f/extNavScaleInnovVar[obsIndex];
+        for (uint8_t i= 0; i<=6; i++) {
+            Kfusion[i] = extNavP[stateIndex][i]*varInnovInv;
+            extNavStateArray[i] -= Kfusion[i] * extNavScaleInnov[obsIndex];
+        }
+
+        // constrain scale factor state
+        extNavStateStruct.scaleFactor = constrain_float(extNavStateStruct.scaleFactor, 1e-3f, 1e3f);
+
+        // update the covariance - take advantage of direct observation of a single state at index = stateIndex to reduce computations
+        // this is a numerically optimised implementation of standard equation P = (I - K*H)*P;
+        for (uint8_t i= 0; i<=6; i++) {
+            for (uint8_t j= 0; j<=6; j++)
+            {
+                KHP[i][j] = Kfusion[i] * extNavP[stateIndex][j];
+            }
+        }
+
+        // Check that we are not going to drive any variances negative and skip the update if so
+        for (uint8_t i= 0; i<=6; i++) {
+            if (KHP[i][i] > P[i][i]) {
+                 return;
+            }
+        }
+
+        // update the covariance matrix
+        for (uint8_t i= 0; i<=6; i++) {
+            for (uint8_t j= 0; j<=6; j++) {
+                extNavP[i][j] = extNavP[i][j] - KHP[i][j];
+            }
+        }
+
+        // force the covariance matrix to be symmetrical and limit the variances to prevent ill-condiioning.
+        for (uint8_t i=1; i<=6; i++)
+        {
+            for (uint8_t j=0; j<=i-1; j++)
+            {
+                float temp = 0.5f*(extNavP[i][j] + extNavP[j][i]);
+                extNavP[i][j] = temp;
+                extNavP[j][i] = temp;
+            }
+            extNavP[i][i] = MIN(extNavP[i][i] , 1e-12f);
+        }
+    }
+
+    extNavScaleFuseTime_ms = imuDataDelayed.time_ms;
 }
 
 /*

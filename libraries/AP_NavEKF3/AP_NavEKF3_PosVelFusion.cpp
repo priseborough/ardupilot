@@ -1645,13 +1645,17 @@ void NavEKF3_core::SelectExtNavFusion()
             calcExtVisRotMat();
         }
 
-        // correct for sensor posiiton in body frame
-        Vector3f posOffsetBody = (*ofDataDelayed.body_offset) - accelPosOffset;
-        Vector3f posOffsetEarth = prevTnb.mul_transpose(posOffsetBody);
-        horizPosMea.x = extNavDataDelayed.pos.x - posOffsetEarth.x;
-        horizPosMea.y = extNavDataDelayed.pos.y - posOffsetEarth.y;
+        // Run the scale factor estimator if required
+        if (estimateScaleFactor) {
+            extNavScaleObservation();
+        }
+
+        // correct for scale factor
+        float scaleFactorInv = 1.0f / extNavStateStruct.scaleFactor;
+        horizPosMea.x = extNavDataDelayed.pos.x * scaleFactorInv;
+        horizPosMea.y = extNavDataDelayed.pos.y * scaleFactorInv;
         horizPosObsVar = sq(extNavDataDelayed.posErr);
-        hgtMea = - extNavDataDelayed.pos.x + posOffsetEarth.z;
+        hgtMea = - extNavDataDelayed.pos.x * scaleFactorInv;
         posDownObsVar = sq(extNavDataDelayed.posErr);
 
         fusePosData = true;

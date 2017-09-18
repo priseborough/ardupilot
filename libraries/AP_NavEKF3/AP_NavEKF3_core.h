@@ -226,7 +226,8 @@ public:
     /*
      * Write position and quaternion data from an external navigation system
      *
-     * frameIsNED : Boolean set to true if the eternal mavigaton system is using a NED coordinate frame
+     * scaleUnknown : Boolean set to true when the position scaling is unknown or not in metres
+     * frameIsNED : Boolean set to true if the external mavigaton system is using a NED coordinate frame
      * sensOffset : position of the external navigatoin sensor in body frame (m)
      * pos        : position in the RH navigation frame. Frame is assumed to be NED if frameIsNED is true. (m)
      * quat       : quaternion desribing the the rotation from navigation frame to body frame
@@ -236,7 +237,7 @@ public:
      * resetTime_ms : system time of the last position reset request (mSec)
      *
     */
-    void writeExtNavData(bool frameIsNED, const Vector3f &sensOffset, const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint32_t resetTime_ms);
+    void writeExtNavData(bool scaleUnknown ,bool frameIsNED, const Vector3f &sensOffset, const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint32_t resetTime_ms);
 
     /*
      * Write odometry data from a wheel encoder. The axis of rotation is assumed to be parallel to the vehicle body axis
@@ -403,6 +404,7 @@ private:
     typedef VectorN<ftype,31> Vector31;
     typedef VectorN<ftype,28> Vector28;
     typedef VectorN<VectorN<ftype,3>,3> Matrix3;
+    typedef VectorN<VectorN<ftype,7>,7> Matrix7;
     typedef VectorN<VectorN<ftype,24>,24> Matrix24;
     typedef VectorN<VectorN<ftype,34>,50> Matrix34_50;
     typedef VectorN<uint32_t,50> Vector_u32_50;
@@ -427,6 +429,7 @@ private:
     typedef ftype Vector25[25];
     typedef ftype Vector28[28];
     typedef ftype Matrix3[3][3];
+    typedef ftype Matrix7[7][7];
     typedef ftype Matrix24[24][24];
     typedef ftype Matrix34_50[34][50];
     typedef uint32_t Vector_u32_50[50];
@@ -448,6 +451,14 @@ private:
         Vector3f    body_magfield;  // body frame magnetic field vector (Gauss)
         Vector2f    wind_vel;       // horizontal North East wind velocity vector in local NED earth frame (m/sec)
     } &stateStruct;
+
+    // state array used by the external nav scale factor estimator and able to be accessed as either an array or a function
+    Vector7 extNavStateArray;
+    struct extNavStateElements {
+        Vector3f    velocity;       // velocity of IMU in external nav world frame (length/sec)
+        Vector3f    position;       // position of IMU in external nav world frame (length)
+        float       scaleFactor;    // scale factor to that converts from EKF nav frame to external nav world frame
+    } &extNavStateStruct;
 
     struct output_elements {
         Quaternion  quat;           // quaternion defining rotation from local NED earth frame to body frame
@@ -539,6 +550,14 @@ private:
 
     // update the quaternion, velocity and position states using IMU measurements
     void UpdateStrapdownEquationsNED();
+
+    // perform state and covariance prediction for the small EKF used to estimate the length
+    // scale factor that converts from navigation frame to external nav system world frame
+    void extNavScalePrediction(Vector3f delVelNED);
+
+    // perform an observation step for the small EKF used to estimate the length
+    // scale factor that converts from navigation frame to external nav system world frame
+    void extNavScaleObservation();
 
     // calculate the predicted state covariance matrix
     void CovariancePrediction();
@@ -1137,13 +1156,21 @@ private:
     bool extNavPrevAvailable;           // true when previous values of the estimate and measurement are available for use
     bool extNavDataToFuse;              // true when there is new external nav data to fuse
 
+    // Estimation of external nav scale factor using a 7 state EKF to estimate
+    // States can be accessed as either an array 'statesArray' or a struct 'stateStruct'
+    // See stateStruct(*reinterpret_cast<struct extNavStateElements *>(&statesArray)) in constructor
+    bool estimateScaleFactor;           // true when the scale factor from navigation to world frame length units needs to be estimated
+    Matrix7 extNavP;                    // Covariance matrix
+    Vector3 extNavScaleInnovVar;        // innovation variance
+    Vector3 extNavScaleInnov;           // innovation
+    uint32_t extNavScaleFuseTime_ms;    // last time external position measurements fused (msec)
+
     // wheel sensor fusion
     uint32_t wheelOdmMeasTime_ms;       // time wheel odometry measurements were accepted for input to the data buffer (msec)
     bool usingWheelSensors;             // true when the body frame velocity fusion method should take onbservation data from the wheel odometry buffer
     obs_ring_buffer_t<wheel_odm_elements> storedWheelOdm;    // body velocity data buffer
     wheel_odm_elements wheelOdmDataNew;       // Body frame odometry data at the current time horizon
     wheel_odm_elements wheelOdmDataDelayed;   // Body  frame odometry data at the fusion time horizon
-
 
     // Range Beacon Sensor Fusion
     obs_ring_buffer_t<rng_bcn_elements> storedRangeBeacon; // Beacon range buffer
