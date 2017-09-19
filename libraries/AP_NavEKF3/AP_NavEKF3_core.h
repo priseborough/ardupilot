@@ -457,7 +457,7 @@ private:
     struct extNavStateElements {
         Vector3f    velocity;       // velocity of IMU in external nav world frame (length/sec)
         Vector3f    position;       // position of IMU in external nav world frame (length)
-        float       scaleFactor;    // scale factor to that converts from EKF nav frame to external nav world frame
+        float       scaleFactorLog; // natural log of scale factor to that converts from EKF nav frame to external nav world frame
     } &extNavStateStruct;
 
     struct output_elements {

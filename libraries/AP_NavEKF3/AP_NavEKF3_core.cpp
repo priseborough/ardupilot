@@ -403,7 +403,7 @@ void NavEKF3_core::InitialiseVariables()
     // external nav scale factor estimation
     estimateScaleFactor = false;
     memset(&extNavStateArray, 0, sizeof(extNavStateArray));
-    extNavStateStruct.scaleFactor = 1.0f;
+    extNavStateStruct.scaleFactorLog = 0.0f;
     memset(&extNavP, 0, sizeof(extNavP));
     memset(&extNavScaleInnovVar, 0, sizeof(extNavScaleInnovVar));
     memset(&extNavScaleInnov, 0, sizeof(extNavScaleInnov));
@@ -726,53 +726,46 @@ void NavEKF3_core::extNavScalePrediction(Vector3f delVelNED)
     // predict states
     Vector3f delVelWorld = extNavToEkfRotMat.mul_transpose(delVelNED);
     Vector3f lastExtNavVelocity = extNavStateStruct.velocity;
-    extNavStateStruct.velocity += delVelWorld * extNavStateStruct.scaleFactor;
+    extNavStateStruct.velocity += delVelWorld * exp(extNavStateStruct.scaleFactorLog);
     extNavStateStruct.position += (extNavStateStruct.velocity + lastExtNavVelocity) * (imuDataDelayed.delVelDT*0.5f);
 
     // constrain scale factor state
-    extNavStateStruct.scaleFactor = constrain_float(extNavStateStruct.scaleFactor, 1e-3f, 1e3f);
+    extNavStateStruct.scaleFactorLog = constrain_float(extNavStateStruct.scaleFactorLog, -7.0f, 7.0f);
 
     // predict covariance
     float delT = imuDataDelayed.delVelDT;
-    float SQ = sq(frontend->_accNoise * imuDataDelayed.delVelDT * extNavStateStruct.scaleFactor);
-
-    float SPP[6];
-    SPP[0] = extNavP[5][6] + delT*extNavP[2][6];
-    SPP[1] = extNavP[4][6] + delT*extNavP[1][6];
-    SPP[2] = extNavP[3][6] + delT*extNavP[0][6];
-    SPP[3] = extNavP[2][6] + delVelWorld.z*extNavP[6][6];
-    SPP[4] = extNavP[1][6] + delVelWorld.y*extNavP[6][6];
-    SPP[5] = extNavP[0][6] + delVelWorld.x*extNavP[6][6];
-
+    float scaleFactor = exp(extNavStateStruct.scaleFactorLog);
+    float SQ = sq(frontend->_accNoise * imuDataDelayed.delVelDT * scaleFactor);
     Matrix7 Pnew;
-    Pnew[0][0] = extNavP[0][0] + SQ + delVelWorld.x*SPP[5] + delVelWorld.x*extNavP[6][0];
-    Pnew[0][1] = extNavP[0][1] + delVelWorld.y*SPP[5] + delVelWorld.x*extNavP[6][1];
-    Pnew[1][1] = extNavP[1][1] + SQ + delVelWorld.y*SPP[4] + delVelWorld.y*extNavP[6][1];
-    Pnew[0][2] = extNavP[0][2] + delVelWorld.z*SPP[5] + delVelWorld.x*extNavP[6][2];
-    Pnew[1][2] = extNavP[1][2] + delVelWorld.z*SPP[4] + delVelWorld.y*extNavP[6][2];
-    Pnew[2][2] = extNavP[2][2] + SQ + delVelWorld.z*SPP[3] + delVelWorld.z*extNavP[6][2];
-    Pnew[0][3] = extNavP[0][3] + delVelWorld.x*extNavP[6][3] + delT*(extNavP[0][0] + delVelWorld.x*extNavP[6][0]);
-    Pnew[1][3] = extNavP[1][3] + delVelWorld.y*extNavP[6][3] + delT*(extNavP[1][0] + delVelWorld.y*extNavP[6][0]);
-    Pnew[2][3] = extNavP[2][3] + delVelWorld.z*extNavP[6][3] + delT*(extNavP[2][0] + delVelWorld.z*extNavP[6][0]);
+    Pnew[0][0] = extNavP[0][0] + SQ + delVelWorld.x*scaleFactor*(extNavP[0][6] + delVelWorld.x*extNavP[6][6]*scaleFactor) + delVelWorld.x*extNavP[6][0]*scaleFactor;
+    Pnew[0][1] = extNavP[0][1] + delVelWorld.y*scaleFactor*(extNavP[0][6] + delVelWorld.x*extNavP[6][6]*scaleFactor) + delVelWorld.x*extNavP[6][1]*scaleFactor;
+    Pnew[1][1] = extNavP[1][1] + SQ + delVelWorld.y*scaleFactor*(extNavP[1][6] + delVelWorld.y*extNavP[6][6]*scaleFactor) + delVelWorld.y*extNavP[6][1]*scaleFactor;
+    Pnew[0][2] = extNavP[0][2] + delVelWorld.z*scaleFactor*(extNavP[0][6] + delVelWorld.x*extNavP[6][6]*scaleFactor) + delVelWorld.x*extNavP[6][2]*scaleFactor;
+    Pnew[1][2] = extNavP[1][2] + delVelWorld.z*scaleFactor*(extNavP[1][6] + delVelWorld.y*extNavP[6][6]*scaleFactor) + delVelWorld.y*extNavP[6][2]*scaleFactor;
+    Pnew[2][2] = extNavP[2][2] + SQ + delVelWorld.z*scaleFactor*(extNavP[2][6] + delVelWorld.z*extNavP[6][6]*scaleFactor) + delVelWorld.z*extNavP[6][2]*scaleFactor;
+    Pnew[0][3] = extNavP[0][3] + delT*(extNavP[0][0] + delVelWorld.x*extNavP[6][0]*scaleFactor) + delVelWorld.x*extNavP[6][3]*scaleFactor;
+    Pnew[1][3] = extNavP[1][3] + delT*(extNavP[1][0] + delVelWorld.y*extNavP[6][0]*scaleFactor) + delVelWorld.y*extNavP[6][3]*scaleFactor;
+    Pnew[2][3] = extNavP[2][3] + delT*(extNavP[2][0] + delVelWorld.z*extNavP[6][0]*scaleFactor) + delVelWorld.z*extNavP[6][3]*scaleFactor;
     Pnew[3][3] = extNavP[3][3] + delT*extNavP[0][3] + delT*(extNavP[3][0] + delT*extNavP[0][0]);
-    Pnew[0][4] = extNavP[0][4] + delVelWorld.x*extNavP[6][4] + delT*(extNavP[0][1] + delVelWorld.x*extNavP[6][1]);
-    Pnew[1][4] = extNavP[1][4] + delVelWorld.y*extNavP[6][4] + delT*(extNavP[1][1] + delVelWorld.y*extNavP[6][1]);
-    Pnew[2][4] = extNavP[2][4] + delVelWorld.z*extNavP[6][4] + delT*(extNavP[2][1] + delVelWorld.z*extNavP[6][1]);
+    Pnew[0][4] = extNavP[0][4] + delT*(extNavP[0][1] + delVelWorld.x*extNavP[6][1]*scaleFactor) + delVelWorld.x*extNavP[6][4]*scaleFactor;
+    Pnew[1][4] = extNavP[1][4] + delT*(extNavP[1][1] + delVelWorld.y*extNavP[6][1]*scaleFactor) + delVelWorld.y*extNavP[6][4]*scaleFactor;
+    Pnew[2][4] = extNavP[2][4] + delT*(extNavP[2][1] + delVelWorld.z*extNavP[6][1]*scaleFactor) + delVelWorld.z*extNavP[6][4]*scaleFactor;
     Pnew[3][4] = extNavP[3][4] + delT*extNavP[0][4] + delT*(extNavP[3][1] + delT*extNavP[0][1]);
     Pnew[4][4] = extNavP[4][4] + delT*extNavP[1][4] + delT*(extNavP[4][1] + delT*extNavP[1][1]);
-    Pnew[0][5] = extNavP[0][5] + delVelWorld.x*extNavP[6][5] + delT*(extNavP[0][2] + delVelWorld.x*extNavP[6][2]);
-    Pnew[1][5] = extNavP[1][5] + delVelWorld.y*extNavP[6][5] + delT*(extNavP[1][2] + delVelWorld.y*extNavP[6][2]);
-    Pnew[2][5] = extNavP[2][5] + delVelWorld.z*extNavP[6][5] + delT*(extNavP[2][2] + delVelWorld.z*extNavP[6][2]);
+    Pnew[0][5] = extNavP[0][5] + delT*(extNavP[0][2] + delVelWorld.x*extNavP[6][2]*scaleFactor) + delVelWorld.x*extNavP[6][5]*scaleFactor;
+    Pnew[1][5] = extNavP[1][5] + delT*(extNavP[1][2] + delVelWorld.y*extNavP[6][2]*scaleFactor) + delVelWorld.y*extNavP[6][5]*scaleFactor;
+    Pnew[2][5] = extNavP[2][5] + delT*(extNavP[2][2] + delVelWorld.z*extNavP[6][2]*scaleFactor) + delVelWorld.z*extNavP[6][5]*scaleFactor;
     Pnew[3][5] = extNavP[3][5] + delT*extNavP[0][5] + delT*(extNavP[3][2] + delT*extNavP[0][2]);
     Pnew[4][5] = extNavP[4][5] + delT*extNavP[1][5] + delT*(extNavP[4][2] + delT*extNavP[1][2]);
     Pnew[5][5] = extNavP[5][5] + delT*extNavP[2][5] + delT*(extNavP[5][2] + delT*extNavP[2][2]);
-    Pnew[0][6] = SPP[5];
-    Pnew[1][6] = SPP[4];
-    Pnew[2][6] = SPP[3];
-    Pnew[3][6] = SPP[2];
-    Pnew[4][6] = SPP[1];
-    Pnew[5][6] = SPP[0];
+    Pnew[0][6] = extNavP[0][6] + delVelWorld.x*extNavP[6][6]*scaleFactor;
+    Pnew[1][6] = extNavP[1][6] + delVelWorld.y*extNavP[6][6]*scaleFactor;
+    Pnew[2][6] = extNavP[2][6] + delVelWorld.z*extNavP[6][6]*scaleFactor;
+    Pnew[3][6] = extNavP[3][6] + delT*extNavP[0][6];
+    Pnew[4][6] = extNavP[4][6] + delT*extNavP[1][6];
+    Pnew[5][6] = extNavP[5][6] + delT*extNavP[2][6];
     Pnew[6][6] = extNavP[6][6];
+
 
     // covariance matrix is symmetrical, so copy diagonals and copy lower half in Pnew
     // to lower and upper half in extNavP
@@ -816,7 +809,7 @@ void NavEKF3_core::extNavScaleObservation()
         }
 
         // constrain scale factor state
-        extNavStateStruct.scaleFactor = constrain_float(extNavStateStruct.scaleFactor, 1e-3f, 1e3f);
+        extNavStateStruct.scaleFactorLog = constrain_float(extNavStateStruct.scaleFactorLog, -7.0f, 7.0f);
 
         // update the covariance - take advantage of direct observation of a single state at index = stateIndex to reduce computations
         // this is a numerically optimised implementation of standard equation P = (I - K*H)*P;
