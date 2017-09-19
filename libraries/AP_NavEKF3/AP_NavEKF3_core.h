@@ -1164,6 +1164,7 @@ private:
     Vector3 extNavScaleInnovVar;        // innovation variance
     Vector3 extNavScaleInnov;           // innovation
     uint32_t extNavScaleFuseTime_ms;    // last time external position measurements fused (msec)
+    float extNavScaleFactor;            // scale factor that converts from nav frame to world frame length units
 
     // wheel sensor fusion
     uint32_t wheelOdmMeasTime_ms;       // time wheel odometry measurements were accepted for input to the data buffer (msec)

@@ -1651,7 +1651,7 @@ void NavEKF3_core::SelectExtNavFusion()
         }
 
         // correct for scale factor
-        float scaleFactorInv = 1.0f / exp(extNavStateStruct.scaleFactorLog);
+        float scaleFactorInv = 1.0f / extNavScaleFactor;
         horizPosMea.x = extNavDataDelayed.pos.x * scaleFactorInv;
         horizPosMea.y = extNavDataDelayed.pos.y * scaleFactorInv;
         horizPosObsVar = sq(extNavDataDelayed.posErr);
