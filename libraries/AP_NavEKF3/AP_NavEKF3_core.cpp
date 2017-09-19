@@ -766,6 +766,8 @@ void NavEKF3_core::extNavScalePrediction(Vector3f delVelNED)
     Pnew[5][6] = extNavP[5][6] + delT*extNavP[2][6];
     Pnew[6][6] = extNavP[6][6];
 
+    // Add process noise for scale factor log
+    Pnew[6][6] += 1e-6f;
 
     // covariance matrix is symmetrical, so copy diagonals and copy lower half in Pnew
     // to lower and upper half in extNavP
