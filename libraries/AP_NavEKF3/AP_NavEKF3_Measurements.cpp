@@ -141,6 +141,12 @@ void NavEKF3_core::writeExtNavData(bool scaleUnknown ,bool frameIsNED, const Vec
         return;
     }
 
+    if (resetTime_ms > extNavLastPosResetTime_ms) {
+        extNavDataNew.posReset = true;
+        extNavLastPosResetTime_ms = resetTime_ms;
+    } else {
+        extNavDataNew.posReset = false;
+    }
     estimateScaleFactor = scaleUnknown;
     extNavDataNew.frameIsNED = frameIsNED;
     extNavDataNew.pos = pos;

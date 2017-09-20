@@ -399,15 +399,18 @@ void NavEKF3_core::InitialiseVariables()
     extNavPosMeasPrev.zero();
     extNavPosEstPrev.zero();
     extNavPrevAvailable = false;
+    extNavLastPosResetTime_ms = 0;
 
     // external nav scale factor estimation
     estimateScaleFactor = false;
     memset(&extNavStateArray, 0, sizeof(extNavStateArray));
     memset(&extNavP, 0, sizeof(extNavP));
+    extNavP[6][6] = 0.1f;
     memset(&extNavScaleInnovVar, 0, sizeof(extNavScaleInnovVar));
     memset(&extNavScaleInnov, 0, sizeof(extNavScaleInnov));
-    extNavScaleFuseTime_ms = 0;
     extNavScaleFactor = 1.0f;
+    extNavScaleFuseTime_ms = 0;
+    extNavScaleEkfInit = false;
 
     // zero data buffers
     storedIMU.reset();
@@ -718,9 +721,9 @@ void NavEKF3_core::UpdateStrapdownEquationsNED()
 
 void NavEKF3_core::extNavScalePrediction(Vector3f delVelNED)
 {
-    if (imuDataDelayed.time_ms - extNavScaleFuseTime_ms > 1000) {
-        extNavStateStruct.position = extNavDataDelayed.pos;
-        extNavStateStruct.velocity = extNavToEkfRotMat.transposed()*stateStruct.velocity;
+    if (!extNavScaleEkfInit) {
+        // don't run the prediction until the filter has been initialised
+        return;
     }
 
     // predict states
@@ -783,6 +786,31 @@ void NavEKF3_core::extNavScalePrediction(Vector3f delVelNED)
 
 void NavEKF3_core::extNavScaleObservation()
 {
+    if (!extNavScaleEkfInit || (imuDataDelayed.time_ms - extNavScaleFuseTime_ms > 1000) || extNavDataDelayed.posReset) {
+        // Reset the covariance matrix but preserve the scale factor variance
+        float temp = extNavP[6][6];
+        memset(&extNavP, 0, sizeof(extNavP));
+        extNavP[6][6] = temp;
+
+        for (uint8_t index=0; index<=2; index++) {
+            // Set the velocity variance from the vehicle velocity state variance
+            extNavP[index][index] = P[index+4][index+4];
+
+            // Set the position variance from the measurement uncertainty
+            extNavP[index+3][index+3] = sq(extNavDataDelayed.posErr);
+
+        }
+
+        // reset the position to the measurement
+        extNavStateStruct.position = extNavDataDelayed.pos;
+
+        // reset the velocity to the vehicle velocity after rotation and scaling
+        extNavStateStruct.velocity = extNavToEkfRotMat.transposed() * stateStruct.velocity * extNavScaleFactor;
+
+        extNavScaleEkfInit = true;
+
+    }
+
     // calculate innovation and innovation variances and exit if innovations are too large
     for (uint8_t obsIndex=0; obsIndex<=2; obsIndex++) {
         uint8_t stateIndex = obsIndex + 3;
@@ -793,7 +821,7 @@ void NavEKF3_core::extNavScaleObservation()
         // calculate the innovation variance
         extNavScaleInnovVar[obsIndex] = sq(extNavDataDelayed.posErr) + extNavP[stateIndex][stateIndex];
 
-        // perform a 5-sigma innovation coinsistency check and exit if failed
+        // perform a 5-sigma innovation consistency check and exit if failed
         if (sq(extNavScaleInnov[obsIndex]) > 25.0f * extNavScaleInnovVar[obsIndex]) {
             return;
         }

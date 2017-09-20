@@ -535,6 +535,7 @@ private:
         float           angErr;     // spherical angular measurement error 1-std (rad)
         const Vector3f *body_offset;// pointer to XYZ position of the sensor in body frame (m)
         uint32_t        time_ms;    // measurement timestamp (msec)
+        bool            posReset;   // true when the position measurement has been reset
     };
 
     struct wheel_odm_elements {
@@ -1155,6 +1156,7 @@ private:
     Vector3f extNavPosEstPrev;          // value of NED position state used by the last odometry fusion (m)
     bool extNavPrevAvailable;           // true when previous values of the estimate and measurement are available for use
     bool extNavDataToFuse;              // true when there is new external nav data to fuse
+    uint32_t extNavLastPosResetTime_ms; // last time the external nav systen performed a position reset (msec)
 
     // Estimation of external nav scale factor using a 7 state EKF to estimate
     // States can be accessed as either an array 'statesArray' or a struct 'stateStruct'
@@ -1165,6 +1167,7 @@ private:
     Vector3 extNavScaleInnov;           // innovation
     uint32_t extNavScaleFuseTime_ms;    // last time external position measurements fused (msec)
     float extNavScaleFactor;            // scale factor that converts from nav frame to world frame length units
+    bool extNavScaleEkfInit;            // true when the EKF has been initialised
 
     // wheel sensor fusion
     uint32_t wheelOdmMeasTime_ms;       // time wheel odometry measurements were accepted for input to the data buffer (msec)
