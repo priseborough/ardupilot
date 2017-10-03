@@ -1638,7 +1638,7 @@ void NavEKF3_core::SelectExtNavFusion()
     // Check for data at the fusion time horizon
     if (storedExtNav.recall(extNavDataDelayed, imuDataDelayed.time_ms)) {
 
-        useExtNavRelPosMethod = !(extNavDataDelayed.frameIsNED || filterStatus.flags.using_gps);
+        useExtNavRelPosMethod = !extNavDataDelayed.frameIsNED || estimateScaleFactor || filterStatus.flags.using_gps;
 
         // If external nav is not using NED, calculate the rotation required to convert measurements
         if (!extNavDataDelayed.frameIsNED) {
