@@ -139,6 +139,8 @@ void NavEKF3_core::writeExtNavData(bool scaleUnknown ,bool frameIsNED, const Vec
     // don't try to write to buffer until the filter has been initialised
     if ((timeStamp_ms - extNavMeasTime_ms) < frontend->sensorIntervalMin_ms) {
         return;
+    } else {
+        extNavMeasTime_ms = timeStamp_ms;
     }
 
     if (resetTime_ms > extNavLastPosResetTime_ms) {
