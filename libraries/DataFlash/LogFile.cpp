@@ -1372,6 +1372,26 @@ void DataFlash_Class::Log_Write_EKF3(AP_AHRS_NavEKF &ahrs)
         updateTime_ms = lastUpdateTime_ms;
     }
 
+    // write debug data for external nav scale factor estimation
+    float scaleLog;
+    Vector3f innovVec;
+    Vector3f innovVarVec;
+    if (ahrs.get_NavEKF3().getScaleFactorDebug(-1, scaleLog, innovVec, innovVarVec)) {
+        struct log_ekfExtNavScaleDebug pkt12 = {
+            LOG_PACKET_HEADER_INIT(LOG_XKFR_MSG),
+            time_us : time_us,
+            scaleLog : scaleLog,
+            innovX : innovVec.x,
+            innovY : innovVec.y,
+            innovZ : innovVec.z,
+            innovVarX : innovVarVec.x,
+            innovVarY : innovVarVec.y,
+            innovVarZ : innovVarVec.z
+         };
+        WriteBlock(&pkt12, sizeof(pkt12));
+
+    }
+
     // log state variances every 0.49s
     static uint32_t lastEkfStateVarLogTime_ms = 0;
     if (AP_HAL::millis() - lastEkfStateVarLogTime_ms > 490) {
