@@ -1650,37 +1650,37 @@ void NavEKF3_core::SelectExtNavFusion()
             extNavScaleObservation();
         }
 
-        // correct for scale factor
-        float scaleFactorInv = 1.0f / extNavScaleFactor;
-        horizPosMea.x = extNavDataDelayed.pos.x * scaleFactorInv;
-        horizPosMea.y = extNavDataDelayed.pos.y * scaleFactorInv;
-        horizPosObsVar = sq(extNavDataDelayed.posErr * scaleFactorInv);
-        hgtMea = - extNavDataDelayed.pos.x * scaleFactorInv;
-        posDownObsVar = sq(extNavDataDelayed.posErr * scaleFactorInv);
+//        // correct for scale factor
+//        float scaleFactorInv = 1.0f / extNavScaleFactor;
+//        horizPosMea.x = extNavDataDelayed.pos.x * scaleFactorInv;
+//        horizPosMea.y = extNavDataDelayed.pos.y * scaleFactorInv;
+//        horizPosObsVar = sq(extNavDataDelayed.posErr * scaleFactorInv);
+//        hgtMea = - extNavDataDelayed.pos.x * scaleFactorInv;
+//        posDownObsVar = sq(extNavDataDelayed.posErr * scaleFactorInv);
 
-        fusePosData = true;
-        fuseHgtData = true;
-        fuseVelData = false;
+//        fusePosData = true;
+//        fuseHgtData = true;
+//        fuseVelData = false;
 
-        if (useExtNavRelPosMethod) {
-            if ((imuDataDelayed.time_ms - ekfToExtNavRotTime_ms) > 1000) {
-                // Need to reinitialise the previous values used to calculate odometry delta
-                extNavPosMeasPrev = extNavDataDelayed.pos;
-                extNavPosEstPrev = stateStruct.position;
-            } else {
-                Vector3f relPosMea = (extNavDataDelayed.pos - extNavPosMeasPrev) * scaleFactorInv;
-                if (!extNavDataDelayed.frameIsNED) {
-                    relPosMea = extNavToEkfRotMat * relPosMea;
-                }
-                innovExtNavPos = stateStruct.position - extNavPosEstPrev - relPosMea;
+//        if (useExtNavRelPosMethod) {
+//            if ((imuDataDelayed.time_ms - ekfToExtNavRotTime_ms) > 1000) {
+//                // Need to reinitialise the previous values used to calculate odometry delta
+//                extNavPosMeasPrev = extNavDataDelayed.pos;
+//                extNavPosEstPrev = stateStruct.position;
+//            } else {
+//                Vector3f relPosMea = (extNavDataDelayed.pos - extNavPosMeasPrev) * scaleFactorInv;
+//                if (!extNavDataDelayed.frameIsNED) {
+//                    relPosMea = extNavToEkfRotMat * relPosMea;
+//                }
+//                innovExtNavPos = stateStruct.position - extNavPosEstPrev - relPosMea;
 
-                extNavPosMeasPrev = extNavDataDelayed.pos;
-                extNavPosEstPrev = stateStruct.position;
-                FuseVelPosNED();
-            }
-        } else {
-            FuseVelPosNED();
-        }
+//                extNavPosMeasPrev = extNavDataDelayed.pos;
+//                extNavPosEstPrev = stateStruct.position;
+//                FuseVelPosNED();
+//            }
+//        } else {
+//            FuseVelPosNED();
+//        }
     }
 }
 
