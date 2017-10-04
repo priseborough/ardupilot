@@ -406,6 +406,7 @@ void NavEKF3_core::InitialiseVariables()
 
     // external nav scale factor estimation
     estimateScaleFactor = false;
+    logScaleFactorFusion = false;
     memset(&extNavStateArray, 0, sizeof(extNavStateArray));
     memset(&extNavP, 0, sizeof(extNavP));
     extNavP[6][6] = 0.1f;

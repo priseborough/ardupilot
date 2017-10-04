@@ -1259,6 +1259,16 @@ bool NavEKF3::getRangeBeaconDebug(int8_t instance, uint8_t &ID, float &rng, floa
     }
 }
 
+bool NavEKF3::getScaleFactorDebug(int8_t instance, float &scaleLog, Vector3f &innov, Vector3f &innovVar)
+{
+    if (instance < 0 || instance >= num_cores) instance = primary;
+    if (core) {
+        return core[instance].getScaleFactorDebug(scaleLog, innov, innovVar);
+    } else {
+        return false;
+    }
+}
+
 // called by vehicle code to specify that a takeoff is happening
 // causes the EKF to compensate for expected barometer errors due to ground effect
 void NavEKF3::setTakeoffExpected(bool val)

@@ -277,6 +277,8 @@ public:
     bool getRangeBeaconDebug(uint8_t &ID, float &rng, float &innov, float &innovVar, float &testRatio, Vector3f &beaconPosNED,
                              float &offsetHigh, float &offsetLow, Vector3f &posNED);
 
+    bool getScaleFactorDebug(float &scaleLog, Vector3f &innov, Vector3f &innovVar);
+
     // called by vehicle code to specify that a takeoff is happening
     // causes the EKF to compensate for expected barometer errors due to ground effect
     void setTakeoffExpected(bool val);
@@ -1163,11 +1165,12 @@ private:
     // See stateStruct(*reinterpret_cast<struct extNavStateElements *>(&statesArray)) in constructor
     bool estimateScaleFactor;           // true when the scale factor from navigation to world frame length units needs to be estimated
     Matrix7 extNavP;                    // Covariance matrix
-    Vector3 extNavScaleInnovVar;        // innovation variance
-    Vector3 extNavScaleInnov;           // innovation
+    Vector3f extNavScaleInnovVar;        // innovation variance
+    Vector3f extNavScaleInnov;           // innovation
     uint32_t extNavScaleFuseTime_ms;    // last time external position measurements fused (msec)
     float extNavScaleFactor;            // scale factor that converts from nav frame to world frame length units
     bool extNavScaleEkfInit;            // true when the EKF has been initialised
+    bool logScaleFactorFusion;          // true when there is a scale factor fusion update to be logged
 
     // wheel sensor fusion
     uint32_t wheelOdmMeasTime_ms;       // time wheel odometry measurements were accepted for input to the data buffer (msec)

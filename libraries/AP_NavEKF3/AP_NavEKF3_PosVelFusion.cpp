@@ -1648,6 +1648,7 @@ void NavEKF3_core::SelectExtNavFusion()
         // Run the scale factor estimator if required
         if (estimateScaleFactor) {
             extNavScaleObservation();
+            logScaleFactorFusion = true;
         }
 
 //        // correct for scale factor
