@@ -795,21 +795,8 @@ void NavEKF3_core::extNavScalePrediction(Vector3f delVelNED)
 void NavEKF3_core::extNavScaleObservation()
 {
     if (!extNavScaleEkfInit || (imuDataDelayed.time_ms - extNavScaleFuseTime_ms > 1000) || extNavDataDelayed.posReset) {
-        // Reset the covariance matrix
-        memset(&extNavP, 0, sizeof(extNavP));
-        extNavP[6][6] = 0.1f;
-        extNavP[2][2] = extNavP[1][1] = extNavP[0][0] = 0.25f;
-        extNavP[5][5] = extNavP[4][4] = extNavP[3][3] = 0.25f;
 
-        for (uint8_t index=0; index<=2; index++) {
-            // Set the velocity variance from the vehicle velocity state variance
-            extNavP[index][index] = P[index+4][index+4];
-
-            // Set the position variance from the measurement uncertainty
-            extNavP[index+3][index+3] = sq(extNavDataDelayed.posErr);
-
-        }
-
+        // assume an initial scale factor of 1
         extNavStateStruct.scaleFactorLog = 0.0f;
 
         // reset the position to the measurement
@@ -818,8 +805,41 @@ void NavEKF3_core::extNavScaleObservation()
         // reset the velocity to the vehicle velocity after rotation and scaling
         extNavStateStruct.velocity = extNavToEkfRotMat.transposed() * stateStruct.velocity * extNavScaleFactor;
 
+        // prevent duplicate resets
         extNavScaleEkfInit = true;
         extNavScaleFuseTime_ms = imuDataDelayed.time_ms;
+
+        // Reset the covariance matrix
+        memset(&extNavP, 0, sizeof(extNavP));
+        extNavP[6][6] = 0.1f;
+
+        if (!extNavDataDelayed.frameIsNED) {
+            // Set the velocity covariance from the vehicle velocity state covariance rotated from nav to world frame
+            Matrix3f velCov;
+            for (uint8_t row=0 ; row<3 ; row++) {
+                for (uint8_t col=0 ; col<3 ; col++) {
+                    velCov[row][col] = P[row+4][col+4];
+                }
+            }
+            velCov = extNavToEkfRotMat * velCov * extNavToEkfRotMat.transposed();
+            for (uint8_t row=0 ; row<3 ; row++) {
+                for (uint8_t col=0 ; col<3 ; col++) {
+                    extNavP[row+4][col+4] = velCov[row][col];
+                }
+            }
+        } else {
+            // Use the main estimator velocity state covariance
+            for (uint8_t row=0 ; row<3 ; row++) {
+                for (uint8_t col=0 ; col<3 ; col++) {
+                    extNavP[row+4][col+4] = P[row+4][col+4];
+                }
+            }
+        }
+
+        // Set the position variance from the measurement uncertainty
+        for (uint8_t index=0 ; index<3 ; index ++) {
+            extNavP[index+3][index+3] = sq(extNavDataDelayed.posErr);
+        }
 
     }
 
