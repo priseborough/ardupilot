@@ -393,6 +393,9 @@ void NavEKF3_core::InitialiseVariables()
     extNavMeasTime_ms = 0;
     ekfToExtNavRotVecFilt.zero();
     memset(&extNavToEkfRotMat, 0, sizeof(extNavToEkfRotMat));
+    extNavToEkfRotMat.a.x = 1.0f;
+    extNavToEkfRotMat.b.y = 1.0f;
+    extNavToEkfRotMat.c.z = 1.0f;
     ekfToExtNavRotTime_ms = 0;
     extNavFusionDelayed = false;
     useExtNavRelPosMethod = false;
@@ -726,15 +729,20 @@ void NavEKF3_core::extNavScalePrediction(Vector3f delVelNED)
         return;
     }
 
+    // constrain scale factor state
+    extNavStateStruct.scaleFactorLog = constrain_float(extNavStateStruct.scaleFactorLog, -7.0f, 7.0f);
+
     // predict states
     extNavScaleFactor = expf(extNavStateStruct.scaleFactorLog);
-    Vector3f delVelWorld = extNavToEkfRotMat.mul_transpose(delVelNED);
+    Vector3f delVelWorld;
+    if (!extNavDataDelayed.frameIsNED) {
+        delVelWorld = extNavToEkfRotMat.mul_transpose(delVelNED);
+    } else {
+        delVelWorld = delVelNED;
+    }
     Vector3f lastExtNavVelocity = extNavStateStruct.velocity;
     extNavStateStruct.velocity += delVelWorld * extNavScaleFactor;
     extNavStateStruct.position += (extNavStateStruct.velocity + lastExtNavVelocity) * (imuDataDelayed.delVelDT*0.5f);
-
-    // constrain scale factor state
-    extNavStateStruct.scaleFactorLog = constrain_float(extNavStateStruct.scaleFactorLog, -7.0f, 7.0f);
 
     // predict covariance
     float delT = imuDataDelayed.delVelDT;
@@ -772,14 +780,13 @@ void NavEKF3_core::extNavScalePrediction(Vector3f delVelNED)
     // Add process noise for scale factor log
     Pnew[6][6] += 1e-6f;
 
-    // covariance matrix is symmetrical, so copy diagonals and copy lower half in Pnew
-    // to lower and upper half in extNavP
+    // covariance matrix is symmetrical, so copy diagonals and copy upper triangle in Pnew
+    // to lower and upper triange in extNavP
     for (uint8_t row = 0; row <= 6; row++) {
-        // copy diagonals and constrain
-        extNavP[row][row] = MAX(Pnew[row][row] , 1e-12f);
-        // copy off diagonals
-        for (uint8_t column = 0 ; column < row; column++) {
-            extNavP[row][column] = extNavP[column][row] = Pnew[column][row];
+        // limit diagonals
+        Pnew[row][row] = MAX(Pnew[row][row] , 1e-12f);
+        for (uint8_t column = row; column <= 6; column++) {
+            extNavP[row][column] = extNavP[column][row] = Pnew[row][column];
         }
     }
 }
@@ -787,10 +794,11 @@ void NavEKF3_core::extNavScalePrediction(Vector3f delVelNED)
 void NavEKF3_core::extNavScaleObservation()
 {
     if (!extNavScaleEkfInit || (imuDataDelayed.time_ms - extNavScaleFuseTime_ms > 1000) || extNavDataDelayed.posReset) {
-        // Reset the covariance matrix but preserve the scale factor variance
-        float temp = extNavP[6][6];
+        // Reset the covariance matrix
         memset(&extNavP, 0, sizeof(extNavP));
-        extNavP[6][6] = temp;
+        extNavP[6][6] = 0.1f;
+        extNavP[2][2] = extNavP[1][1] = extNavP[0][0] = 0.25f;
+        extNavP[5][5] = extNavP[4][4] = extNavP[3][3] = 0.25f;
 
         for (uint8_t index=0; index<=2; index++) {
             // Set the velocity variance from the vehicle velocity state variance
@@ -801,6 +809,8 @@ void NavEKF3_core::extNavScaleObservation()
 
         }
 
+        extNavStateStruct.scaleFactorLog = 0.0f;
+
         // reset the position to the measurement
         extNavStateStruct.position = extNavDataDelayed.pos;
 
@@ -808,6 +818,7 @@ void NavEKF3_core::extNavScaleObservation()
         extNavStateStruct.velocity = extNavToEkfRotMat.transposed() * stateStruct.velocity * extNavScaleFactor;
 
         extNavScaleEkfInit = true;
+        extNavScaleFuseTime_ms = imuDataDelayed.time_ms;
 
     }
 
@@ -834,7 +845,7 @@ void NavEKF3_core::extNavScaleObservation()
         // calculate the Kalman gain vector and update the states
         float varInnovInv = 1.0f/extNavScaleInnovVar[obsIndex];
         for (uint8_t i= 0; i<=6; i++) {
-            Kfusion[i] = extNavP[stateIndex][i]*varInnovInv;
+            Kfusion[i] = extNavP[i][stateIndex]*varInnovInv;
             extNavStateArray[i] -= Kfusion[i] * extNavScaleInnov[obsIndex];
         }
 
@@ -853,7 +864,7 @@ void NavEKF3_core::extNavScaleObservation()
 
         // Check that we are not going to drive any variances negative and skip the update if so
         for (uint8_t i= 0; i<=6; i++) {
-            if (KHP[i][i] > P[i][i]) {
+            if (KHP[i][i] > extNavP[i][i]) {
                  return;
             }
         }
@@ -863,18 +874,16 @@ void NavEKF3_core::extNavScaleObservation()
             for (uint8_t j= 0; j<=6; j++) {
                 extNavP[i][j] = extNavP[i][j] - KHP[i][j];
             }
+            extNavP[i][i] = MAX(extNavP[i][i] , 1e-12f);
         }
 
         // force the covariance matrix to be symmetrical and limit the variances to prevent ill-condiioning.
-        for (uint8_t i=1; i<=6; i++)
-        {
-            for (uint8_t j=0; j<=i-1; j++)
-            {
+        for (uint8_t i=1; i<=6; i++) {
+            for (uint8_t j=0; j<=i-1; j++) {
                 float temp = 0.5f*(extNavP[i][j] + extNavP[j][i]);
                 extNavP[i][j] = temp;
                 extNavP[j][i] = temp;
             }
-            extNavP[i][i] = MIN(extNavP[i][i] , 1e-12f);
         }
     }
 
