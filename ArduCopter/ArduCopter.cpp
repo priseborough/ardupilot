@@ -543,6 +543,7 @@ void Copter::update_GPS(void)
             if (!originSet && haccValid && (hacc < 5.0f) && (gps.status() >= 3)) {
                 ekfOrigin = gpsLoc;
                 originSet = true;
+                gcs().send_text(MAV_SEVERITY_INFO, "GPS test origin set");
             } else if (originSet && (gps.status() >= 3)) {
                 Vector2f posNE = location_diff(ekfOrigin, gpsLoc);
                 pos.x = posNE.x;
