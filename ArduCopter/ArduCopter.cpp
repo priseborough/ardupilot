@@ -531,7 +531,10 @@ void Copter::update_GPS(void)
             quat[1] = 0.0f;
             quat[2] = 0.0f;
             quat[3] = 0.0f;
-            float posErr = 0.1f;
+            float posErr;
+            if (!gps.horizontal_accuracy(posErr)) {
+                 posErr = 0.1f;
+            }
             float angErr = 0.05f;
             uint32_t timeStamp_ms = gps.last_message_time_ms(i);
             uint32_t resetTime_ms = 0;
