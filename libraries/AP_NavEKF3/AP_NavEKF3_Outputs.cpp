@@ -105,13 +105,18 @@ bool NavEKF3_core::getRangeBeaconDebug(uint8_t &ID, float &rng, float &innov, fl
     return true;
 }
 
-bool NavEKF3_core::getScaleFactorDebug(float &scaleLog, Vector3f &innov, Vector3f &innovVar)
+bool NavEKF3_core::getScaleFactorDebug(float &scaleLog, float &scaleLogSigma, Vector3f &innov, Vector3f &innovVar)
 {
     scaleLog = extNavStateStruct.scaleFactorLog;
     innov = innovExtNavPos;
     innovVar = extNavScaleInnovVar;
-    return logScaleFactorFusion;
-    logScaleFactorFusion = false;
+    scaleLogSigma = sqrtf(extNavP[6][6]);
+    if (logScaleFactorFusion) {
+        logScaleFactorFusion = false;
+        return true;
+    } else {
+        return false;
+    }
 }
 
 // provides the height limit to be observed by the control loops

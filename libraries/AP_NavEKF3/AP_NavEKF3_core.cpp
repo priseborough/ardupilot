@@ -779,7 +779,7 @@ void NavEKF3_core::extNavScalePrediction(Vector3f delVelNED)
     Pnew[6][6] = extNavP[6][6];
 
     // Add process noise for scale factor log
-    Pnew[6][6] += 1e-6f;
+    Pnew[6][6] += sq(frontend->_extNavLogScaleNse);
 
     // covariance matrix is symmetrical, so copy diagonals and copy upper triangle in Pnew
     // to lower and upper triange in extNavP

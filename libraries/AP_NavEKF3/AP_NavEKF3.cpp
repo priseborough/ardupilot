@@ -575,6 +575,14 @@ const AP_Param::GroupInfo NavEKF3::var_info[] = {
     // @Units: m/s
     AP_GROUPINFO("WENC_VERR", 53, NavEKF3, _wencOdmVelErr, 0.1f),
 
+    // @Param: SCL_NSE
+    // @DisplayName: External nav scale process noise
+    // @Description: This noise controls the growth of the vertical accelerometer delta velocity bias state error estimate. Increasing it makes accelerometer bias estimation faster and noisier.
+    // @Range: 0.00001 0.001
+    // @User: Advanced
+    // @Units: 1/s
+    AP_GROUPINFO("SCL_NSE", 54, NavEKF3, _extNavLogScaleNse, 0.001f),
+
     AP_GROUPEND
 };
 
@@ -1259,11 +1267,11 @@ bool NavEKF3::getRangeBeaconDebug(int8_t instance, uint8_t &ID, float &rng, floa
     }
 }
 
-bool NavEKF3::getScaleFactorDebug(int8_t instance, float &scaleLog, Vector3f &innov, Vector3f &innovVar)
+bool NavEKF3::getScaleFactorDebug(int8_t instance, float &scaleLog, float &scaleLogSigma, Vector3f &innov, Vector3f &innovVar)
 {
     if (instance < 0 || instance >= num_cores) instance = primary;
     if (core) {
-        return core[instance].getScaleFactorDebug(scaleLog, innov, innovVar);
+        return core[instance].getScaleFactorDebug(scaleLog, scaleLogSigma, innov, innovVar);
     } else {
         return false;
     }
