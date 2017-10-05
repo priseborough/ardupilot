@@ -578,6 +578,7 @@ struct PACKED log_ekfExtNavScaleDebug {
     LOG_PACKET_HEADER;
     uint64_t time_us;
     float scaleLog;
+    float scaleLogSigma;
     float innovX;
     float innovY;
     float innovZ;
