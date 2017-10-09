@@ -210,7 +210,7 @@ void NavEKF3_core::setAidingMode()
         // GPS aiding is the preferred option unless excluded by the user
         if(readyToUseGPS() || readyToUseRangeBeacon()) {
             PV_AidingMode = AID_ABSOLUTE;
-        } else if (readyToUseOptFlow() || readyToUseBodyOdm()) {
+        } else if (readyToUseOptFlow() || readyToUseBodyOdm() || (readyToUseExtNav() && useExtNavRelPosMethod)) {
             PV_AidingMode = AID_RELATIVE;
         }
     } else if (PV_AidingMode == AID_RELATIVE) {
@@ -218,11 +218,13 @@ void NavEKF3_core::setAidingMode()
          bool flowFusionTimeout = ((imuSampleTime_ms - prevFlowFuseTime_ms) > 5000);
          // Check if the fusion has timed out (body odometry measurements have been rejected for too long)
          bool bodyOdmFusionTimeout = ((imuSampleTime_ms - prevBodyVelFuseTime_ms) > 5000);
+         // Check if external nav data use has timed out
+         bool extNavFusionTimeout = ((imuSampleTime_ms - lastPosPassTime_ms) > 5000);
          // Enable switch to absolute position mode if GPS or range beacon data is available
          // If GPS or range beacons data is not available and flow fusion has timed out, then fall-back to no-aiding
          if(readyToUseGPS() || readyToUseRangeBeacon()) {
              PV_AidingMode = AID_ABSOLUTE;
-         } else if (flowFusionTimeout && bodyOdmFusionTimeout) {
+         } else if (flowFusionTimeout && bodyOdmFusionTimeout && extNavFusionTimeout) {
              PV_AidingMode = AID_NONE;
          }
      } else if (PV_AidingMode == AID_ABSOLUTE) {
@@ -322,8 +324,6 @@ void NavEKF3_core::setAidingMode()
             break;
 
         case AID_RELATIVE:
-            // We are doing relative position navigation where velocity errors are constrained, but position drift will occur
-            gcs().send_text(MAV_SEVERITY_INFO, "EKF3 IMU%u started relative aiding",(unsigned)imu_index);
             if (readyToUseOptFlow()) {
                 // Reset time stamps
                 flowValidMeaTime_ms = imuSampleTime_ms;
@@ -332,9 +332,20 @@ void NavEKF3_core::setAidingMode()
                  // Reset time stamps
                 lastbodyVelPassTime_ms = imuSampleTime_ms;
                 prevBodyVelFuseTime_ms = imuSampleTime_ms;
+            } else if (readyToUseExtNav() && useExtNavRelPosMethod) {
+                lastPosPassTime_ms = imuSampleTime_ms;
+            } else {
+                PV_AidingMode = AID_NONE;
+                posTimeout = true;
+                velTimeout = true;
+                break;
             }
+
+            // We are doing relative position navigation where velocity errors are constrained, but position drift will occur
+            gcs().send_text(MAV_SEVERITY_INFO, "EKF3 IMU%u started relative aiding",(unsigned)imu_index);
             posTimeout = true;
             velTimeout = true;
+
             break;
 
         case AID_ABSOLUTE:
@@ -447,7 +458,7 @@ bool NavEKF3_core::readyToUseRangeBeacon(void) const
 // return true if the filter to be ready to use the external nav estimates
 bool NavEKF3_core::readyToUseExtNav(void) const
 {
-    return tiltAlignComplete && yawAlignComplete && delAngBiasLearned && extNavDataToFuse;
+    return tiltAlignComplete && yawAlignComplete && delAngBiasLearned && ((imuDataDelayed.time_ms - extNavDataDelayed.time_ms) < 250);
 }
 
 // return true if we should use the compass

@@ -386,7 +386,6 @@ void NavEKF3_core::InitialiseVariables()
     // external nav data fusion
     memset(&extNavDataNew, 0, sizeof(extNavDataNew));
     memset(&extNavDataDelayed, 0, sizeof(extNavDataDelayed));
-    lastExtNavPosFuseTime_ms = 0;
     memset(&extNavPosTestRatio, 0, sizeof(extNavPosTestRatio));
     memset(&varInnovExtNavPos, 0, sizeof(varInnovExtNavPos));
     innovExtNavPos.zero();
@@ -798,6 +797,7 @@ void NavEKF3_core::extNavScaleObservation()
 
         // assume an initial scale factor of 1
         extNavStateStruct.scaleFactorLog = 0.0f;
+        extNavScaleFactor = expf(extNavStateStruct.scaleFactorLog);
 
         // reset the position to the measurement
         extNavStateStruct.position = extNavDataDelayed.pos;

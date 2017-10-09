@@ -1651,36 +1651,43 @@ void NavEKF3_core::SelectExtNavFusion()
             logScaleFactorFusion = true;
         }
 
-        // correct for scale factor
-        float scaleFactorInv = 1.0f / extNavScaleFactor;
-        horizPosMea.x = extNavDataDelayed.pos.x * scaleFactorInv;
-        horizPosMea.y = extNavDataDelayed.pos.y * scaleFactorInv;
-        horizPosObsVar = sq(extNavDataDelayed.posErr * scaleFactorInv);
-        hgtMea = - extNavDataDelayed.pos.x * scaleFactorInv;
-        posDownObsVar = sq(extNavDataDelayed.posErr * scaleFactorInv);
-
         fusePosData = true;
         fuseHgtData = true;
         fuseVelData = false;
 
         if (useExtNavRelPosMethod) {
-            if ((imuDataDelayed.time_ms - ekfToExtNavRotTime_ms) > 1000) {
+            if ((imuDataDelayed.time_ms - extNavDataDelayed.time_ms) > 1000) {
                 // Need to reinitialise the previous values used to calculate odometry delta
                 extNavPosMeasPrev = extNavDataDelayed.pos;
                 extNavPosEstPrev = stateStruct.position;
+                fusePosData = false;
+                fuseHgtData = false;
+                fuseVelData = false;
+                gcs().send_text(MAV_SEVERITY_INFO, "EKF3 IMU%u reset ext nav odometry",(unsigned)imu_index);
+                return;
+
             } else {
+                float scaleFactorInv = 1.0f / extNavScaleFactor;
                 Vector3f relPosMea = (extNavDataDelayed.pos - extNavPosMeasPrev) * scaleFactorInv;
                 if (!extNavDataDelayed.frameIsNED) {
                     relPosMea = extNavToEkfRotMat * relPosMea;
                 }
                 innovExtNavPos = stateStruct.position - extNavPosEstPrev - relPosMea;
+                horizPosObsVar = posDownObsVar = sq(extNavDataDelayed.posErr * scaleFactorInv);
 
                 extNavPosMeasPrev = extNavDataDelayed.pos;
                 extNavPosEstPrev = stateStruct.position;
                 FuseVelPosNED();
+                fusePosData = false;
+                fuseHgtData = false;
+                fuseVelData = false;
             }
         } else {
-            FuseVelPosNED();
+            horizPosMea.x = extNavDataDelayed.pos.x;
+            horizPosMea.y = extNavDataDelayed.pos.y;
+            horizPosObsVar = sq(extNavDataDelayed.posErr);
+            hgtMea = - extNavDataDelayed.pos.x;
+            posDownObsVar = sq(extNavDataDelayed.posErr);
         }
     }
 }

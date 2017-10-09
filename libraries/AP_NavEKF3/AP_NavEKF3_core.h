@@ -1035,7 +1035,8 @@ private:
                     FLOW=3,         // Use optical flow rates
                     BARO=4,         // Use Baro height
                     MAG=5,          // Use magnetometer data
-                    RNGFND=6        // Use rangefinder data
+                    RNGFND=6,       // Use rangefinder data
+                    EXTNAV=7        // Use external nav system data
                         };
     resetDataSource posResetSource; // preferred soure of data for position reset
     resetDataSource velResetSource; // preferred source of data for a velocity reset
@@ -1144,7 +1145,6 @@ private:
     obs_ring_buffer_t<ext_nav_elements> storedExtNav; // external navigation data buffer
     ext_nav_elements extNavDataNew;     // External nav data at the current time horizon
     ext_nav_elements extNavDataDelayed; // External nav at the fusion time horizon
-    uint32_t lastExtNavPosFuseTime_ms;  // time stamp when the nav measurements last passed innovation consistency checks and were fused (msec)
     Vector3 extNavPosTestRatio;         // Innovation test ratios for external nav position measurements
     Vector3 varInnovExtNavPos;          // External nav position XYZ innovation variances (m)^2
     Vector3f innovExtNavPos;            // External nav position XYZ innovations (m)
@@ -1157,7 +1157,6 @@ private:
     Vector3f extNavPosMeasPrev;         // previous value of NED position measurement fused using odometry assumption (m)
     Vector3f extNavPosEstPrev;          // value of NED position state used by the last odometry fusion (m)
     bool extNavPrevAvailable;           // true when previous values of the estimate and measurement are available for use
-    bool extNavDataToFuse;              // true when there is new external nav data to fuse
     uint32_t extNavLastPosResetTime_ms; // last time the external nav systen performed a position reset (msec)
 
     // Estimation of external nav scale factor using a 7 state EKF to estimate
