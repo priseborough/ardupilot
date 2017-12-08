@@ -211,8 +211,10 @@ public:
     // rawGyroRates are the sensor rotation rates in rad/sec measured by the sensors internal gyro
     // The sign convention is that a RH physical rotation of the sensor about an axis produces both a positive flow and gyro rate
     // msecFlowMeas is the scheduler time in msec when the optical flow data was received from the sensor.
+    // range is the distance measured from the camera focal point to the surface being viewed (m). Set to a negative number if no range available.
     // posOffset is the XYZ flow sensor position in the body frame in m
-    void writeOptFlowMeas(uint8_t &rawFlowQuality, Vector2f &rawFlowRates, Vector2f &rawGyroRates, uint32_t &msecFlowMeas, const Vector3f &posOffset);
+    // rotMat is the rotation matrix from body frame to sensor frame
+    void writeOptFlowMeas(uint8_t &rawFlowQuality, Vector2f &rawFlowRates, Vector2f &rawGyroRates, uint32_t &msecFlowMeas, float &range, const Vector3f &posOffset, const Matrix3f &rotMat);
 
     /*
      * Write body frame linear and angular displacement measurements from a visual odometry sensor
