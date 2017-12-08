@@ -325,6 +325,7 @@ void NavEKF3_core::InitialiseVariables()
     posOffsetNED.zero();
     posResetSource = DEFAULT;
     velResetSource = DEFAULT;
+    flowUseTerrainNo = false;
 
     // range beacon fusion variables
     memset(&rngBcnDataNew, 0, sizeof(rngBcnDataNew));

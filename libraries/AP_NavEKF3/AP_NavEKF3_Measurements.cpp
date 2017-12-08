@@ -161,7 +161,7 @@ void NavEKF3_core::writeWheelOdom(float delAng, float delTime, uint32_t timeStam
 
 // write the raw optical flow measurements
 // this needs to be called externally.
-void NavEKF3_core::writeOptFlowMeas(uint8_t &rawFlowQuality, Vector2f &rawFlowRates, Vector2f &rawGyroRates, uint32_t &msecFlowMeas, const Vector3f &posOffset)
+void NavEKF3_core::writeOptFlowMeas(uint8_t &rawFlowQuality, Vector2f &rawFlowRates, Vector2f &rawGyroRates, uint32_t &msecFlowMeas, float &range, const Vector3f &posOffset, const Matrix3f &rotMat)
 {
     // limit update rate to maximum allowed by sensor buffers
     if ((imuSampleTime_ms - flowMeaTime_ms) < frontend->sensorIntervalMin_ms) {
@@ -179,8 +179,10 @@ void NavEKF3_core::writeOptFlowMeas(uint8_t &rawFlowQuality, Vector2f &rawFlowRa
     // reset the accumulated body delta angle and time
     // don't do the calculation if not enough time lapsed for a reliable body rate measurement
     if (delTimeOF > 0.01f) {
-        flowGyroBias.x = 0.99f * flowGyroBias.x + 0.01f * constrain_float((rawGyroRates.x - delAngBodyOF.x/delTimeOF),-0.1f,0.1f);
-        flowGyroBias.y = 0.99f * flowGyroBias.y + 0.01f * constrain_float((rawGyroRates.y - delAngBodyOF.y/delTimeOF),-0.1f,0.1f);
+        // rotate nav gyro data data into sensor frame and use to calculate bias errors in flow sensor gyro data
+        Vector3f delAngSensOF = rotMat * delAngBodyOF;
+        flowGyroBias.x = 0.99f * flowGyroBias.x + 0.01f * constrain_float((rawGyroRates.x - delAngSensOF.x/delTimeOF),-0.1f,0.1f);
+        flowGyroBias.y = 0.99f * flowGyroBias.y + 0.01f * constrain_float((rawGyroRates.y - delAngSensOF.y/delTimeOF),-0.1f,0.1f);
         delAngBodyOF.zero();
         delTimeOF = 0.0f;
     }
@@ -211,6 +213,10 @@ void NavEKF3_core::writeOptFlowMeas(uint8_t &rawFlowQuality, Vector2f &rawFlowRa
         ofDataNew.flowRadXY = - rawFlowRates; // raw (non motion compensated) optical flow angular rate about the X axis (rad/sec)
         // write the flow sensor position in body frame
         ofDataNew.body_offset = &posOffset;
+        // write the angular orientation of the flow sensor in body frame
+        ofDataNew.Tbs = &rotMat;
+        // write measured range
+        ofDataNew.range = range;
         // write flow rate measurements corrected for body rates
         ofDataNew.flowRadXYcomp.x = ofDataNew.flowRadXY.x + ofDataNew.bodyRadXYZ.x;
         ofDataNew.flowRadXYcomp.y = ofDataNew.flowRadXY.y + ofDataNew.bodyRadXYZ.y;
@@ -218,7 +224,7 @@ void NavEKF3_core::writeOptFlowMeas(uint8_t &rawFlowQuality, Vector2f &rawFlowRa
         flowValidMeaTime_ms = imuSampleTime_ms;
         // estimate sample time of the measurement
         ofDataNew.time_ms = imuSampleTime_ms - frontend->_flowDelay_ms - frontend->flowTimeDeltaAvg_ms/2;
-        // Correct for the average intersampling delay due to the filter updaterate
+        // Correct for the average intersampling delay due to the filter update rate
         ofDataNew.time_ms -= localFilterTimeStep_ms/2;
         // Prevent time delay exceeding age of oldest IMU data in the buffer
         ofDataNew.time_ms = MAX(ofDataNew.time_ms,imuDataDelayed.time_ms);

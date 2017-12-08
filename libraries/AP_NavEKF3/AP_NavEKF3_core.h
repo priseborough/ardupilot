@@ -489,7 +489,9 @@ private:
         Vector2f    flowRadXYcomp;  // motion compensated XY optical flow angular rates about the XY body axes (rad/sec)
         uint32_t    time_ms;        // measurement timestamp (msec)
         Vector3f    bodyRadXYZ;     // body frame XYZ axis angular rates averaged across the optical flow measurement interval (rad/sec)
+        float       range;          // distance from sensor focal point to subject measured along sensor Z axis (m)
         const Vector3f *body_offset;// pointer to XYZ position of the optical flow sensor in body frame (m)
+        const Matrix3f *Tbs;        // pointer to rotation matrix defining rotatoin from body to sensor frame
     };
 
     struct vel_odm_elements {
@@ -1013,6 +1015,7 @@ private:
     of_elements ofDataDelayed;      // OF data at the fusion time horizon
     uint8_t ofStoreIndex;           // OF data storage index
     bool flowDataToFuse;            // true when optical flow data has is ready for fusion
+    bool flowUseTerrainNo;          // true when the flow sensor is not using the terrain below the vehicle as a reference
     bool flowDataValid;             // true while optical flow data is still fresh
     bool fuseOptFlowData;           // this boolean causes the last optical flow measurement to be fused
     float auxFlowObsInnov;          // optical flow rate innovation from 1-state terrain offset estimator
@@ -1022,6 +1025,7 @@ private:
     uint32_t flowMeaTime_ms;        // time stamp from latest flow measurement (msec)
     uint32_t gndHgtValidTime_ms;    // time stamp from last terrain offset state update (msec)
     Matrix3f Tbn_flow;              // transformation matrix from body to nav axes at the middle of the optical flow sample period
+    Matrix3f Tbs_flow;              // transformation matrix from body to flow sensor axes
     Vector2 varInnovOptFlow;        // optical flow innovations variances (rad/sec)^2
     Vector2 innovOptFlow;           // optical flow LOS innovations (rad/sec)
     float Popt;                     // Optical flow terrain height state covariance (m^2)

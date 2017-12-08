@@ -27,6 +27,14 @@ void NavEKF3_core::SelectFlowFusion()
     // Check for data at the fusion time horizon
     flowDataToFuse = storedOF.recall(ofDataDelayed, imuDataDelayed.time_ms);
 
+    // Check if the flow sensor is orientated such that it can use the terrain height as a reference
+    if (flowDataToFuse) {
+        // Get the rotation matrix from body frame to sensor frame
+        Tbs_flow = *ofDataDelayed.Tbs;
+        // If the flow sensor is not aligned with the Z body axis then it cannot use the terrain height as a reference
+        flowUseTerrainNo = (Tbs_flow.c.z < 0.95f);
+    }
+
     // Check if the magnetometer has been fused on that time step and the filter is running at faster than 200 Hz
     // If so, don't fuse measurements on this time step to reduce frame over-runs
     // Only allow one time slip to prevent high rate magnetometer data preventing fusion of other measurements
@@ -40,10 +48,13 @@ void NavEKF3_core::SelectFlowFusion()
     // Perform Data Checks
     // Check if the optical flow data is still valid
     flowDataValid = ((imuSampleTime_ms - flowValidMeaTime_ms) < 1000);
+
     // check is the terrain offset estimate is still valid - if we are using range finder as the main height reference, the ground is assumed to be at 0
     gndOffsetValid = ((imuSampleTime_ms - gndHgtValidTime_ms) < 5000) || (activeHgtSource == HGT_SOURCE_RNG);
+
     // Perform tilt check
     bool tiltOK = (prevTnb.c.z > frontend->DCM33FlowMin);
+
     // Constrain measurements to zero if takeoff is not detected and the height above ground
     // is insuffient to achieve acceptable focus. This allows the vehicle to be picked up
     // and carried to test optical flow operation
@@ -56,15 +67,14 @@ void NavEKF3_core::SelectFlowFusion()
     // if we do have valid flow measurements, fuse data into a 1-state EKF to estimate terrain height
     // we don't do terrain height estimation in optical flow only mode as the ground becomes our zero height reference
     if ((flowDataToFuse || rangeDataToFuse) && tiltOK) {
-        // fuse optical flow data into the terrain estimator if available and if there is no range data (range data is better)
-        fuseOptFlowData = (flowDataToFuse && !rangeDataToFuse);
+        // fuse optical flow data into the terrain estimator if available, the flow sensor can use the terrain height as a reference and there is no range data (range data is better)
+         fuseOptFlowData = (flowDataToFuse && !flowUseTerrainNo && !rangeDataToFuse);
         // Estimate the terrain offset (runs a one state EKF)
         EstimateTerrainOffset();
     }
 
     // Fuse optical flow data into the main filter
-    if (flowDataToFuse && tiltOK)
-    {
+    if (flowDataToFuse && (tiltOK || flowUseTerrainNo)) {
         // Set the flow noise used by the fusion processes
         R_LOS = sq(MAX(frontend->_flowNoise, 0.05f));
         // Fuse the optical flow X and Y axis data into the main filter sequentially
@@ -259,7 +269,7 @@ void NavEKF3_core::EstimateTerrainOffset()
 
 /*
  * Fuse angular motion compensated optical flow rates using explicit algebraic equations generated with Matlab symbolic toolbox.
- * The script file used to generate these and other equations in this filter can be found here:
+ * The script file used to generate these and other equations in this filter can be found here at commit 1615442:
  * https://github.com/PX4/ecl/blob/master/matlab/scripts/Inertial%20Nav%20EKF/GenerateNavFilterEquations.m
  * Requires a valid terrain height estimate.
 */
@@ -267,7 +277,6 @@ void NavEKF3_core::FuseOptFlow()
 {
     Vector24 H_LOS;
     Vector3f relVelSensor;
-    Vector14 SH_LOS;
     Vector2 losPred;
 
     // Copy required states to local variable names
@@ -280,386 +289,450 @@ void NavEKF3_core::FuseOptFlow()
     float vd = stateStruct.velocity.z;
     float pd = stateStruct.position.z;
 
-    // constrain height above ground to be above range measured on ground
-    float heightAboveGndEst = MAX((terrainState - pd), rngOnGnd);
-    float ptd = pd + heightAboveGndEst;
-
-    // Calculate common expressions for observation jacobians
-    SH_LOS[0] = sq(q0) - sq(q1) - sq(q2) + sq(q3);
-    SH_LOS[1] = vn*(sq(q0) + sq(q1) - sq(q2) - sq(q3)) - vd*(2*q0*q2 - 2*q1*q3) + ve*(2*q0*q3 + 2*q1*q2);
-    SH_LOS[2] = ve*(sq(q0) - sq(q1) + sq(q2) - sq(q3)) + vd*(2*q0*q1 + 2*q2*q3) - vn*(2*q0*q3 - 2*q1*q2);
-    SH_LOS[3] = 1/(pd - ptd);
-    SH_LOS[4] = vd*SH_LOS[0] - ve*(2*q0*q1 - 2*q2*q3) + vn*(2*q0*q2 + 2*q1*q3);
-    SH_LOS[5] = 2.0f*q0*q2 - 2.0f*q1*q3;
-    SH_LOS[6] = 2.0f*q0*q1 + 2.0f*q2*q3;
-    SH_LOS[7] = q0*q0;
-    SH_LOS[8] = q1*q1;
-    SH_LOS[9] = q2*q2;
-    SH_LOS[10] = q3*q3;
-    SH_LOS[11] = q0*q3*2.0f;
-    SH_LOS[12] = pd-ptd;
-    SH_LOS[13] = 1.0f/(SH_LOS[12]*SH_LOS[12]);
-
-    // Fuse X and Y axis measurements sequentially assuming observation errors are uncorrelated
-    for (uint8_t obsIndex=0; obsIndex<=1; obsIndex++) { // fuse X axis data first
-        // calculate range from ground plain to centre of sensor fov assuming flat earth
-        float range = constrain_float((heightAboveGndEst/prevTnb.c.z),rngOnGnd,1000.0f);
-
+    // if using downwards pointing flow sensor calculate range from ground plain to centre of sensor fov assuming flat earth
+    // otherwise use range measurement directly
+    float range;
+    Vector3f posOffsetBody = (*ofDataDelayed.body_offset) - accelPosOffset;
+    if (!flowUseTerrainNo) {
+        // constrain height above ground to be above range measured on ground
+        float heightAboveGndEst = MAX((terrainState - pd), rngOnGnd);
+        range = constrain_float((heightAboveGndEst/prevTnb.c.z),rngOnGnd,1000.0f);
         // correct range for flow sensor offset body frame position offset
         // the corrected value is the predicted range from the sensor focal point to the
         // centre of the image on the ground assuming flat terrain
-        Vector3f posOffsetBody = (*ofDataDelayed.body_offset) - accelPosOffset;
         if (!posOffsetBody.is_zero()) {
             Vector3f posOffsetEarth = prevTnb.mul_transpose(posOffsetBody);
             range -= posOffsetEarth.z / prevTnb.c.z;
         }
+    } else if (ofDataDelayed.range > 0.01f) {
+        range = ofDataDelayed.range;
+    } else {
+        return;
+    }
 
-        // calculate relative velocity in sensor frame including the relative motion due to rotation
-        relVelSensor = (prevTnb * stateStruct.velocity) + (ofDataDelayed.bodyRadXYZ % posOffsetBody);
+    // calculate relative velocity in body frame including the relative motion due to rotation
+    // and rotate into sensor frame
+    relVelSensor = Tbs_flow * ((prevTnb * stateStruct.velocity) + (ofDataDelayed.bodyRadXYZ % posOffsetBody));
 
-        // divide velocity by range  to get predicted angular LOS rates relative to X and Y axes
-        losPred[0] =  relVelSensor.y/range;
-        losPred[1] = -relVelSensor.x/range;
+    // divide velocity by range  to get predicted angular LOS rates relative to X and Y axes
+    losPred[0] =  relVelSensor.y/range;
+    losPred[1] = -relVelSensor.x/range;
+
+    // Fuse X and Y axis measurements sequentially assuming observation errors are uncorrelated
+    for (uint8_t obsIndex=0; obsIndex<=1; obsIndex++) { // fuse X axis data first
 
         // calculate observation jacobians and Kalman gains
         memset(&H_LOS[0], 0, sizeof(H_LOS));
         if (obsIndex == 0) {
-            // calculate X axis observation Jacobian
-            float t2 = 1.0f / range;
-            H_LOS[0] = t2*(q1*vd*2.0f+q0*ve*2.0f-q3*vn*2.0f);
-            H_LOS[1] = t2*(q0*vd*2.0f-q1*ve*2.0f+q2*vn*2.0f);
-            H_LOS[2] = t2*(q3*vd*2.0f+q2*ve*2.0f+q1*vn*2.0f);
-            H_LOS[3] = -t2*(q2*vd*-2.0f+q3*ve*2.0f+q0*vn*2.0f);
-            H_LOS[4] = -t2*(q0*q3*2.0f-q1*q2*2.0f);
-            H_LOS[5] = t2*(q0*q0-q1*q1+q2*q2-q3*q3);
-            H_LOS[6] = t2*(q0*q1*2.0f+q2*q3*2.0f);
-
-            // calculate intermediate variables for the X observaton innovatoin variance and Kalman gains
-            float t3 = q1*vd*2.0f;
-            float t4 = q0*ve*2.0f;
-            float t11 = q3*vn*2.0f;
-            float t5 = t3+t4-t11;
-            float t6 = q0*q3*2.0f;
+            // calculate X axis observation Jacobian and Kalman gain vectors
+            // code fragments from https://github.com/PX4/ecl/blob/master/matlab/scripts/LOSX.c
+            // at commit 1615442
+            float t2 = 1.0f/range;
+            float t3 = Tbs_flow.b.y*q0*2.0f;
+            float t4 = Tbs_flow.b.x*q3*2.0f;
+            float t18 = Tbs_flow.b.z*q1*2.0f;
+            float t5 = t3+t4-t18;
+            float t6 = Tbs_flow.b.y*q1*2.0f;
+            float t7 = Tbs_flow.b.z*q0*2.0f;
+            float t16 = Tbs_flow.b.x*q2*2.0f;
+            float t8 = t6+t7-t16;
+            float t9 = Tbs_flow.b.x*q0*2.0f;
+            float t10 = Tbs_flow.b.z*q2*2.0f;
+            float t17 = Tbs_flow.b.y*q3*2.0f;
+            float t11 = t9+t10-t17;
+            float t12 = Tbs_flow.b.x*q1*2.0f;
+            float t13 = Tbs_flow.b.y*q2*2.0f;
+            float t14 = Tbs_flow.b.z*q3*2.0f;
+            float t15 = t12+t13+t14;
+            float t19 = q0*q0;
+            float t20 = q1*q1;
+            float t21 = q2*q2;
+            float t22 = q3*q3;
+            float t23 = q0*q3*2.0f;
+            float t24 = q0*q2*2.0f;
+            float t25 = q1*q3*2.0f;
+            float t26 = q0*q1*2.0f;
+            float t27 = t19+t20-t21-t22;
+            float t28 = Tbs_flow.b.x*t27;
             float t29 = q1*q2*2.0f;
-            float t7 = t6-t29;
-            float t8 = q0*q1*2.0f;
-            float t9 = q2*q3*2.0f;
-            float t10 = t8+t9;
-            float t12 = P[0][0]*t2*t5;
-            float t13 = q0*vd*2.0f;
-            float t14 = q2*vn*2.0f;
-            float t28 = q1*ve*2.0f;
-            float t15 = t13+t14-t28;
-            float t16 = q3*vd*2.0f;
-            float t17 = q2*ve*2.0f;
-            float t18 = q1*vn*2.0f;
-            float t19 = t16+t17+t18;
-            float t20 = q3*ve*2.0f;
-            float t21 = q0*vn*2.0f;
-            float t30 = q2*vd*2.0f;
-            float t22 = t20+t21-t30;
-            float t23 = q0*q0;
-            float t24 = q1*q1;
-            float t25 = q2*q2;
-            float t26 = q3*q3;
-            float t27 = t23-t24+t25-t26;
-            float t31 = P[1][1]*t2*t15;
-            float t32 = P[6][0]*t2*t10;
-            float t33 = P[1][0]*t2*t15;
-            float t34 = P[2][0]*t2*t19;
-            float t35 = P[5][0]*t2*t27;
-            float t79 = P[4][0]*t2*t7;
-            float t80 = P[3][0]*t2*t22;
-            float t36 = t12+t32+t33+t34+t35-t79-t80;
-            float t37 = t2*t5*t36;
-            float t38 = P[6][1]*t2*t10;
-            float t39 = P[0][1]*t2*t5;
-            float t40 = P[2][1]*t2*t19;
-            float t41 = P[5][1]*t2*t27;
-            float t81 = P[4][1]*t2*t7;
-            float t82 = P[3][1]*t2*t22;
-            float t42 = t31+t38+t39+t40+t41-t81-t82;
-            float t43 = t2*t15*t42;
-            float t44 = P[6][2]*t2*t10;
-            float t45 = P[0][2]*t2*t5;
-            float t46 = P[1][2]*t2*t15;
-            float t47 = P[2][2]*t2*t19;
-            float t48 = P[5][2]*t2*t27;
-            float t83 = P[4][2]*t2*t7;
-            float t84 = P[3][2]*t2*t22;
-            float t49 = t44+t45+t46+t47+t48-t83-t84;
-            float t50 = t2*t19*t49;
-            float t51 = P[6][3]*t2*t10;
-            float t52 = P[0][3]*t2*t5;
-            float t53 = P[1][3]*t2*t15;
-            float t54 = P[2][3]*t2*t19;
-            float t55 = P[5][3]*t2*t27;
-            float t85 = P[4][3]*t2*t7;
-            float t86 = P[3][3]*t2*t22;
-            float t56 = t51+t52+t53+t54+t55-t85-t86;
-            float t57 = P[6][5]*t2*t10;
-            float t58 = P[0][5]*t2*t5;
-            float t59 = P[1][5]*t2*t15;
-            float t60 = P[2][5]*t2*t19;
-            float t61 = P[5][5]*t2*t27;
-            float t88 = P[4][5]*t2*t7;
-            float t89 = P[3][5]*t2*t22;
-            float t62 = t57+t58+t59+t60+t61-t88-t89;
-            float t63 = t2*t27*t62;
-            float t64 = P[6][4]*t2*t10;
-            float t65 = P[0][4]*t2*t5;
-            float t66 = P[1][4]*t2*t15;
-            float t67 = P[2][4]*t2*t19;
-            float t68 = P[5][4]*t2*t27;
-            float t90 = P[4][4]*t2*t7;
-            float t91 = P[3][4]*t2*t22;
-            float t69 = t64+t65+t66+t67+t68-t90-t91;
-            float t70 = P[6][6]*t2*t10;
-            float t71 = P[0][6]*t2*t5;
-            float t72 = P[1][6]*t2*t15;
-            float t73 = P[2][6]*t2*t19;
-            float t74 = P[5][6]*t2*t27;
-            float t93 = P[4][6]*t2*t7;
-            float t94 = P[3][6]*t2*t22;
-            float t75 = t70+t71+t72+t73+t74-t93-t94;
-            float t76 = t2*t10*t75;
-            float t87 = t2*t22*t56;
-            float t92 = t2*t7*t69;
-            float t77 = R_LOS+t37+t43+t50+t63+t76-t87-t92;
-            float t78;
+            float t30 = t24+t25;
+            float t31 = Tbs_flow.b.z*t30;
+            float t32 = t19-t20+t21-t22;
+            float t33 = Tbs_flow.b.y*t32;
+            float t34 = t23+t29;
+            float t35 = Tbs_flow.b.x*t34;
+            float t36 = q2*q3*2.0f;
+            float t37 = t19-t20-t21+t22;
+            float t38 = Tbs_flow.b.z*t37;
+            float t39 = t24-t25;
+            float t40 = t26+t36;
+            float t41 = Tbs_flow.b.y*t40;
+            float t60 = Tbs_flow.b.x*t39;
+            float t42 = t38+t41-t60;
+            float t43 = t8*vd;
+            float t44 = t5*ve;
+            float t45 = t11*vn;
+            float t46 = t43+t44+t45;
+            float t47 = t5*vd;
+            float t48 = t15*vn;
+            float t62 = t8*ve;
+            float t49 = t47+t48-t62;
+            float t50 = t15*ve;
+            float t51 = t8*vn;
+            float t63 = t11*vd;
+            float t52 = t50+t51-t63;
+            float t53 = t15*vd;
+            float t54 = t11*ve;
+            float t64 = t5*vn;
+            float t55 = t53+t54-t64;
+            float t56 = t23-t29;
+            float t65 = Tbs_flow.b.y*t56;
+            float t57 = t28+t31-t65;
+            float t58 = t26-t36;
+            float t66 = Tbs_flow.b.z*t58;
+            float t59 = t33+t35-t66;
+            float t61 = P[0][0]*t2*t46;
+            float t67 = P[1][1]*t2*t49;
+            float t68 = P[4][0]*t2*t57;
+            float t69 = P[5][0]*t2*t59;
+            float t70 = P[6][0]*t2*t42;
+            float t71 = P[1][0]*t2*t49;
+            float t72 = P[2][0]*t2*t52;
+            float t73 = P[3][0]*t2*t55;
+            float t74 = t61+t68+t69+t70+t71+t72+t73;
+            float t75 = t2*t46*t74;
+            float t76 = P[4][1]*t2*t57;
+            float t77 = P[5][1]*t2*t59;
+            float t78 = P[6][1]*t2*t42;
+            float t79 = P[0][1]*t2*t46;
+            float t80 = P[2][1]*t2*t52;
+            float t81 = P[3][1]*t2*t55;
+            float t82 = t67+t76+t77+t78+t79+t80+t81;
+            float t83 = t2*t49*t82;
+            float t84 = P[4][2]*t2*t57;
+            float t85 = P[5][2]*t2*t59;
+            float t86 = P[6][2]*t2*t42;
+            float t87 = P[0][2]*t2*t46;
+            float t88 = P[1][2]*t2*t49;
+            float t89 = P[2][2]*t2*t52;
+            float t90 = P[3][2]*t2*t55;
+            float t91 = t84+t85+t86+t87+t88+t89+t90;
+            float t92 = t2*t52*t91;
+            float t93 = P[4][3]*t2*t57;
+            float t94 = P[5][3]*t2*t59;
+            float t95 = P[6][3]*t2*t42;
+            float t96 = P[0][3]*t2*t46;
+            float t97 = P[1][3]*t2*t49;
+            float t98 = P[2][3]*t2*t52;
+            float t99 = P[3][3]*t2*t55;
+            float t100 = t93+t94+t95+t96+t97+t98+t99;
+            float t101 = t2*t55*t100;
+            float t102 = P[4][4]*t2*t57;
+            float t103 = P[5][4]*t2*t59;
+            float t104 = P[6][4]*t2*t42;
+            float t105 = P[0][4]*t2*t46;
+            float t106 = P[1][4]*t2*t49;
+            float t107 = P[2][4]*t2*t52;
+            float t108 = P[3][4]*t2*t55;
+            float t109 = t102+t103+t104+t105+t106+t107+t108;
+            float t110 = t2*t57*t109;
+            float t111 = P[4][5]*t2*t57;
+            float t112 = P[5][5]*t2*t59;
+            float t113 = P[6][5]*t2*t42;
+            float t114 = P[0][5]*t2*t46;
+            float t115 = P[1][5]*t2*t49;
+            float t116 = P[2][5]*t2*t52;
+            float t117 = P[3][5]*t2*t55;
+            float t118 = t111+t112+t113+t114+t115+t116+t117;
+            float t119 = t2*t59*t118;
+            float t120 = P[4][6]*t2*t57;
+            float t121 = P[5][6]*t2*t59;
+            float t122 = P[6][6]*t2*t42;
+            float t123 = P[0][6]*t2*t46;
+            float t124 = P[1][6]*t2*t49;
+            float t125 = P[2][6]*t2*t52;
+            float t126 = P[3][6]*t2*t55;
+            float t127 = t120+t121+t122+t123+t124+t125+t126;
+            float t128 = t2*t42*t127;
+            float t129 = R_LOS+t75+t83+t92+t101+t110+t119+t128;
+            float t130;
+
+            H_LOS[0] = t2*t46;
+            H_LOS[1] = t2*t49;
+            H_LOS[2] = t2*t52;
+            H_LOS[3] = t2*t55;
+            H_LOS[4] = t2*(t28+t31-Tbs_flow.b.y*(t23-q1*q2*2.0f));
+            H_LOS[5] = t2*(t33+t35-Tbs_flow.b.z*(t26-q2*q3*2.0f));
+            H_LOS[6] = t2*t42;
 
             // calculate innovation variance for X axis observation and protect against a badly conditioned calculation
-            if (t77 > R_LOS) {
-                t78 = 1.0f/t77;
+            if (t129 > R_LOS) {
+                t130 = 1.0f/t129;
                 faultStatus.bad_xflow = false;
             } else {
-                t77 = R_LOS;
-                t78 = 1.0f/R_LOS;
+                t129 = R_LOS;
+                t130 = 1.0f/R_LOS;
                 faultStatus.bad_xflow = true;
                 return;
             }
-            varInnovOptFlow[0] = t77;
+            varInnovOptFlow[0] = t129;
 
             // calculate innovation for X axis observation
             innovOptFlow[0] = losPred[0] - ofDataDelayed.flowRadXYcomp.x;
 
             // calculate Kalman gains for X-axis observation
-            Kfusion[0] = t78*(t12-P[0][4]*t2*t7+P[0][1]*t2*t15+P[0][6]*t2*t10+P[0][2]*t2*t19-P[0][3]*t2*t22+P[0][5]*t2*t27);
-            Kfusion[1] = t78*(t31+P[1][0]*t2*t5-P[1][4]*t2*t7+P[1][6]*t2*t10+P[1][2]*t2*t19-P[1][3]*t2*t22+P[1][5]*t2*t27);
-            Kfusion[2] = t78*(t47+P[2][0]*t2*t5-P[2][4]*t2*t7+P[2][1]*t2*t15+P[2][6]*t2*t10-P[2][3]*t2*t22+P[2][5]*t2*t27);
-            Kfusion[3] = t78*(-t86+P[3][0]*t2*t5-P[3][4]*t2*t7+P[3][1]*t2*t15+P[3][6]*t2*t10+P[3][2]*t2*t19+P[3][5]*t2*t27);
-            Kfusion[4] = t78*(-t90+P[4][0]*t2*t5+P[4][1]*t2*t15+P[4][6]*t2*t10+P[4][2]*t2*t19-P[4][3]*t2*t22+P[4][5]*t2*t27);
-            Kfusion[5] = t78*(t61+P[5][0]*t2*t5-P[5][4]*t2*t7+P[5][1]*t2*t15+P[5][6]*t2*t10+P[5][2]*t2*t19-P[5][3]*t2*t22);
-            Kfusion[6] = t78*(t70+P[6][0]*t2*t5-P[6][4]*t2*t7+P[6][1]*t2*t15+P[6][2]*t2*t19-P[6][3]*t2*t22+P[6][5]*t2*t27);
-            Kfusion[7] = t78*(P[7][0]*t2*t5-P[7][4]*t2*t7+P[7][1]*t2*t15+P[7][6]*t2*t10+P[7][2]*t2*t19-P[7][3]*t2*t22+P[7][5]*t2*t27);
-            Kfusion[8] = t78*(P[8][0]*t2*t5-P[8][4]*t2*t7+P[8][1]*t2*t15+P[8][6]*t2*t10+P[8][2]*t2*t19-P[8][3]*t2*t22+P[8][5]*t2*t27);
-            Kfusion[9] = t78*(P[9][0]*t2*t5-P[9][4]*t2*t7+P[9][1]*t2*t15+P[9][6]*t2*t10+P[9][2]*t2*t19-P[9][3]*t2*t22+P[9][5]*t2*t27);
+            Kfusion[0] = t130*(t61+P[0][6]*t2*t42+P[0][1]*t2*t49+P[0][2]*t2*t52+P[0][3]*t2*t55+P[0][4]*t2*t57+P[0][5]*t2*t59);
+            Kfusion[1] = t130*(t67+P[1][0]*t2*t46+P[1][6]*t2*t42+P[1][2]*t2*t52+P[1][3]*t2*t55+P[1][4]*t2*t57+P[1][5]*t2*t59);
+            Kfusion[2] = t130*(t89+P[2][0]*t2*t46+P[2][6]*t2*t42+P[2][1]*t2*t49+P[2][3]*t2*t55+P[2][4]*t2*t57+P[2][5]*t2*t59);
+            Kfusion[3] = t130*(t99+P[3][0]*t2*t46+P[3][6]*t2*t42+P[3][1]*t2*t49+P[3][2]*t2*t52+P[3][4]*t2*t57+P[3][5]*t2*t59);
+            Kfusion[4] = t130*(t102+P[4][0]*t2*t46+P[4][6]*t2*t42+P[4][1]*t2*t49+P[4][2]*t2*t52+P[4][3]*t2*t55+P[4][5]*t2*t59);
+            Kfusion[5] = t130*(t112+P[5][0]*t2*t46+P[5][6]*t2*t42+P[5][1]*t2*t49+P[5][2]*t2*t52+P[5][3]*t2*t55+P[5][4]*t2*t57);
+            Kfusion[6] = t130*(t122+P[6][0]*t2*t46+P[6][1]*t2*t49+P[6][2]*t2*t52+P[6][3]*t2*t55+P[6][4]*t2*t57+P[6][5]*t2*t59);
+            Kfusion[7] = t130*(P[7][0]*t2*t46+P[7][6]*t2*t42+P[7][1]*t2*t49+P[7][2]*t2*t52+P[7][3]*t2*t55+P[7][4]*t2*t57+P[7][5]*t2*t59);
+            Kfusion[8] = t130*(P[8][0]*t2*t46+P[8][6]*t2*t42+P[8][1]*t2*t49+P[8][2]*t2*t52+P[8][3]*t2*t55+P[8][4]*t2*t57+P[8][5]*t2*t59);
+            Kfusion[9] = t130*(P[9][0]*t2*t46+P[9][6]*t2*t42+P[9][1]*t2*t49+P[9][2]*t2*t52+P[9][3]*t2*t55+P[9][4]*t2*t57+P[9][5]*t2*t59);
 
             if (!inhibitDelAngBiasStates) {
-                Kfusion[10] = t78*(P[10][0]*t2*t5-P[10][4]*t2*t7+P[10][1]*t2*t15+P[10][6]*t2*t10+P[10][2]*t2*t19-P[10][3]*t2*t22+P[10][5]*t2*t27);
-                Kfusion[11] = t78*(P[11][0]*t2*t5-P[11][4]*t2*t7+P[11][1]*t2*t15+P[11][6]*t2*t10+P[11][2]*t2*t19-P[11][3]*t2*t22+P[11][5]*t2*t27);
-                Kfusion[12] = t78*(P[12][0]*t2*t5-P[12][4]*t2*t7+P[12][1]*t2*t15+P[12][6]*t2*t10+P[12][2]*t2*t19-P[12][3]*t2*t22+P[12][5]*t2*t27);
+                Kfusion[10] = t130*(P[10][0]*t2*t46+P[10][6]*t2*t42+P[10][1]*t2*t49+P[10][2]*t2*t52+P[10][3]*t2*t55+P[10][4]*t2*t57+P[10][5]*t2*t59);
+                Kfusion[11] = t130*(P[11][0]*t2*t46+P[11][6]*t2*t42+P[11][1]*t2*t49+P[11][2]*t2*t52+P[11][3]*t2*t55+P[11][4]*t2*t57+P[11][5]*t2*t59);
+                Kfusion[12] = t130*(P[12][0]*t2*t46+P[12][6]*t2*t42+P[12][1]*t2*t49+P[12][2]*t2*t52+P[12][3]*t2*t55+P[12][4]*t2*t57+P[12][5]*t2*t59);
             } else {
                 // zero indexes 10 to 12 = 3*4 bytes
                 memset(&Kfusion[10], 0, 12);
             }
 
             if (!inhibitDelVelBiasStates) {
-                Kfusion[13] = t78*(P[13][0]*t2*t5-P[13][4]*t2*t7+P[13][1]*t2*t15+P[13][6]*t2*t10+P[13][2]*t2*t19-P[13][3]*t2*t22+P[13][5]*t2*t27);
-                Kfusion[14] = t78*(P[14][0]*t2*t5-P[14][4]*t2*t7+P[14][1]*t2*t15+P[14][6]*t2*t10+P[14][2]*t2*t19-P[14][3]*t2*t22+P[14][5]*t2*t27);
-                Kfusion[15] = t78*(P[15][0]*t2*t5-P[15][4]*t2*t7+P[15][1]*t2*t15+P[15][6]*t2*t10+P[15][2]*t2*t19-P[15][3]*t2*t22+P[15][5]*t2*t27);
+                Kfusion[13] = t130*(P[13][0]*t2*t46+P[13][6]*t2*t42+P[13][1]*t2*t49+P[13][2]*t2*t52+P[13][3]*t2*t55+P[13][4]*t2*t57+P[13][5]*t2*t59);
+                Kfusion[14] = t130*(P[14][0]*t2*t46+P[14][6]*t2*t42+P[14][1]*t2*t49+P[14][2]*t2*t52+P[14][3]*t2*t55+P[14][4]*t2*t57+P[14][5]*t2*t59);
+                Kfusion[15] = t130*(P[15][0]*t2*t46+P[15][6]*t2*t42+P[15][1]*t2*t49+P[15][2]*t2*t52+P[15][3]*t2*t55+P[15][4]*t2*t57+P[15][5]*t2*t59);
             } else {
                 // zero indexes 13 to 15 = 3*4 bytes
                 memset(&Kfusion[13], 0, 12);
             }
 
             if (!inhibitMagStates) {
-                Kfusion[16] = t78*(P[16][0]*t2*t5-P[16][4]*t2*t7+P[16][1]*t2*t15+P[16][6]*t2*t10+P[16][2]*t2*t19-P[16][3]*t2*t22+P[16][5]*t2*t27);
-                Kfusion[17] = t78*(P[17][0]*t2*t5-P[17][4]*t2*t7+P[17][1]*t2*t15+P[17][6]*t2*t10+P[17][2]*t2*t19-P[17][3]*t2*t22+P[17][5]*t2*t27);
-                Kfusion[18] = t78*(P[18][0]*t2*t5-P[18][4]*t2*t7+P[18][1]*t2*t15+P[18][6]*t2*t10+P[18][2]*t2*t19-P[18][3]*t2*t22+P[18][5]*t2*t27);
-                Kfusion[19] = t78*(P[19][0]*t2*t5-P[19][4]*t2*t7+P[19][1]*t2*t15+P[19][6]*t2*t10+P[19][2]*t2*t19-P[19][3]*t2*t22+P[19][5]*t2*t27);
-                Kfusion[20] = t78*(P[20][0]*t2*t5-P[20][4]*t2*t7+P[20][1]*t2*t15+P[20][6]*t2*t10+P[20][2]*t2*t19-P[20][3]*t2*t22+P[20][5]*t2*t27);
-                Kfusion[21] = t78*(P[21][0]*t2*t5-P[21][4]*t2*t7+P[21][1]*t2*t15+P[21][6]*t2*t10+P[21][2]*t2*t19-P[21][3]*t2*t22+P[21][5]*t2*t27);
+                Kfusion[16] = t130*(P[16][0]*t2*t46+P[16][6]*t2*t42+P[16][1]*t2*t49+P[16][2]*t2*t52+P[16][3]*t2*t55+P[16][4]*t2*t57+P[16][5]*t2*t59);
+                Kfusion[17] = t130*(P[17][0]*t2*t46+P[17][6]*t2*t42+P[17][1]*t2*t49+P[17][2]*t2*t52+P[17][3]*t2*t55+P[17][4]*t2*t57+P[17][5]*t2*t59);
+                Kfusion[18] = t130*(P[18][0]*t2*t46+P[18][6]*t2*t42+P[18][1]*t2*t49+P[18][2]*t2*t52+P[18][3]*t2*t55+P[18][4]*t2*t57+P[18][5]*t2*t59);
+                Kfusion[19] = t130*(P[19][0]*t2*t46+P[19][6]*t2*t42+P[19][1]*t2*t49+P[19][2]*t2*t52+P[19][3]*t2*t55+P[19][4]*t2*t57+P[19][5]*t2*t59);
+                Kfusion[20] = t130*(P[20][0]*t2*t46+P[20][6]*t2*t42+P[20][1]*t2*t49+P[20][2]*t2*t52+P[20][3]*t2*t55+P[20][4]*t2*t57+P[20][5]*t2*t59);
+                Kfusion[21] = t130*(P[21][0]*t2*t46+P[21][6]*t2*t42+P[21][1]*t2*t49+P[21][2]*t2*t52+P[21][3]*t2*t55+P[21][4]*t2*t57+P[21][5]*t2*t59);
             } else {
                 // zero indexes 16 to 21 = 6*4 bytes
                 memset(&Kfusion[16], 0, 24);
             }
 
             if (!inhibitWindStates) {
-                Kfusion[22] = t78*(P[22][0]*t2*t5-P[22][4]*t2*t7+P[22][1]*t2*t15+P[22][6]*t2*t10+P[22][2]*t2*t19-P[22][3]*t2*t22+P[22][5]*t2*t27);
-                Kfusion[23] = t78*(P[23][0]*t2*t5-P[23][4]*t2*t7+P[23][1]*t2*t15+P[23][6]*t2*t10+P[23][2]*t2*t19-P[23][3]*t2*t22+P[23][5]*t2*t27);
+                Kfusion[22] = t130*(P[22][0]*t2*t46+P[22][6]*t2*t42+P[22][1]*t2*t49+P[22][2]*t2*t52+P[22][3]*t2*t55+P[22][4]*t2*t57+P[22][5]*t2*t59);
+                Kfusion[23] = t130*(P[23][0]*t2*t46+P[23][6]*t2*t42+P[23][1]*t2*t49+P[23][2]*t2*t52+P[23][3]*t2*t55+P[23][4]*t2*t57+P[23][5]*t2*t59);
             } else {
                 // zero indexes 22 to 23 = 2*4 bytes
                 memset(&Kfusion[22], 0, 8);
             }
 
         } else {
-
-            // calculate Y axis observation Jacobian
-            float t2 = 1.0f / range;
-            H_LOS[0] = -t2*(q2*vd*-2.0f+q3*ve*2.0f+q0*vn*2.0f);
-            H_LOS[1] = -t2*(q3*vd*2.0f+q2*ve*2.0f+q1*vn*2.0f);
-            H_LOS[2] = t2*(q0*vd*2.0f-q1*ve*2.0f+q2*vn*2.0f);
-            H_LOS[3] = -t2*(q1*vd*2.0f+q0*ve*2.0f-q3*vn*2.0f);
-            H_LOS[4] = -t2*(q0*q0+q1*q1-q2*q2-q3*q3);
-            H_LOS[5] = -t2*(q0*q3*2.0f+q1*q2*2.0f);
-            H_LOS[6] = t2*(q0*q2*2.0f-q1*q3*2.0f);
-
-            // calculate intermediate variables for the Y observaton innovatoin variance and Kalman gains
-            float t3 = q3*ve*2.0f;
-            float t4 = q0*vn*2.0f;
-            float t11 = q2*vd*2.0f;
-            float t5 = t3+t4-t11;
-            float t6 = q0*q3*2.0f;
-            float t7 = q1*q2*2.0f;
-            float t8 = t6+t7;
-            float t9 = q0*q2*2.0f;
-            float t28 = q1*q3*2.0f;
-            float t10 = t9-t28;
-            float t12 = P[0][0]*t2*t5;
-            float t13 = q3*vd*2.0f;
-            float t14 = q2*ve*2.0f;
-            float t15 = q1*vn*2.0f;
-            float t16 = t13+t14+t15;
-            float t17 = q0*vd*2.0f;
-            float t18 = q2*vn*2.0f;
-            float t29 = q1*ve*2.0f;
-            float t19 = t17+t18-t29;
-            float t20 = q1*vd*2.0f;
-            float t21 = q0*ve*2.0f;
-            float t30 = q3*vn*2.0f;
-            float t22 = t20+t21-t30;
-            float t23 = q0*q0;
-            float t24 = q1*q1;
-            float t25 = q2*q2;
-            float t26 = q3*q3;
-            float t27 = t23+t24-t25-t26;
-            float t31 = P[1][1]*t2*t16;
-            float t32 = P[5][0]*t2*t8;
-            float t33 = P[1][0]*t2*t16;
-            float t34 = P[3][0]*t2*t22;
-            float t35 = P[4][0]*t2*t27;
-            float t80 = P[6][0]*t2*t10;
-            float t81 = P[2][0]*t2*t19;
-            float t36 = t12+t32+t33+t34+t35-t80-t81;
-            float t37 = t2*t5*t36;
-            float t38 = P[5][1]*t2*t8;
-            float t39 = P[0][1]*t2*t5;
-            float t40 = P[3][1]*t2*t22;
-            float t41 = P[4][1]*t2*t27;
-            float t82 = P[6][1]*t2*t10;
-            float t83 = P[2][1]*t2*t19;
-            float t42 = t31+t38+t39+t40+t41-t82-t83;
-            float t43 = t2*t16*t42;
-            float t44 = P[5][2]*t2*t8;
-            float t45 = P[0][2]*t2*t5;
-            float t46 = P[1][2]*t2*t16;
-            float t47 = P[3][2]*t2*t22;
-            float t48 = P[4][2]*t2*t27;
-            float t79 = P[2][2]*t2*t19;
-            float t84 = P[6][2]*t2*t10;
-            float t49 = t44+t45+t46+t47+t48-t79-t84;
-            float t50 = P[5][3]*t2*t8;
-            float t51 = P[0][3]*t2*t5;
-            float t52 = P[1][3]*t2*t16;
-            float t53 = P[3][3]*t2*t22;
-            float t54 = P[4][3]*t2*t27;
-            float t86 = P[6][3]*t2*t10;
-            float t87 = P[2][3]*t2*t19;
-            float t55 = t50+t51+t52+t53+t54-t86-t87;
-            float t56 = t2*t22*t55;
-            float t57 = P[5][4]*t2*t8;
-            float t58 = P[0][4]*t2*t5;
-            float t59 = P[1][4]*t2*t16;
-            float t60 = P[3][4]*t2*t22;
-            float t61 = P[4][4]*t2*t27;
-            float t88 = P[6][4]*t2*t10;
-            float t89 = P[2][4]*t2*t19;
-            float t62 = t57+t58+t59+t60+t61-t88-t89;
-            float t63 = t2*t27*t62;
-            float t64 = P[5][5]*t2*t8;
-            float t65 = P[0][5]*t2*t5;
-            float t66 = P[1][5]*t2*t16;
-            float t67 = P[3][5]*t2*t22;
-            float t68 = P[4][5]*t2*t27;
-            float t90 = P[6][5]*t2*t10;
-            float t91 = P[2][5]*t2*t19;
-            float t69 = t64+t65+t66+t67+t68-t90-t91;
-            float t70 = t2*t8*t69;
-            float t71 = P[5][6]*t2*t8;
-            float t72 = P[0][6]*t2*t5;
-            float t73 = P[1][6]*t2*t16;
-            float t74 = P[3][6]*t2*t22;
-            float t75 = P[4][6]*t2*t27;
-            float t92 = P[6][6]*t2*t10;
-            float t93 = P[2][6]*t2*t19;
-            float t76 = t71+t72+t73+t74+t75-t92-t93;
-            float t85 = t2*t19*t49;
-            float t94 = t2*t10*t76;
-            float t77 = R_LOS+t37+t43+t56+t63+t70-t85-t94;
-            float t78;
+            // calculate Y axis observation Jacobian and Kalman gain vectors
+            // code fragments from https://github.com/PX4/ecl/blob/master/matlab/scripts/LOSY.c
+            // at commit 1615442
+            float t2 = 1.0f/range;
+            float t3 = Tbs_flow.a.y*q0*2.0f;
+            float t4 = Tbs_flow.a.x*q3*2.0f;
+            float t18 = Tbs_flow.a.z*q1*2.0f;
+            float t5 = t3+t4-t18;
+            float t6 = Tbs_flow.a.y*q1*2.0f;
+            float t7 = Tbs_flow.a.z*q0*2.0f;
+            float t16 = Tbs_flow.a.x*q2*2.0f;
+            float t8 = t6+t7-t16;
+            float t9 = Tbs_flow.a.x*q0*2.0f;
+            float t10 = Tbs_flow.a.z*q2*2.0f;
+            float t17 = Tbs_flow.a.y*q3*2.0f;
+            float t11 = t9+t10-t17;
+            float t12 = Tbs_flow.a.x*q1*2.0f;
+            float t13 = Tbs_flow.a.y*q2*2.0f;
+            float t14 = Tbs_flow.a.z*q3*2.0f;
+            float t15 = t12+t13+t14;
+            float t19 = q0*q0;
+            float t20 = q1*q1;
+            float t21 = q2*q2;
+            float t22 = q3*q3;
+            float t23 = q0*q3*2.0f;
+            float t24 = q0*q2*2.0f;
+            float t25 = q1*q3*2.0f;
+            float t26 = q0*q1*2.0f;
+            float t27 = t19+t20-t21-t22;
+            float t28 = Tbs_flow.a.x*t27;
+            float t29 = q1*q2*2.0f;
+            float t30 = t24+t25;
+            float t31 = Tbs_flow.a.z*t30;
+            float t32 = t19-t20+t21-t22;
+            float t33 = Tbs_flow.a.y*t32;
+            float t34 = t23+t29;
+            float t35 = Tbs_flow.a.x*t34;
+            float t36 = q2*q3*2.0f;
+            float t37 = t19-t20-t21+t22;
+            float t38 = Tbs_flow.a.z*t37;
+            float t39 = t24-t25;
+            float t40 = t26+t36;
+            float t41 = Tbs_flow.a.y*t40;
+            float t60 = Tbs_flow.a.x*t39;
+            float t42 = t38+t41-t60;
+            float t43 = t8*vd;
+            float t44 = t5*ve;
+            float t45 = t11*vn;
+            float t46 = t43+t44+t45;
+            float t47 = t5*vd;
+            float t48 = t15*vn;
+            float t62 = t8*ve;
+            float t49 = t47+t48-t62;
+            float t50 = t15*ve;
+            float t51 = t8*vn;
+            float t63 = t11*vd;
+            float t52 = t50+t51-t63;
+            float t53 = t15*vd;
+            float t54 = t11*ve;
+            float t64 = t5*vn;
+            float t55 = t53+t54-t64;
+            float t56 = t23-t29;
+            float t65 = Tbs_flow.a.y*t56;
+            float t57 = t28+t31-t65;
+            float t58 = t26-t36;
+            float t66 = Tbs_flow.a.z*t58;
+            float t59 = t33+t35-t66;
+            float t61 = P[0][0]*t2*t46;
+            float t67 = P[1][1]*t2*t49;
+            float t68 = P[4][0]*t2*t57;
+            float t69 = P[5][0]*t2*t59;
+            float t70 = P[6][0]*t2*t42;
+            float t71 = P[1][0]*t2*t49;
+            float t72 = P[2][0]*t2*t52;
+            float t73 = P[3][0]*t2*t55;
+            float t74 = t61+t68+t69+t70+t71+t72+t73;
+            float t75 = t2*t46*t74;
+            float t76 = P[4][1]*t2*t57;
+            float t77 = P[5][1]*t2*t59;
+            float t78 = P[6][1]*t2*t42;
+            float t79 = P[0][1]*t2*t46;
+            float t80 = P[2][1]*t2*t52;
+            float t81 = P[3][1]*t2*t55;
+            float t82 = t67+t76+t77+t78+t79+t80+t81;
+            float t83 = t2*t49*t82;
+            float t84 = P[4][2]*t2*t57;
+            float t85 = P[5][2]*t2*t59;
+            float t86 = P[6][2]*t2*t42;
+            float t87 = P[0][2]*t2*t46;
+            float t88 = P[1][2]*t2*t49;
+            float t89 = P[2][2]*t2*t52;
+            float t90 = P[3][2]*t2*t55;
+            float t91 = t84+t85+t86+t87+t88+t89+t90;
+            float t92 = t2*t52*t91;
+            float t93 = P[4][3]*t2*t57;
+            float t94 = P[5][3]*t2*t59;
+            float t95 = P[6][3]*t2*t42;
+            float t96 = P[0][3]*t2*t46;
+            float t97 = P[1][3]*t2*t49;
+            float t98 = P[2][3]*t2*t52;
+            float t99 = P[3][3]*t2*t55;
+            float t100 = t93+t94+t95+t96+t97+t98+t99;
+            float t101 = t2*t55*t100;
+            float t102 = P[4][4]*t2*t57;
+            float t103 = P[5][4]*t2*t59;
+            float t104 = P[6][4]*t2*t42;
+            float t105 = P[0][4]*t2*t46;
+            float t106 = P[1][4]*t2*t49;
+            float t107 = P[2][4]*t2*t52;
+            float t108 = P[3][4]*t2*t55;
+            float t109 = t102+t103+t104+t105+t106+t107+t108;
+            float t110 = t2*t57*t109;
+            float t111 = P[4][5]*t2*t57;
+            float t112 = P[5][5]*t2*t59;
+            float t113 = P[6][5]*t2*t42;
+            float t114 = P[0][5]*t2*t46;
+            float t115 = P[1][5]*t2*t49;
+            float t116 = P[2][5]*t2*t52;
+            float t117 = P[3][5]*t2*t55;
+            float t118 = t111+t112+t113+t114+t115+t116+t117;
+            float t119 = t2*t59*t118;
+            float t120 = P[4][6]*t2*t57;
+            float t121 = P[5][6]*t2*t59;
+            float t122 = P[6][6]*t2*t42;
+            float t123 = P[0][6]*t2*t46;
+            float t124 = P[1][6]*t2*t49;
+            float t125 = P[2][6]*t2*t52;
+            float t126 = P[3][6]*t2*t55;
+            float t127 = t120+t121+t122+t123+t124+t125+t126;
+            float t128 = t2*t42*t127;
+            float t129 = R_LOS+t75+t83+t92+t101+t110+t119+t128;
+            float t130 = 1.0f/t129;
 
             // calculate innovation variance for X axis observation and protect against a badly conditioned calculation
             // calculate innovation variance for X axis observation and protect against a badly conditioned calculation
-            if (t77 > R_LOS) {
-                t78 = 1.0f/t77;
+            if (t130 > R_LOS) {
+                t130 = 1.0f/t129;
                 faultStatus.bad_yflow = false;
             } else {
-                t77 = R_LOS;
-                t78 = 1.0f/R_LOS;
+                t129 = R_LOS;
+                t130 = 1.0f/R_LOS;
                 faultStatus.bad_yflow = true;
                 return;
             }
-            varInnovOptFlow[1] = t77;
+            varInnovOptFlow[1] = t129;
+
+            H_LOS[0] = -t2*t46;
+            H_LOS[1] = -t2*t49;
+            H_LOS[2] = -t2*t52;
+            H_LOS[3] = -t2*t55;
+            H_LOS[4] = -t2*(t28+t31-Tbs_flow.a.y*(t23-q1*q2*2.0f));
+            H_LOS[5] = -t2*(t33+t35-Tbs_flow.a.z*(t26-q2*q3*2.0f));
+            H_LOS[6] = -t2*t42;
 
             // calculate innovation for Y observation
             innovOptFlow[1] = losPred[1] - ofDataDelayed.flowRadXYcomp.y;
 
             // calculate Kalman gains for the Y-axis observation
-            Kfusion[0] = -t78*(t12+P[0][5]*t2*t8-P[0][6]*t2*t10+P[0][1]*t2*t16-P[0][2]*t2*t19+P[0][3]*t2*t22+P[0][4]*t2*t27);
-            Kfusion[1] = -t78*(t31+P[1][0]*t2*t5+P[1][5]*t2*t8-P[1][6]*t2*t10-P[1][2]*t2*t19+P[1][3]*t2*t22+P[1][4]*t2*t27);
-            Kfusion[2] = -t78*(-t79+P[2][0]*t2*t5+P[2][5]*t2*t8-P[2][6]*t2*t10+P[2][1]*t2*t16+P[2][3]*t2*t22+P[2][4]*t2*t27);
-            Kfusion[3] = -t78*(t53+P[3][0]*t2*t5+P[3][5]*t2*t8-P[3][6]*t2*t10+P[3][1]*t2*t16-P[3][2]*t2*t19+P[3][4]*t2*t27);
-            Kfusion[4] = -t78*(t61+P[4][0]*t2*t5+P[4][5]*t2*t8-P[4][6]*t2*t10+P[4][1]*t2*t16-P[4][2]*t2*t19+P[4][3]*t2*t22);
-            Kfusion[5] = -t78*(t64+P[5][0]*t2*t5-P[5][6]*t2*t10+P[5][1]*t2*t16-P[5][2]*t2*t19+P[5][3]*t2*t22+P[5][4]*t2*t27);
-            Kfusion[6] = -t78*(-t92+P[6][0]*t2*t5+P[6][5]*t2*t8+P[6][1]*t2*t16-P[6][2]*t2*t19+P[6][3]*t2*t22+P[6][4]*t2*t27);
-            Kfusion[7] = -t78*(P[7][0]*t2*t5+P[7][5]*t2*t8-P[7][6]*t2*t10+P[7][1]*t2*t16-P[7][2]*t2*t19+P[7][3]*t2*t22+P[7][4]*t2*t27);
-            Kfusion[8] = -t78*(P[8][0]*t2*t5+P[8][5]*t2*t8-P[8][6]*t2*t10+P[8][1]*t2*t16-P[8][2]*t2*t19+P[8][3]*t2*t22+P[8][4]*t2*t27);
-            Kfusion[9] = -t78*(P[9][0]*t2*t5+P[9][5]*t2*t8-P[9][6]*t2*t10+P[9][1]*t2*t16-P[9][2]*t2*t19+P[9][3]*t2*t22+P[9][4]*t2*t27);
+            Kfusion[0] = -t130*(t61+P[0][6]*t2*t42+P[0][1]*t2*t49+P[0][2]*t2*t52+P[0][3]*t2*t55+P[0][4]*t2*t57+P[0][5]*t2*t59);
+            Kfusion[1] = -t130*(t67+P[1][0]*t2*t46+P[1][6]*t2*t42+P[1][2]*t2*t52+P[1][3]*t2*t55+P[1][4]*t2*t57+P[1][5]*t2*t59);
+            Kfusion[2] = -t130*(t89+P[2][0]*t2*t46+P[2][6]*t2*t42+P[2][1]*t2*t49+P[2][3]*t2*t55+P[2][4]*t2*t57+P[2][5]*t2*t59);
+            Kfusion[3] = -t130*(t99+P[3][0]*t2*t46+P[3][6]*t2*t42+P[3][1]*t2*t49+P[3][2]*t2*t52+P[3][4]*t2*t57+P[3][5]*t2*t59);
+            Kfusion[4] = -t130*(t102+P[4][0]*t2*t46+P[4][6]*t2*t42+P[4][1]*t2*t49+P[4][2]*t2*t52+P[4][3]*t2*t55+P[4][5]*t2*t59);
+            Kfusion[5] = -t130*(t112+P[5][0]*t2*t46+P[5][6]*t2*t42+P[5][1]*t2*t49+P[5][2]*t2*t52+P[5][3]*t2*t55+P[5][4]*t2*t57);
+            Kfusion[6] = -t130*(t122+P[6][0]*t2*t46+P[6][1]*t2*t49+P[6][2]*t2*t52+P[6][3]*t2*t55+P[6][4]*t2*t57+P[6][5]*t2*t59);
+            Kfusion[7] = -t130*(P[7][0]*t2*t46+P[7][6]*t2*t42+P[7][1]*t2*t49+P[7][2]*t2*t52+P[7][3]*t2*t55+P[7][4]*t2*t57+P[7][5]*t2*t59);
+            Kfusion[8] = -t130*(P[8][0]*t2*t46+P[8][6]*t2*t42+P[8][1]*t2*t49+P[8][2]*t2*t52+P[8][3]*t2*t55+P[8][4]*t2*t57+P[8][5]*t2*t59);
+            Kfusion[9] = -t130*(P[9][0]*t2*t46+P[9][6]*t2*t42+P[9][1]*t2*t49+P[9][2]*t2*t52+P[9][3]*t2*t55+P[9][4]*t2*t57+P[9][5]*t2*t59);
 
             if (!inhibitDelAngBiasStates) {
-                Kfusion[10] = -t78*(P[10][0]*t2*t5+P[10][5]*t2*t8-P[10][6]*t2*t10+P[10][1]*t2*t16-P[10][2]*t2*t19+P[10][3]*t2*t22+P[10][4]*t2*t27);
-                Kfusion[11] = -t78*(P[11][0]*t2*t5+P[11][5]*t2*t8-P[11][6]*t2*t10+P[11][1]*t2*t16-P[11][2]*t2*t19+P[11][3]*t2*t22+P[11][4]*t2*t27);
-                Kfusion[12] = -t78*(P[12][0]*t2*t5+P[12][5]*t2*t8-P[12][6]*t2*t10+P[12][1]*t2*t16-P[12][2]*t2*t19+P[12][3]*t2*t22+P[12][4]*t2*t27);
+                Kfusion[10] = -t130*(P[10][0]*t2*t46+P[10][6]*t2*t42+P[10][1]*t2*t49+P[10][2]*t2*t52+P[10][3]*t2*t55+P[10][4]*t2*t57+P[10][5]*t2*t59);
+                Kfusion[11] = -t130*(P[11][0]*t2*t46+P[11][6]*t2*t42+P[11][1]*t2*t49+P[11][2]*t2*t52+P[11][3]*t2*t55+P[11][4]*t2*t57+P[11][5]*t2*t59);
+                Kfusion[12] = -t130*(P[12][0]*t2*t46+P[12][6]*t2*t42+P[12][1]*t2*t49+P[12][2]*t2*t52+P[12][3]*t2*t55+P[12][4]*t2*t57+P[12][5]*t2*t59);
             } else {
                 // zero indexes 10 to 12 = 3*4 bytes
                 memset(&Kfusion[10], 0, 12);
             }
 
             if (!inhibitDelVelBiasStates) {
-                Kfusion[13] = -t78*(P[13][0]*t2*t5+P[13][5]*t2*t8-P[13][6]*t2*t10+P[13][1]*t2*t16-P[13][2]*t2*t19+P[13][3]*t2*t22+P[13][4]*t2*t27);
-                Kfusion[14] = -t78*(P[14][0]*t2*t5+P[14][5]*t2*t8-P[14][6]*t2*t10+P[14][1]*t2*t16-P[14][2]*t2*t19+P[14][3]*t2*t22+P[14][4]*t2*t27);
-                Kfusion[15] = -t78*(P[15][0]*t2*t5+P[15][5]*t2*t8-P[15][6]*t2*t10+P[15][1]*t2*t16-P[15][2]*t2*t19+P[15][3]*t2*t22+P[15][4]*t2*t27);
+                Kfusion[13] = -t130*(P[13][0]*t2*t46+P[13][6]*t2*t42+P[13][1]*t2*t49+P[13][2]*t2*t52+P[13][3]*t2*t55+P[13][4]*t2*t57+P[13][5]*t2*t59);
+                Kfusion[14] = -t130*(P[14][0]*t2*t46+P[14][6]*t2*t42+P[14][1]*t2*t49+P[14][2]*t2*t52+P[14][3]*t2*t55+P[14][4]*t2*t57+P[14][5]*t2*t59);
+                Kfusion[15] = -t130*(P[15][0]*t2*t46+P[15][6]*t2*t42+P[15][1]*t2*t49+P[15][2]*t2*t52+P[15][3]*t2*t55+P[15][4]*t2*t57+P[15][5]*t2*t59);
             } else {
                 // zero indexes 13 to 15 = 3*4 bytes
                 memset(&Kfusion[13], 0, 12);
             }
 
             if (!inhibitMagStates) {
-                Kfusion[16] = -t78*(P[16][0]*t2*t5+P[16][5]*t2*t8-P[16][6]*t2*t10+P[16][1]*t2*t16-P[16][2]*t2*t19+P[16][3]*t2*t22+P[16][4]*t2*t27);
-                Kfusion[17] = -t78*(P[17][0]*t2*t5+P[17][5]*t2*t8-P[17][6]*t2*t10+P[17][1]*t2*t16-P[17][2]*t2*t19+P[17][3]*t2*t22+P[17][4]*t2*t27);
-                Kfusion[18] = -t78*(P[18][0]*t2*t5+P[18][5]*t2*t8-P[18][6]*t2*t10+P[18][1]*t2*t16-P[18][2]*t2*t19+P[18][3]*t2*t22+P[18][4]*t2*t27);
-                Kfusion[19] = -t78*(P[19][0]*t2*t5+P[19][5]*t2*t8-P[19][6]*t2*t10+P[19][1]*t2*t16-P[19][2]*t2*t19+P[19][3]*t2*t22+P[19][4]*t2*t27);
-                Kfusion[20] = -t78*(P[20][0]*t2*t5+P[20][5]*t2*t8-P[20][6]*t2*t10+P[20][1]*t2*t16-P[20][2]*t2*t19+P[20][3]*t2*t22+P[20][4]*t2*t27);
-                Kfusion[21] = -t78*(P[21][0]*t2*t5+P[21][5]*t2*t8-P[21][6]*t2*t10+P[21][1]*t2*t16-P[21][2]*t2*t19+P[21][3]*t2*t22+P[21][4]*t2*t27);
+                Kfusion[16] = -t130*(P[16][0]*t2*t46+P[16][6]*t2*t42+P[16][1]*t2*t49+P[16][2]*t2*t52+P[16][3]*t2*t55+P[16][4]*t2*t57+P[16][5]*t2*t59);
+                Kfusion[17] = -t130*(P[17][0]*t2*t46+P[17][6]*t2*t42+P[17][1]*t2*t49+P[17][2]*t2*t52+P[17][3]*t2*t55+P[17][4]*t2*t57+P[17][5]*t2*t59);
+                Kfusion[18] = -t130*(P[18][0]*t2*t46+P[18][6]*t2*t42+P[18][1]*t2*t49+P[18][2]*t2*t52+P[18][3]*t2*t55+P[18][4]*t2*t57+P[18][5]*t2*t59);
+                Kfusion[19] = -t130*(P[19][0]*t2*t46+P[19][6]*t2*t42+P[19][1]*t2*t49+P[19][2]*t2*t52+P[19][3]*t2*t55+P[19][4]*t2*t57+P[19][5]*t2*t59);
+                Kfusion[20] = -t130*(P[20][0]*t2*t46+P[20][6]*t2*t42+P[20][1]*t2*t49+P[20][2]*t2*t52+P[20][3]*t2*t55+P[20][4]*t2*t57+P[20][5]*t2*t59);
+                Kfusion[21] = -t130*(P[21][0]*t2*t46+P[21][6]*t2*t42+P[21][1]*t2*t49+P[21][2]*t2*t52+P[21][3]*t2*t55+P[21][4]*t2*t57+P[21][5]*t2*t59);
             } else {
                 // zero indexes 16 to 21 = 6*4 bytes
                 memset(&Kfusion[16], 0, 24);
             }
 
             if (!inhibitWindStates) {
-                Kfusion[22] = -t78*(P[22][0]*t2*t5+P[22][5]*t2*t8-P[22][6]*t2*t10+P[22][1]*t2*t16-P[22][2]*t2*t19+P[22][3]*t2*t22+P[22][4]*t2*t27);
-                Kfusion[23] = -t78*(P[23][0]*t2*t5+P[23][5]*t2*t8-P[23][6]*t2*t10+P[23][1]*t2*t16-P[23][2]*t2*t19+P[23][3]*t2*t22+P[23][4]*t2*t27);
+                Kfusion[22] = -t130*(P[22][0]*t2*t46+P[22][6]*t2*t42+P[22][1]*t2*t49+P[22][2]*t2*t52+P[22][3]*t2*t55+P[22][4]*t2*t57+P[22][5]*t2*t59);
+                Kfusion[23] = -t130*(P[23][0]*t2*t46+P[23][6]*t2*t42+P[23][1]*t2*t49+P[23][2]*t2*t52+P[23][3]*t2*t55+P[23][4]*t2*t57+P[23][5]*t2*t59);
             } else {
                 // zero indexes 22 to 23 = 2*4 bytes
                 memset(&Kfusion[22], 0, 8);
