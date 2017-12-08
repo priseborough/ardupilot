@@ -53,10 +53,11 @@ public:
     // quality - returns the surface quality as a measure from 0 ~ 255
     uint8_t quality() const { return _state.surface_quality; }
 
-    // raw - returns the raw movement from the sensor
+    // Return optical flow angular rate in rad/sec measured about the X and Y sensor axis. A RH rotation about a sensor axis produces a positive rate.
+    // This rate will be the combination of translational and rotation movement of the sensor relative to it's surroundings.
     const Vector2f& flowRate() const { return _state.flowRate; }
 
-    // velocity - returns the velocity in m/s
+    // Return body inertial angular rate in rad/sec measured about the X and Y sensor axis. A RH rotation about a sensor axis produces a positive rate.
     const Vector2f& bodyRate() const { return _state.bodyRate; }
 
     // device_id - returns device id
@@ -68,13 +69,18 @@ public:
     struct OpticalFlow_state {
         uint8_t device_id;          // device id
         uint8_t  surface_quality;   // image quality (below TBD you can't trust the dx,dy values returned)
-        Vector2f flowRate;          // optical flow angular rate in rad/sec measured about the X and Y body axis. A RH rotation about a sensor axis produces a positive rate.
-        Vector2f bodyRate;          // body inertial angular rate in rad/sec measured about the X and Y body axis. A RH rotation about a sensor axis produces a positive rate.
+        Vector2f flowRate;          // optical flow angular rate in rad/sec measured about the X and Y sensor axis. A RH rotation about a sensor axis produces a positive rate.
+        Vector2f bodyRate;          // body inertial angular rate in rad/sec measured about the X and Y sensor axis. A RH rotation about a sensor axis produces a positive rate.
     };
 
     // return a 3D vector defining the position offset of the sensors focal point in metres relative to the body frame origin
     const Vector3f &get_pos_offset(void) const {
         return _pos_offset;
+    }
+
+    // Return a 3x3 matrix  defining the transformation of a vector from body to sensor frame of reference.
+    const Matrix3f &get_sensor_rotmat(void) const {
+        return _sensor_rotmat;
     }
 
     // parameter var info table
@@ -94,9 +100,13 @@ private:
     AP_Int8  _enabled;              // enabled/disabled flag
     AP_Int16 _flowScalerX;          // X axis flow scale factor correction - parts per thousand
     AP_Int16 _flowScalerY;          // Y axis flow scale factor correction - parts per thousand
-    AP_Int16 _yawAngle_cd;          // yaw angle of sensor X axis with respect to vehicle X axis - centi degrees
     AP_Vector3f _pos_offset;        // position offset of the flow sensor in the body frame
     AP_Int8  _address;              // address on the bus (allows selecting between 8 possible I2C addresses for px4flow)
+    AP_Int16 _rot_x_cd;             // X-axis rotation from a ZYX Tait-Bryan rotation sequence defining the rotation from body frame to sensor frame (centi-deg)
+    AP_Int16 _rot_y_cd;             // Y-axis rotation from a ZYX Tait-Bryan rotation sequence defining the rotation from body frame to sensor frame (centi-deg)
+    AP_Int16 _rot_z_cd;             // Z-axis rotation from a ZYX Tait-Bryan rotation sequence defining the rotation from body frame to sensor frame (centi-deg)
+
+    Matrix3f _sensor_rotmat;        // rotation matrix from body frame to sensor frame
 
     // state filled in by backend
     struct OpticalFlow_state _state;

@@ -348,9 +348,6 @@ void AP_OpticalFlow_Pixart::update(void)
                                   integral.sum.y * flowScaleFactorY);
         state.flowRate *= flow_pixel_scaling / dt;
 
-        // we only apply yaw to flowRate as body rate comes from AHRS
-        _applyYaw(state.flowRate);
-        
         state.bodyRate = integral.gyro / dt;
 
         integral.sum.zero();
