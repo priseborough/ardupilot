@@ -174,6 +174,52 @@ void Copter::update_optical_flow(void)
         float range = -1.0f; // set to a negative number if sensor range is not available
         const Matrix3f &rotMat = optflow.get_sensor_rotmat();
 
+        // find a range finder that matches the flow sensor direction
+        bool sensor_available = false;
+        if (rotMat.c.z > 0.95f) {
+            // look for range finder pointing down
+            sensor_available = ((rangefinder.status_orient(ROTATION_PITCH_270) == RangeFinder::RangeFinder_Good) && (rangefinder.range_valid_count_orient(ROTATION_PITCH_270) >= RANGEFINDER_HEALTH_MAX));
+            if (sensor_available) {
+                int16_t temp_alt = rangefinder.distance_cm_orient(ROTATION_PITCH_270);
+                range = 0.01f * (float)temp_alt;
+            }
+        } if (rotMat.c.z < -0.95f) {
+            // look for range finder pointing up
+            sensor_available = ((rangefinder.status_orient(ROTATION_PITCH_90) == RangeFinder::RangeFinder_Good) && (rangefinder.range_valid_count_orient(ROTATION_PITCH_90) >= RANGEFINDER_HEALTH_MAX));
+            if (sensor_available) {
+                int16_t temp_alt = rangefinder.distance_cm_orient(ROTATION_PITCH_90);
+                range = 0.01f * (float)temp_alt;
+            }
+        } else if (rotMat.c.x > 0.95f) {
+            // look for range finder pointing ahead
+            sensor_available = ((rangefinder.status_orient(ROTATION_NONE) == RangeFinder::RangeFinder_Good) && (rangefinder.range_valid_count_orient(ROTATION_NONE) >= RANGEFINDER_HEALTH_MAX));
+            if (sensor_available) {
+                int16_t temp_alt = rangefinder.distance_cm_orient(ROTATION_NONE);
+                range = 0.01f * (float)temp_alt;
+            }
+        } else if (rotMat.c.x < -0.95f) {
+            // look for range finder pointing behind
+            sensor_available = ((rangefinder.status_orient(ROTATION_YAW_180) == RangeFinder::RangeFinder_Good) && (rangefinder.range_valid_count_orient(ROTATION_YAW_180) >= RANGEFINDER_HEALTH_MAX));
+            if (sensor_available) {
+                int16_t temp_alt = rangefinder.distance_cm_orient(ROTATION_YAW_180);
+                range = 0.01f * (float)temp_alt;
+            }
+        } else if (rotMat.c.y > 0.95f) {
+            // look for range finder pointing right
+            sensor_available = ((rangefinder.status_orient(ROTATION_YAW_90) == RangeFinder::RangeFinder_Good) && (rangefinder.range_valid_count_orient(ROTATION_YAW_90) >= RANGEFINDER_HEALTH_MAX));
+            if (sensor_available) {
+                int16_t temp_alt = rangefinder.distance_cm_orient(ROTATION_YAW_90);
+                range = 0.01f * (float)temp_alt;
+            }
+        } else if (rotMat.c.y < -0.95f) {
+            // look for range finder pointing left
+            sensor_available = ((rangefinder.status_orient(ROTATION_YAW_270) == RangeFinder::RangeFinder_Good) && (rangefinder.range_valid_count_orient(ROTATION_YAW_270) >= RANGEFINDER_HEALTH_MAX));
+            if (sensor_available) {
+                int16_t temp_alt = rangefinder.distance_cm_orient(ROTATION_YAW_270);
+                range = 0.01f * (float)temp_alt;
+            }
+        }
+
         ahrs.writeOptFlowMeas(flowQuality, flowRate, bodyRate, last_of_update, range, posOffset, rotMat);
         if (g.log_bitmask & MASK_LOG_OPTFLOW) {
             Log_Write_Optflow();
