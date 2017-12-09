@@ -31,15 +31,15 @@ const AP_Param::GroupInfo OpticalFlow::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("_FYSCALER", 2,  OpticalFlow,    _flowScalerY,   0),
 
-    // @Param: _EUL_Z
+    // @Param: _EUL_Z_CD
     // @DisplayName: Z rotation
     // @Description: Z axis rotation from a ZYX Tait-Bryan rotation sequence describing the orientation of the optical flow sensor frame relative to the autopilot body frame. The flow camera looks out along the Z sensor axis.
-    // @Units: centi-deg
+    // @Units: cdeg
     // @Range: -18000 +18000
     // @Increment: 1
     // @User: Standard
     // @RebootRequired: True
-    AP_GROUPINFO("_EUL_Z", 3, OpticalFlow, _rot_z_cd, 0),
+    AP_GROUPINFO("_EUL_Z_CD", 3, OpticalFlow, _rot_z_cd, 0),
 
     // @Param: _POS_X
     // @DisplayName:  X position offset
@@ -67,25 +67,25 @@ const AP_Param::GroupInfo OpticalFlow::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("_ADDR", 5,  OpticalFlow, _address,   0),
 
-    // @Param: _EUL_X
+    // @Param: _EUL_X_CD
     // @DisplayName: X rotation
     // @Description: X axis rotation from a ZYX Tait-Bryan rotation sequence describing the orientation of the optical flow sensor frame relative to the autopilot body frame. The flow camera looks out along the Z sensor axis.
-    // @Units: centi-deg
+    // @Units: cdeg
     // @Range: -18000 +18000
     // @Increment: 1
     // @User: Standard
     // @RebootRequired: True
-    AP_GROUPINFO("_EUL_X", 6, OpticalFlow, _rot_x_cd, 0),
+    AP_GROUPINFO("_EUL_X_CD", 6, OpticalFlow, _rot_x_cd, 0),
 
-    // @Param: _EUL_Y
+    // @Param: _EUL_Y_CD
     // @DisplayName: Y rotation
     // @Description: Y axis rotation from a ZYX Tait-Bryan rotation sequence describing the orientation of the optical flow sensor frame relative to the autopilot body frame. The flow camera looks out along the Z sensor axis..
-    // @Units: centi-deg
+    // @Units: cdeg
     // @Range: -9000 +9000
     // @Increment: 1
     // @User: Standard
     // @RebootRequired: True
-    AP_GROUPINFO("_EUL_Y", 7, OpticalFlow, _rot_y_cd, 0),
+    AP_GROUPINFO("_EUL_Y_CD", 7, OpticalFlow, _rot_y_cd, 0),
 
     AP_GROUPEND
 };
