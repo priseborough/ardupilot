@@ -1375,11 +1375,32 @@ void DataFlash_Class::Log_Write_EKF3(AP_AHRS_NavEKF &ahrs)
         updateTime_ms = lastUpdateTime_ms;
     }
 
+    // write debug data for external nav scale factor estimation
+    float scaleLog;
+    float scaleLogSigma;
+    Vector3f delPosInnov,delPosInnovVar;
+    if (ahrs.get_NavEKF3().getScaleFactorDebug(-1, scaleLog, scaleLogSigma, delPosInnov, delPosInnovVar)) {
+        struct log_ekfExtNavScaleDebug pkt12 = {
+            LOG_PACKET_HEADER_INIT(LOG_XKFR_MSG),
+            time_us : time_us,
+            scaleLog : scaleLog,
+            scaleLogSigma : scaleLogSigma,
+            innovX : delPosInnov.x,
+            innovY : delPosInnov.y,
+            innovZ : delPosInnov.z,
+            innovVarX : delPosInnovVar.x,
+            innovVarY : delPosInnovVar.y,
+            innovVarZ : delPosInnovVar.z
+         };
+        WriteBlock(&pkt12, sizeof(pkt12));
+
+    }
+
     // log state variances every 0.49s
     static uint32_t lastEkfStateVarLogTime_ms = 0;
     if (AP_HAL::millis() - lastEkfStateVarLogTime_ms > 490) {
         lastEkfStateVarLogTime_ms = AP_HAL::millis();
-        float stateVar[24];
+        float stateVar[25];
         ahrs.get_NavEKF3().getStateVariances(-1, stateVar);
         struct log_ekfStateVar pktv1 = {
             LOG_PACKET_HEADER_INIT(LOG_XKV1_MSG),
@@ -1412,7 +1433,7 @@ void DataFlash_Class::Log_Write_EKF3(AP_AHRS_NavEKF &ahrs)
             v08 : stateVar[20],
             v09 : stateVar[21],
             v10 : stateVar[22],
-            v11 : stateVar[23]
+            v11 : (stateVar[23]+stateVar[24])
         };
         WriteBlock(&pktv2, sizeof(pktv2));
     }
