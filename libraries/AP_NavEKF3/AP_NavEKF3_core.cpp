@@ -128,6 +128,9 @@ bool NavEKF3_core::setup_core(NavEKF3 *_frontend, uint8_t _imu_index, uint8_t _c
     if(!storedWheelOdm.init(imu_buffer_length)) { // initialise to same length of IMU to allow for multiple wheel sensors
         return false;
     }
+    if(!storedExtNav.init(obs_buffer_length)) {
+        return false;
+    }
     // Note: the use of dual range finders potentially doubles the amount of data to be stored
     if(!storedRange.init(MIN(2*obs_buffer_length , imu_buffer_length))) {
         return false;
@@ -238,6 +241,7 @@ void NavEKF3_core::InitialiseVariables()
     inhibitMagStates = true;
     inhibitDelVelBiasStates = true;
     inhibitDelAngBiasStates = true;
+    inhibitScaleFactorState = true;
     gndOffsetValid =  false;
     validOrigin = false;
     takeoffExpectedSet_ms = 0;
@@ -252,7 +256,7 @@ void NavEKF3_core::InitialiseVariables()
     lastYawReset_ms = 0;
     tiltAlignComplete = false;
     yawAlignComplete = false;
-    stateIndexLim = 23;
+    stateIndexLim = 24;
     baroStoreIndex = 0;
     rangeStoreIndex = 0;
     magStoreIndex = 0;
@@ -379,6 +383,29 @@ void NavEKF3_core::InitialiseVariables()
     usingWheelSensors = false;
     wheelOdmMeasTime_ms = 0;
 
+    // external nav data fusion
+    memset(&extNavDataNew, 0, sizeof(extNavDataNew));
+    memset(&extNavDataDelayed, 0, sizeof(extNavDataDelayed));
+    memset(&extNavPosTestRatio, 0, sizeof(extNavPosTestRatio));
+    memset(&varInnovExtNavPos, 0, sizeof(varInnovExtNavPos));
+    innovExtNavPos.zero();
+    extNavMeasTime_ms = 0;
+    ekfToExtNavRotVecFilt.zero();
+    memset(&extNavToEkfRotMat, 0, sizeof(extNavToEkfRotMat));
+    extNavToEkfRotMat.a.x = 1.0f;
+    extNavToEkfRotMat.b.y = 1.0f;
+    extNavToEkfRotMat.c.z = 1.0f;
+    ekfToExtNavRotTime_ms = 0;
+    extNavFusionDelayed = false;
+    useExtNavRelPosMethod = false;
+    extNavPosMeasPrev.zero();
+    extNavPosEstPrev.zero();
+    extNavPrevAvailable = false;
+    extNavLastPosResetTime_ms = 0;
+
+    // external nav scale factor estimation
+    logScaleFactorFusion = false;
+
     // zero data buffers
     storedIMU.reset();
     storedGPS.reset();
@@ -390,6 +417,7 @@ void NavEKF3_core::InitialiseVariables()
     storedRangeBeacon.reset();
     storedBodyOdm.reset();
     storedWheelOdm.reset();
+    storedExtNav.reset();
 }
 
 // Initialise the states from accelerometer and magnetometer data (if present)
@@ -517,9 +545,11 @@ void NavEKF3_core::CovarianceInit()
     P[19][19] = 0.0f;
     P[20][20] = P[19][19];
     P[21][21] = P[19][19];
-    // wind velocities
+    // scale factor
     P[22][22] = 0.0f;
-    P[23][23]  = P[22][22];
+    // wind velocities
+    P[23][23] = 0.0f;
+    P[24][24]  = P[23][23];
 
 
     // optical flow ground height covariance
@@ -577,6 +607,9 @@ void NavEKF3_core::UpdateFilter(bool predict)
 
         // Update states using body frame odometry data
         SelectBodyOdomFusion();
+
+        // Update states external nav system data
+        SelectExtNavFusion();
 
         // Update states using airspeed data
         SelectTasFusion();
@@ -674,6 +707,7 @@ void NavEKF3_core::UpdateStrapdownEquationsNED()
     if (filterStatus.flags.horiz_vel) {
         receiverPos += (stateStruct.velocity + lastVelocity) * (imuDataDelayed.delVelDT*0.5f);
     }
+
 }
 
 /*
@@ -869,7 +903,7 @@ void NavEKF3_core::CovariancePrediction()
 
     // calculate covariance prediction process noise added to diagonals of predicted covariance matrix
     // error growth of first 10 kinematic states is built into auto-code for covariance prediction and driven by IMU noise parameters
-    Vector14 processNoiseVariance = {};
+    Vector15 processNoiseVariance = {};
 
     if (!inhibitDelAngBiasStates) {
         float dAngBiasVar = sq(sq(dt) * constrain_float(frontend->_gyroBiasProcessNoise, 0.0f, 1.0f));
@@ -896,9 +930,13 @@ void NavEKF3_core::CovariancePrediction()
         for (uint8_t i=9; i<=11; i++) processNoiseVariance[i] = magBodyVar;
     }
 
+    if (!inhibitScaleFactorState) {
+        processNoiseVariance[12] = sq(frontend->_extNavLogScaleNse);
+    }
+
     if (!inhibitWindStates) {
         float windVelVar  = sq(dt * constrain_float(frontend->_windVelProcessNoise, 0.0f, 1.0f) * (1.0f + constrain_float(frontend->_wndVarHgtRateScale, 0.0f, 1.0f) * fabsf(hgtRate)));
-        for (uint8_t i=12; i<=13; i++) processNoiseVariance[i] = windVelVar;
+        for (uint8_t i=13; i<=14; i++) processNoiseVariance[i] = windVelVar;
     }
 
     // set variables used to calculate covariance growth
@@ -985,7 +1023,6 @@ void NavEKF3_core::CovariancePrediction()
     SPP[8] = 2*q0*q3 + 2*q1*q2;
     SPP[9] = 2*q0*q2 + 2*q1*q3;
     SPP[10] = SF[16];
-
 
     nextP[0][0] = P[0][0] + P[1][0]*SF[9] + P[2][0]*SF[11] + P[3][0]*SF[10] + P[10][0]*SF[14] + P[11][0]*SF[15] + P[12][0]*SPP[10] + (daxVar*SQ[10])/4 + SF[9]*(P[0][1] + P[1][1]*SF[9] + P[2][1]*SF[11] + P[3][1]*SF[10] + P[10][1]*SF[14] + P[11][1]*SF[15] + P[12][1]*SPP[10]) + SF[11]*(P[0][2] + P[1][2]*SF[9] + P[2][2]*SF[11] + P[3][2]*SF[10] + P[10][2]*SF[14] + P[11][2]*SF[15] + P[12][2]*SPP[10]) + SF[10]*(P[0][3] + P[1][3]*SF[9] + P[2][3]*SF[11] + P[3][3]*SF[10] + P[10][3]*SF[14] + P[11][3]*SF[15] + P[12][3]*SPP[10]) + SF[14]*(P[0][10] + P[1][10]*SF[9] + P[2][10]*SF[11] + P[3][10]*SF[10] + P[10][10]*SF[14] + P[11][10]*SF[15] + P[12][10]*SPP[10]) + SF[15]*(P[0][11] + P[1][11]*SF[9] + P[2][11]*SF[11] + P[3][11]*SF[10] + P[10][11]*SF[14] + P[11][11]*SF[15] + P[12][11]*SPP[10]) + SPP[10]*(P[0][12] + P[1][12]*SF[9] + P[2][12]*SF[11] + P[3][12]*SF[10] + P[10][12]*SF[14] + P[11][12]*SF[15] + P[12][12]*SPP[10]) + (dayVar*sq(q2))/4 + (dazVar*sq(q3))/4;
     nextP[0][1] = P[0][1] + SQ[8] + P[1][1]*SF[9] + P[2][1]*SF[11] + P[3][1]*SF[10] + P[10][1]*SF[14] + P[11][1]*SF[15] + P[12][1]*SPP[10] + SF[8]*(P[0][0] + P[1][0]*SF[9] + P[2][0]*SF[11] + P[3][0]*SF[10] + P[10][0]*SF[14] + P[11][0]*SF[15] + P[12][0]*SPP[10]) + SF[7]*(P[0][2] + P[1][2]*SF[9] + P[2][2]*SF[11] + P[3][2]*SF[10] + P[10][2]*SF[14] + P[11][2]*SF[15] + P[12][2]*SPP[10]) + SF[11]*(P[0][3] + P[1][3]*SF[9] + P[2][3]*SF[11] + P[3][3]*SF[10] + P[10][3]*SF[14] + P[11][3]*SF[15] + P[12][3]*SPP[10]) - SF[15]*(P[0][12] + P[1][12]*SF[9] + P[2][12]*SF[11] + P[3][12]*SF[10] + P[10][12]*SF[14] + P[11][12]*SF[15] + P[12][12]*SPP[10]) + SPP[10]*(P[0][11] + P[1][11]*SF[9] + P[2][11]*SF[11] + P[3][11]*SF[10] + P[10][11]*SF[14] + P[11][11]*SF[15] + P[12][11]*SPP[10]) - (q0*(P[0][10] + P[1][10]*SF[9] + P[2][10]*SF[11] + P[3][10]*SF[10] + P[10][10]*SF[14] + P[11][10]*SF[15] + P[12][10]*SPP[10]))/2;
@@ -1247,7 +1284,7 @@ void NavEKF3_core::CovariancePrediction()
                 nextP[20][21] = P[20][21];
                 nextP[21][21] = P[21][21];
 
-                if (stateIndexLim > 21) {
+                if (stateIndexLim > 22) {
                     nextP[0][22] = P[0][22] + P[1][22]*SF[9] + P[2][22]*SF[11] + P[3][22]*SF[10] + P[10][22]*SF[14] + P[11][22]*SF[15] + P[12][22]*SPP[10];
                     nextP[1][22] = P[1][22] + P[0][22]*SF[8] + P[2][22]*SF[7] + P[3][22]*SF[11] - P[12][22]*SF[15] + P[11][22]*SPP[10] - (P[10][22]*q0)/2;
                     nextP[2][22] = P[2][22] + P[0][22]*SF[6] + P[1][22]*SF[10] + P[3][22]*SF[8] + P[12][22]*SF[14] - P[10][22]*SPP[10] - (P[11][22]*q0)/2;
@@ -1271,30 +1308,58 @@ void NavEKF3_core::CovariancePrediction()
                     nextP[20][22] = P[20][22];
                     nextP[21][22] = P[21][22];
                     nextP[22][22] = P[22][22];
-                    nextP[0][23] = P[0][23] + P[1][23]*SF[9] + P[2][23]*SF[11] + P[3][23]*SF[10] + P[10][23]*SF[14] + P[11][23]*SF[15] + P[12][23]*SPP[10];
-                    nextP[1][23] = P[1][23] + P[0][23]*SF[8] + P[2][23]*SF[7] + P[3][23]*SF[11] - P[12][23]*SF[15] + P[11][23]*SPP[10] - (P[10][23]*q0)/2;
-                    nextP[2][23] = P[2][23] + P[0][23]*SF[6] + P[1][23]*SF[10] + P[3][23]*SF[8] + P[12][23]*SF[14] - P[10][23]*SPP[10] - (P[11][23]*q0)/2;
-                    nextP[3][23] = P[3][23] + P[0][23]*SF[7] + P[1][23]*SF[6] + P[2][23]*SF[9] + P[10][23]*SF[15] - P[11][23]*SF[14] - (P[12][23]*q0)/2;
-                    nextP[4][23] = P[4][23] + P[0][23]*SF[5] + P[1][23]*SF[3] - P[3][23]*SF[4] + P[2][23]*SPP[0] + P[13][23]*SPP[3] + P[14][23]*SPP[6] - P[15][23]*SPP[9];
-                    nextP[5][23] = P[5][23] + P[0][23]*SF[4] + P[2][23]*SF[3] + P[3][23]*SF[5] - P[1][23]*SPP[0] - P[13][23]*SPP[8] + P[14][23]*SPP[2] + P[15][23]*SPP[5];
-                    nextP[6][23] = P[6][23] + P[1][23]*SF[4] - P[2][23]*SF[5] + P[3][23]*SF[3] + P[0][23]*SPP[0] + P[13][23]*SPP[4] - P[14][23]*SPP[7] - P[15][23]*SPP[1];
-                    nextP[7][23] = P[7][23] + P[4][23]*dt;
-                    nextP[8][23] = P[8][23] + P[5][23]*dt;
-                    nextP[9][23] = P[9][23] + P[6][23]*dt;
-                    nextP[10][23] = P[10][23];
-                    nextP[11][23] = P[11][23];
-                    nextP[12][23] = P[12][23];
-                    nextP[13][23] = P[13][23];
-                    nextP[14][23] = P[14][23];
-                    nextP[15][23] = P[15][23];
-                    nextP[16][23] = P[16][23];
-                    nextP[17][23] = P[17][23];
-                    nextP[18][23] = P[18][23];
-                    nextP[19][23] = P[19][23];
-                    nextP[20][23] = P[20][23];
-                    nextP[21][23] = P[21][23];
-                    nextP[22][23] = P[22][23];
-                    nextP[23][23] = P[23][23];
+
+                    if (stateIndexLim > 23) {
+                        nextP[0][23] = P[0][23] + P[1][23]*SF[9] + P[2][23]*SF[11] + P[3][23]*SF[10] + P[10][23]*SF[14] + P[11][23]*SF[15] + P[12][23]*SPP[10];
+                        nextP[1][23] = P[1][23] + P[0][23]*SF[8] + P[2][23]*SF[7] + P[3][23]*SF[11] - P[12][23]*SF[15] + P[11][23]*SPP[10] - (P[10][23]*q0)/2;
+                        nextP[2][23] = P[2][23] + P[0][23]*SF[6] + P[1][23]*SF[10] + P[3][23]*SF[8] + P[12][23]*SF[14] - P[10][23]*SPP[10] - (P[11][23]*q0)/2;
+                        nextP[3][23] = P[3][23] + P[0][23]*SF[7] + P[1][23]*SF[6] + P[2][23]*SF[9] + P[10][23]*SF[15] - P[11][23]*SF[14] - (P[12][23]*q0)/2;
+                        nextP[4][23] = P[4][23] + P[0][23]*SF[5] + P[1][23]*SF[3] - P[3][23]*SF[4] + P[2][23]*SPP[0] + P[13][23]*SPP[3] + P[14][23]*SPP[6] - P[15][23]*SPP[9];
+                        nextP[5][23] = P[5][23] + P[0][23]*SF[4] + P[2][23]*SF[3] + P[3][23]*SF[5] - P[1][23]*SPP[0] - P[13][23]*SPP[8] + P[14][23]*SPP[2] + P[15][23]*SPP[5];
+                        nextP[6][23] = P[6][23] + P[1][23]*SF[4] - P[2][23]*SF[5] + P[3][23]*SF[3] + P[0][23]*SPP[0] + P[13][23]*SPP[4] - P[14][23]*SPP[7] - P[15][23]*SPP[1];
+                        nextP[7][23] = P[7][23] + P[4][23]*dt;
+                        nextP[8][23] = P[8][23] + P[5][23]*dt;
+                        nextP[9][23] = P[9][23] + P[6][23]*dt;
+                        nextP[10][23] = P[10][23];
+                        nextP[11][23] = P[11][23];
+                        nextP[12][23] = P[12][23];
+                        nextP[13][23] = P[13][23];
+                        nextP[14][23] = P[14][23];
+                        nextP[15][23] = P[15][23];
+                        nextP[16][23] = P[16][23];
+                        nextP[17][23] = P[17][23];
+                        nextP[18][23] = P[18][23];
+                        nextP[19][23] = P[19][23];
+                        nextP[20][23] = P[20][23];
+                        nextP[21][23] = P[21][23];
+                        nextP[22][23] = P[22][23];
+                        nextP[23][23] = P[23][23];
+                        nextP[0][24] = P[0][24] + P[1][24]*SF[9] + P[2][24]*SF[11] + P[3][24]*SF[10] + P[10][24]*SF[14] + P[11][24]*SF[15] + P[12][24]*SPP[10];
+                        nextP[1][24] = P[1][24] + P[0][24]*SF[8] + P[2][24]*SF[7] + P[3][24]*SF[11] - P[12][24]*SF[15] + P[11][24]*SPP[10] - (P[10][24]*q0)/2;
+                        nextP[2][24] = P[2][24] + P[0][24]*SF[6] + P[1][24]*SF[10] + P[3][24]*SF[8] + P[12][24]*SF[14] - P[10][24]*SPP[10] - (P[11][24]*q0)/2;
+                        nextP[3][24] = P[3][24] + P[0][24]*SF[7] + P[1][24]*SF[6] + P[2][24]*SF[9] + P[10][24]*SF[15] - P[11][24]*SF[14] - (P[12][24]*q0)/2;
+                        nextP[4][24] = P[4][24] + P[0][24]*SF[5] + P[1][24]*SF[3] - P[3][24]*SF[4] + P[2][24]*SPP[0] + P[13][24]*SPP[3] + P[14][24]*SPP[6] - P[15][24]*SPP[9];
+                        nextP[5][24] = P[5][24] + P[0][24]*SF[4] + P[2][24]*SF[3] + P[3][24]*SF[5] - P[1][24]*SPP[0] - P[13][24]*SPP[8] + P[14][24]*SPP[2] + P[15][24]*SPP[5];
+                        nextP[6][24] = P[6][24] + P[1][24]*SF[4] - P[2][24]*SF[5] + P[3][24]*SF[3] + P[0][24]*SPP[0] + P[13][24]*SPP[4] - P[14][24]*SPP[7] - P[15][24]*SPP[1];
+                        nextP[7][24] = P[7][24] + P[4][24]*dt;
+                        nextP[8][24] = P[8][24] + P[5][24]*dt;
+                        nextP[9][24] = P[9][24] + P[6][24]*dt;
+                        nextP[10][24] = P[10][24];
+                        nextP[11][24] = P[11][24];
+                        nextP[12][24] = P[12][24];
+                        nextP[13][24] = P[13][24];
+                        nextP[14][24] = P[14][24];
+                        nextP[15][24] = P[15][24];
+                        nextP[16][24] = P[16][24];
+                        nextP[17][24] = P[17][24];
+                        nextP[18][24] = P[18][24];
+                        nextP[19][24] = P[19][24];
+                        nextP[20][24] = P[20][24];
+                        nextP[21][24] = P[21][24];
+                        nextP[22][24] = P[22][24];
+                        nextP[23][24] = P[23][24];
+                        nextP[24][24] = P[24][24];
+                    }
                 }
             }
         }
@@ -1340,20 +1405,20 @@ void NavEKF3_core::CovariancePrediction()
 }
 
 // zero specified range of rows in the state covariance matrix
-void NavEKF3_core::zeroRows(Matrix24 &covMat, uint8_t first, uint8_t last)
+void NavEKF3_core::zeroRows(Matrix25 &covMat, uint8_t first, uint8_t last)
 {
     uint8_t row;
     for (row=first; row<=last; row++)
     {
-        memset(&covMat[row][0], 0, sizeof(covMat[0][0])*24);
+        memset(&covMat[row][0], 0, sizeof(covMat[0][0])*25);
     }
 }
 
 // zero specified range of columns in the state covariance matrix
-void NavEKF3_core::zeroCols(Matrix24 &covMat, uint8_t first, uint8_t last)
+void NavEKF3_core::zeroCols(Matrix25 &covMat, uint8_t first, uint8_t last)
 {
     uint8_t row;
-    for (row=0; row<=23; row++)
+    for (row=0; row<=25; row++)
     {
         memset(&covMat[row][first], 0, sizeof(covMat[0][0])*(1+last-first));
     }
@@ -1476,11 +1541,17 @@ void NavEKF3_core::ConstrainVariances()
         zeroRows(P,16,21);
     }
 
-    if (!inhibitWindStates) {
-        for (uint8_t i=22; i<=23; i++) P[i][i] = constrain_float(P[i][i],0.0f,1.0e3f);
+    if (!inhibitScaleFactorState) {
+        P[22][22] = constrain_float(P[22][22],0.0f,1.0f);
     } else {
-        zeroCols(P,22,23);
-        zeroRows(P,22,23);
+        zeroCols(P,22,22);
+    }
+
+    if (!inhibitWindStates) {
+        for (uint8_t i=22; i<=24; i++) P[i][i] = constrain_float(P[i][i],0.0f,1.0e3f);
+    } else {
+        zeroCols(P,23,24);
+        zeroRows(P,23,24);
     }
 }
 
@@ -1503,8 +1574,10 @@ void NavEKF3_core::ConstrainStates()
     for (uint8_t i=16; i<=18; i++) statesArray[i] = constrain_float(statesArray[i],-1.0f,1.0f);
     // body magnetic field limit
     for (uint8_t i=19; i<=21; i++) statesArray[i] = constrain_float(statesArray[i],-0.5f,0.5f);
+    // scale factor log equivalent to a sacle factor between 0.1 and 10
+    stateStruct.scaleFactorLog = constrain_float(stateStruct.scaleFactorLog,-2.3f,2.3f);
     // wind velocity limit 100 m/s (could be based on some multiple of max airspeed * EAS2TAS) - TODO apply circular limit
-    for (uint8_t i=22; i<=23; i++) statesArray[i] = constrain_float(statesArray[i],-100.0f,100.0f);
+    for (uint8_t i=23; i<=24; i++) statesArray[i] = constrain_float(statesArray[i],-100.0f,100.0f);
     // constrain the terrain state to be below the vehicle height unless we are using terrain as the height datum
     if (!inhibitGndState) {
         terrainState = MAX(terrainState, stateStruct.position.z + rngOnGnd);

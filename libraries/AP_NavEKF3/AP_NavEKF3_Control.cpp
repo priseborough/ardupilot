@@ -74,12 +74,12 @@ void NavEKF3_core::setWindMagStateLearningMode()
             stateStruct.wind_vel.y = windSpeed * sinf(tempEuler.z);
 
             // set the wind sate variances to the measurement uncertainty
-            for (uint8_t index=22; index<=23; index++) {
+            for (uint8_t index=23; index<=24; index++) {
                 P[index][index] = sq(constrain_float(frontend->_easNoise, 0.5f, 5.0f) * constrain_float(_ahrs->get_EAS2TAS(), 0.9f, 10.0f));
             }
         } else {
             // set the variances using a typical wind speed
-            for (uint8_t index=22; index<=23; index++) {
+            for (uint8_t index=23; index<=24; index++) {
                 P[index][index] = sq(5.0f);
             }
         }
@@ -175,21 +175,25 @@ void NavEKF3_core::setWindMagStateLearningMode()
 void NavEKF3_core::updateStateIndexLim()
 {
     if (inhibitWindStates) {
-        if (inhibitMagStates) {
-            if (inhibitDelVelBiasStates) {
-                if (inhibitDelAngBiasStates) {
-                    stateIndexLim = 9;
+        if (inhibitScaleFactorState) {
+            if (inhibitMagStates) {
+                if (inhibitDelVelBiasStates) {
+                    if (inhibitDelAngBiasStates) {
+                        stateIndexLim = 9;
+                    } else {
+                        stateIndexLim = 12;
+                    }
                 } else {
-                    stateIndexLim = 12;
+                    stateIndexLim = 15;
                 }
             } else {
-                stateIndexLim = 15;
+                stateIndexLim = 21;
             }
         } else {
-            stateIndexLim = 21;
+            stateIndexLim = 22;
         }
     } else {
-        stateIndexLim = 23;
+        stateIndexLim = 24;
     }
 }
 
@@ -328,8 +332,6 @@ void NavEKF3_core::setAidingMode()
             break;
 
         case AID_RELATIVE:
-            // We are doing relative position navigation where velocity errors are constrained, but position drift will occur
-            gcs().send_text(MAV_SEVERITY_INFO, "EKF3 IMU%u started relative aiding",(unsigned)imu_index);
             if (readyToUseOptFlow()) {
                 // Reset time stamps
                 flowValidMeaTime_ms = imuSampleTime_ms;
@@ -338,9 +340,20 @@ void NavEKF3_core::setAidingMode()
                  // Reset time stamps
                 lastbodyVelPassTime_ms = imuSampleTime_ms;
                 prevBodyVelFuseTime_ms = imuSampleTime_ms;
+            } else if (readyToUseExtNav() && useExtNavRelPosMethod) {
+                lastPosPassTime_ms = imuSampleTime_ms;
+            } else {
+                PV_AidingMode = AID_NONE;
+                posTimeout = true;
+                velTimeout = true;
+                break;
             }
+
+            // We are doing relative position navigation where velocity errors are constrained, but position drift will occur
+            gcs().send_text(MAV_SEVERITY_INFO, "EKF3 IMU%u started relative aiding",(unsigned)imu_index);
             posTimeout = true;
             velTimeout = true;
+
             break;
 
         case AID_ABSOLUTE:
@@ -448,6 +461,12 @@ bool NavEKF3_core::readyToUseGPS(void) const
 bool NavEKF3_core::readyToUseRangeBeacon(void) const
 {
     return tiltAlignComplete && yawAlignComplete && delAngBiasLearned && rngBcnGoodToAlign && rngBcnDataToFuse;
+}
+
+// return true if the filter to be ready to use the external nav estimates
+bool NavEKF3_core::readyToUseExtNav(void) const
+{
+    return tiltAlignComplete && yawAlignComplete && delAngBiasLearned && ((imuDataDelayed.time_ms - extNavDataDelayed.time_ms) < 250);
 }
 
 // return true if we should use the compass
