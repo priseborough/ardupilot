@@ -457,6 +457,43 @@ void Copter::update_GPS(void)
                 DataFlash.Log_Write_GPS(gps, i);
             }
 
+            // hack to use GPs as a surrogate external nav system
+            if (true) {
+                bool scaleUnknown = true;
+                bool frameIsNED = true;
+                float scaleFactor = 2.0f;
+                Vector3f sensOffset = {0.0f, 0.0f, 0.0f};
+                static Vector3f pos = {0.0f, 0.0f, 0.0f};
+                Quaternion quat;
+                quat[0] = 1.0f;
+                quat[1] = 0.0f;
+                quat[2] = 0.0f;
+                quat[3] = 0.0f;
+                float posErr;
+                if (!gps.horizontal_accuracy(posErr)) {
+                     posErr = 0.1f;
+                }
+                float angErr = 0.05f;
+                uint32_t timeStamp_ms = gps.last_message_time_ms(i);
+                uint32_t resetTime_ms = 0;
+                Location gpsLoc = gps.location();
+                static Location ekfOrigin;
+                static bool originSet = false;
+                float hacc = 0.0f;
+                bool haccValid = gps.horizontal_accuracy(hacc);
+                if (!originSet && haccValid && (hacc < 5.0f) && (gps.status() >= 3)) {
+                    ekfOrigin = gpsLoc;
+                    originSet = true;
+                    gcs().send_text(MAV_SEVERITY_INFO, "GPS test origin set");
+                } else if (originSet && (gps.status() >= 3)) {
+                    Vector2f posNE = location_diff(ekfOrigin, gpsLoc);
+                    pos.x = posNE.x * scaleFactor;
+                    pos.y = posNE.y * scaleFactor;
+                    pos.z = 0.01f * (float)(ekfOrigin.alt - gpsLoc.alt) * scaleFactor;
+                }
+                EKF3.writeExtNavData(scaleUnknown, frameIsNED, sensOffset, pos, quat, posErr, angErr, timeStamp_ms, resetTime_ms);
+            }
+
             gps_updated = true;
         }
     }
