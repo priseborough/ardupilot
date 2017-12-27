@@ -526,10 +526,11 @@ void Copter::update_GPS(void)
                 DataFlash.Log_Write_GPS(gps, i);
             }
 
-            // hack to provide the EKF with position data from the GPS
-            if (false) {
+            // hack to use GPs as a surrogate external nav system
+            if (true) {
                 bool scaleUnknown = true;
                 bool frameIsNED = true;
+                float scaleFactor = 2.0f;
                 Vector3f sensOffset = {0.0f, 0.0f, 0.0f};
                 static Vector3f pos = {0.0f, 0.0f, 0.0f};
                 Quaternion quat;
@@ -555,9 +556,9 @@ void Copter::update_GPS(void)
                     gcs().send_text(MAV_SEVERITY_INFO, "GPS test origin set");
                 } else if (originSet && (gps.status() >= 3)) {
                     Vector2f posNE = location_diff(ekfOrigin, gpsLoc);
-                    pos.x = posNE.x;
-                    pos.y = posNE.y;
-                    pos.z = 0.01f * (float)(ekfOrigin.alt - gpsLoc.alt);
+                    pos.x = posNE.x * scaleFactor;
+                    pos.y = posNE.y * scaleFactor;
+                    pos.z = 0.01f * (float)(ekfOrigin.alt - gpsLoc.alt) * scaleFactor;
                 }
                 EKF3.writeExtNavData(scaleUnknown, frameIsNED, sensOffset, pos, quat, posErr, angErr, timeStamp_ms, resetTime_ms);
             }
