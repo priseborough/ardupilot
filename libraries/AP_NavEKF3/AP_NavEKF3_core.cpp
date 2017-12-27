@@ -1418,7 +1418,7 @@ void NavEKF3_core::zeroRows(Matrix25 &covMat, uint8_t first, uint8_t last)
 void NavEKF3_core::zeroCols(Matrix25 &covMat, uint8_t first, uint8_t last)
 {
     uint8_t row;
-    for (row=0; row<=25; row++)
+    for (row=0; row<=24; row++)
     {
         memset(&covMat[row][first], 0, sizeof(covMat[0][0])*(1+last-first));
     }
