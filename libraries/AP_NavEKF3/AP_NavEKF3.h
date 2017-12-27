@@ -280,7 +280,7 @@ public:
     bool getRangeBeaconDebug(int8_t instance, uint8_t &ID, float &rng, float &innov, float &innovVar, float &testRatio, Vector3f &beaconPosNED,
                              float &offsetHigh, float &offsetLow, Vector3f &posNED);
 
-    bool getScaleFactorDebug(int8_t instance, float &scaleLog, float &scaleLogSigma, Vector3f &innov, Vector3f &innovVar);
+    bool getScaleFactorDebug(int8_t instance, float &scaleLog, float &scaleLogSigma);
 
     // called by vehicle code to specify that a takeoff is happening
     // causes the EKF to compensate for expected barometer errors due to ground effect
@@ -437,7 +437,7 @@ private:
     AP_Float _visOdmVelErrMax;      // Observation 1-STD velocity error assumed for visual odometry sensor at lowest reported quality (m/s)
     AP_Float _visOdmVelErrMin;      // Observation 1-STD velocity error assumed for visual odometry sensor at highest reported quality (m/s)
     AP_Float _wencOdmVelErr;        // Observation 1-STD velocity error assumed for wheel odometry sensor (m/s)
-    AP_Float _extNavLogScaleNse;    // External nav log scale factor process noise
+    AP_Float _extNavLogScaleNse;    // Process noise for natural log of scale factor converting from external nav to local NED earth frame
 
 
     // Tuning parameters

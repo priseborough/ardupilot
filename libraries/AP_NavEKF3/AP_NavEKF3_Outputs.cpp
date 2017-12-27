@@ -105,12 +105,10 @@ bool NavEKF3_core::getRangeBeaconDebug(uint8_t &ID, float &rng, float &innov, fl
     return true;
 }
 
-bool NavEKF3_core::getScaleFactorDebug(float &scaleLog, float &scaleLogSigma, Vector3f &innov, Vector3f &innovVar)
+bool NavEKF3_core::getScaleFactorDebug(float &scaleLog, float &scaleLogSigma)
 {
-    scaleLog = extNavStateStruct.scaleFactorLog;
-    innov = extNavScaleInnov;
-    innovVar = extNavScaleInnovVar;
-    scaleLogSigma = sqrtf(extNavP[6][6]);
+    scaleLog = stateStruct.scaleFactorLog;
+    scaleLogSigma = sqrtf(P[22][22]);
     if (logScaleFactorFusion) {
         logScaleFactorFusion = false;
         return true;

@@ -74,12 +74,12 @@ void NavEKF3_core::setWindMagStateLearningMode()
             stateStruct.wind_vel.y = windSpeed * sinf(tempEuler.z);
 
             // set the wind sate variances to the measurement uncertainty
-            for (uint8_t index=22; index<=23; index++) {
+            for (uint8_t index=23; index<=24; index++) {
                 P[index][index] = sq(constrain_float(frontend->_easNoise, 0.5f, 5.0f) * constrain_float(_ahrs->get_EAS2TAS(), 0.9f, 10.0f));
             }
         } else {
             // set the variances using a typical wind speed
-            for (uint8_t index=22; index<=23; index++) {
+            for (uint8_t index=23; index<=24; index++) {
                 P[index][index] = sq(5.0f);
             }
         }
@@ -175,18 +175,22 @@ void NavEKF3_core::setWindMagStateLearningMode()
 void NavEKF3_core::updateStateIndexLim()
 {
     if (inhibitWindStates) {
-        if (inhibitMagStates) {
-            if (inhibitDelVelBiasStates) {
-                if (inhibitDelAngBiasStates) {
-                    stateIndexLim = 9;
+        if (inhibitScaleFactorState) {
+            if (inhibitMagStates) {
+                if (inhibitDelVelBiasStates) {
+                    if (inhibitDelAngBiasStates) {
+                        stateIndexLim = 9;
+                    } else {
+                        stateIndexLim = 12;
+                    }
                 } else {
-                    stateIndexLim = 12;
+                    stateIndexLim = 15;
                 }
             } else {
-                stateIndexLim = 15;
+                stateIndexLim = 21;
             }
         } else {
-            stateIndexLim = 21;
+            stateIndexLim = 22;
         }
     } else {
         stateIndexLim = 23;

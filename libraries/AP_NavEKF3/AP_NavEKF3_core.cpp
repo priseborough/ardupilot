@@ -13,7 +13,6 @@ extern const AP_HAL::HAL& hal;
 // constructor
 NavEKF3_core::NavEKF3_core(void) :
     stateStruct(*reinterpret_cast<struct state_elements *>(&statesArray)),
-    extNavStateStruct(*reinterpret_cast<struct extNavStateElements *>(&extNavStateArray)),
 
     _perf_UpdateFilter(hal.util->perf_alloc(AP_HAL::Util::PC_ELAPSED, "EK3_UpdateFilter")),
     _perf_CovariancePrediction(hal.util->perf_alloc(AP_HAL::Util::PC_ELAPSED, "EK3_CovariancePrediction")),
@@ -242,6 +241,7 @@ void NavEKF3_core::InitialiseVariables()
     inhibitMagStates = true;
     inhibitDelVelBiasStates = true;
     inhibitDelAngBiasStates = true;
+    inhibitScaleFactorState = true;
     gndOffsetValid =  false;
     validOrigin = false;
     takeoffExpectedSet_ms = 0;
@@ -256,7 +256,7 @@ void NavEKF3_core::InitialiseVariables()
     lastYawReset_ms = 0;
     tiltAlignComplete = false;
     yawAlignComplete = false;
-    stateIndexLim = 23;
+    stateIndexLim = 24;
     baroStoreIndex = 0;
     rangeStoreIndex = 0;
     magStoreIndex = 0;
@@ -404,16 +404,7 @@ void NavEKF3_core::InitialiseVariables()
     extNavLastPosResetTime_ms = 0;
 
     // external nav scale factor estimation
-    estimateScaleFactor = false;
     logScaleFactorFusion = false;
-    memset(&extNavStateArray, 0, sizeof(extNavStateArray));
-    memset(&extNavP, 0, sizeof(extNavP));
-    extNavP[6][6] = 0.1f;
-    memset(&extNavScaleInnovVar, 0, sizeof(extNavScaleInnovVar));
-    memset(&extNavScaleInnov, 0, sizeof(extNavScaleInnov));
-    extNavScaleFactor = 1.0f;
-    extNavScaleFuseTime_ms = 0;
-    extNavScaleEkfInit = false;
 
     // zero data buffers
     storedIMU.reset();
@@ -700,11 +691,6 @@ void NavEKF3_core::UpdateStrapdownEquationsNED()
     // sum delta velocities to get velocity
     stateStruct.velocity += delVelNav;
 
-    // update external nav world frame states and covariance
-    if (estimateScaleFactor) {
-        extNavScalePrediction(delVelNav);
-    }
-
     // apply a trapezoidal integration to velocities to calculate position
     stateStruct.position += (stateStruct.velocity + lastVelocity) * (imuDataDelayed.delVelDT*0.5f);
 
@@ -720,195 +706,6 @@ void NavEKF3_core::UpdateStrapdownEquationsNED()
         receiverPos += (stateStruct.velocity + lastVelocity) * (imuDataDelayed.delVelDT*0.5f);
     }
 
-}
-
-void NavEKF3_core::extNavScalePrediction(Vector3f delVelNED)
-{
-    if (!extNavScaleEkfInit) {
-        // don't run the prediction until the filter has been initialised
-        return;
-    }
-
-    // constrain scale factor state
-    extNavStateStruct.scaleFactorLog = constrain_float(extNavStateStruct.scaleFactorLog, -7.0f, 7.0f);
-
-    // predict states
-    extNavScaleFactor = expf(extNavStateStruct.scaleFactorLog);
-    Vector3f delVelWorld;
-    if (!extNavDataDelayed.frameIsNED) {
-        delVelWorld = extNavToEkfRotMat.mul_transpose(delVelNED);
-    } else {
-        delVelWorld = delVelNED;
-    }
-    Vector3f lastExtNavVelocity = extNavStateStruct.velocity;
-    extNavStateStruct.velocity += delVelWorld * extNavScaleFactor;
-    extNavStateStruct.position += (extNavStateStruct.velocity + lastExtNavVelocity) * (imuDataDelayed.delVelDT*0.5f);
-
-    // predict covariance
-    float delT = imuDataDelayed.delVelDT;
-    float SQ = sq(frontend->_accNoise * imuDataDelayed.delVelDT * extNavScaleFactor);
-    Matrix7 Pnew;
-    Pnew[0][0] = extNavP[0][0] + SQ + delVelWorld.x*extNavScaleFactor*(extNavP[0][6] + delVelWorld.x*extNavP[6][6]*extNavScaleFactor) + delVelWorld.x*extNavP[6][0]*extNavScaleFactor;
-    Pnew[0][1] = extNavP[0][1] + delVelWorld.y*extNavScaleFactor*(extNavP[0][6] + delVelWorld.x*extNavP[6][6]*extNavScaleFactor) + delVelWorld.x*extNavP[6][1]*extNavScaleFactor;
-    Pnew[1][1] = extNavP[1][1] + SQ + delVelWorld.y*extNavScaleFactor*(extNavP[1][6] + delVelWorld.y*extNavP[6][6]*extNavScaleFactor) + delVelWorld.y*extNavP[6][1]*extNavScaleFactor;
-    Pnew[0][2] = extNavP[0][2] + delVelWorld.z*extNavScaleFactor*(extNavP[0][6] + delVelWorld.x*extNavP[6][6]*extNavScaleFactor) + delVelWorld.x*extNavP[6][2]*extNavScaleFactor;
-    Pnew[1][2] = extNavP[1][2] + delVelWorld.z*extNavScaleFactor*(extNavP[1][6] + delVelWorld.y*extNavP[6][6]*extNavScaleFactor) + delVelWorld.y*extNavP[6][2]*extNavScaleFactor;
-    Pnew[2][2] = extNavP[2][2] + SQ + delVelWorld.z*extNavScaleFactor*(extNavP[2][6] + delVelWorld.z*extNavP[6][6]*extNavScaleFactor) + delVelWorld.z*extNavP[6][2]*extNavScaleFactor;
-    Pnew[0][3] = extNavP[0][3] + delT*(extNavP[0][0] + delVelWorld.x*extNavP[6][0]*extNavScaleFactor) + delVelWorld.x*extNavP[6][3]*extNavScaleFactor;
-    Pnew[1][3] = extNavP[1][3] + delT*(extNavP[1][0] + delVelWorld.y*extNavP[6][0]*extNavScaleFactor) + delVelWorld.y*extNavP[6][3]*extNavScaleFactor;
-    Pnew[2][3] = extNavP[2][3] + delT*(extNavP[2][0] + delVelWorld.z*extNavP[6][0]*extNavScaleFactor) + delVelWorld.z*extNavP[6][3]*extNavScaleFactor;
-    Pnew[3][3] = extNavP[3][3] + delT*extNavP[0][3] + delT*(extNavP[3][0] + delT*extNavP[0][0]);
-    Pnew[0][4] = extNavP[0][4] + delT*(extNavP[0][1] + delVelWorld.x*extNavP[6][1]*extNavScaleFactor) + delVelWorld.x*extNavP[6][4]*extNavScaleFactor;
-    Pnew[1][4] = extNavP[1][4] + delT*(extNavP[1][1] + delVelWorld.y*extNavP[6][1]*extNavScaleFactor) + delVelWorld.y*extNavP[6][4]*extNavScaleFactor;
-    Pnew[2][4] = extNavP[2][4] + delT*(extNavP[2][1] + delVelWorld.z*extNavP[6][1]*extNavScaleFactor) + delVelWorld.z*extNavP[6][4]*extNavScaleFactor;
-    Pnew[3][4] = extNavP[3][4] + delT*extNavP[0][4] + delT*(extNavP[3][1] + delT*extNavP[0][1]);
-    Pnew[4][4] = extNavP[4][4] + delT*extNavP[1][4] + delT*(extNavP[4][1] + delT*extNavP[1][1]);
-    Pnew[0][5] = extNavP[0][5] + delT*(extNavP[0][2] + delVelWorld.x*extNavP[6][2]*extNavScaleFactor) + delVelWorld.x*extNavP[6][5]*extNavScaleFactor;
-    Pnew[1][5] = extNavP[1][5] + delT*(extNavP[1][2] + delVelWorld.y*extNavP[6][2]*extNavScaleFactor) + delVelWorld.y*extNavP[6][5]*extNavScaleFactor;
-    Pnew[2][5] = extNavP[2][5] + delT*(extNavP[2][2] + delVelWorld.z*extNavP[6][2]*extNavScaleFactor) + delVelWorld.z*extNavP[6][5]*extNavScaleFactor;
-    Pnew[3][5] = extNavP[3][5] + delT*extNavP[0][5] + delT*(extNavP[3][2] + delT*extNavP[0][2]);
-    Pnew[4][5] = extNavP[4][5] + delT*extNavP[1][5] + delT*(extNavP[4][2] + delT*extNavP[1][2]);
-    Pnew[5][5] = extNavP[5][5] + delT*extNavP[2][5] + delT*(extNavP[5][2] + delT*extNavP[2][2]);
-    Pnew[0][6] = extNavP[0][6] + delVelWorld.x*extNavP[6][6]*extNavScaleFactor;
-    Pnew[1][6] = extNavP[1][6] + delVelWorld.y*extNavP[6][6]*extNavScaleFactor;
-    Pnew[2][6] = extNavP[2][6] + delVelWorld.z*extNavP[6][6]*extNavScaleFactor;
-    Pnew[3][6] = extNavP[3][6] + delT*extNavP[0][6];
-    Pnew[4][6] = extNavP[4][6] + delT*extNavP[1][6];
-    Pnew[5][6] = extNavP[5][6] + delT*extNavP[2][6];
-    Pnew[6][6] = extNavP[6][6];
-
-    // Add process noise for scale factor log
-    Pnew[6][6] += sq(frontend->_extNavLogScaleNse);
-
-    // covariance matrix is symmetrical, so copy diagonals and copy upper triangle in Pnew
-    // to lower and upper triange in extNavP
-    for (uint8_t row = 0; row <= 6; row++) {
-        // limit diagonals
-        Pnew[row][row] = MAX(Pnew[row][row] , 1e-12f);
-        for (uint8_t column = row; column <= 6; column++) {
-            extNavP[row][column] = extNavP[column][row] = Pnew[row][column];
-        }
-    }
-}
-
-void NavEKF3_core::extNavScaleObservation()
-{
-    if (!extNavScaleEkfInit || (imuDataDelayed.time_ms - extNavScaleFuseTime_ms > 1000) || extNavDataDelayed.posReset) {
-
-        // assume an initial scale factor of 1
-        extNavStateStruct.scaleFactorLog = 0.0f;
-        extNavScaleFactor = expf(extNavStateStruct.scaleFactorLog);
-
-        // reset the position to the measurement
-        extNavStateStruct.position = extNavDataDelayed.pos;
-
-        // reset the velocity to the vehicle velocity after rotation and scaling
-        extNavStateStruct.velocity = extNavToEkfRotMat.transposed() * stateStruct.velocity * extNavScaleFactor;
-
-        // prevent duplicate resets
-        extNavScaleEkfInit = true;
-        extNavScaleFuseTime_ms = imuDataDelayed.time_ms;
-
-        // Reset the covariance matrix
-        memset(&extNavP, 0, sizeof(extNavP));
-        extNavP[6][6] = 0.1f;
-
-        if (!extNavDataDelayed.frameIsNED) {
-            // Set the velocity covariance from the vehicle velocity state covariance rotated from nav to world frame
-            Matrix3f velCov;
-            for (uint8_t row=0 ; row<3 ; row++) {
-                for (uint8_t col=0 ; col<3 ; col++) {
-                    velCov[row][col] = P[row+4][col+4];
-                }
-            }
-            velCov = extNavToEkfRotMat * velCov * extNavToEkfRotMat.transposed();
-            for (uint8_t row=0 ; row<3 ; row++) {
-                for (uint8_t col=0 ; col<3 ; col++) {
-                    extNavP[row+4][col+4] = velCov[row][col];
-                }
-            }
-        } else {
-            // Use the main estimator velocity state covariance
-            for (uint8_t row=0 ; row<3 ; row++) {
-                for (uint8_t col=0 ; col<3 ; col++) {
-                    extNavP[row+4][col+4] = P[row+4][col+4];
-                }
-            }
-        }
-
-        // Set the position variance from the measurement uncertainty
-        for (uint8_t index=0 ; index<3 ; index ++) {
-            extNavP[index+3][index+3] = sq(extNavDataDelayed.posErr);
-        }
-
-    }
-
-    // calculate innovation and innovation variances and exit if innovations are too large
-    for (uint8_t obsIndex=0; obsIndex<=2; obsIndex++) {
-        uint8_t stateIndex = obsIndex + 3;
-
-        // calculate innovation
-        extNavScaleInnov[obsIndex] = extNavStateStruct.position[obsIndex] - extNavDataDelayed.pos[obsIndex];
-
-        // calculate the innovation variance
-        extNavScaleInnovVar[obsIndex] = sq(extNavDataDelayed.posErr) + extNavP[stateIndex][stateIndex];
-
-        // perform a 5-sigma innovation consistency check and exit if failed
-        if (sq(extNavScaleInnov[obsIndex]) > 25.0f * extNavScaleInnovVar[obsIndex]) {
-            return;
-        }
-    }
-
-    // fuse observations sequentially
-    for (uint8_t obsIndex=0; obsIndex<=2; obsIndex++) {
-        uint8_t stateIndex = obsIndex + 3;
-
-        // calculate the Kalman gain vector and update the states
-        float varInnovInv = 1.0f/extNavScaleInnovVar[obsIndex];
-        for (uint8_t i= 0; i<=6; i++) {
-            Kfusion[i] = extNavP[i][stateIndex]*varInnovInv;
-            extNavStateArray[i] -= Kfusion[i] * extNavScaleInnov[obsIndex];
-        }
-
-        // constrain scale factor state
-        extNavStateStruct.scaleFactorLog = constrain_float(extNavStateStruct.scaleFactorLog, -7.0f, 7.0f);
-        extNavScaleFactor = expf(extNavStateStruct.scaleFactorLog);
-
-        // update the covariance - take advantage of direct observation of a single state at index = stateIndex to reduce computations
-        // this is a numerically optimised implementation of standard equation P = (I - K*H)*P;
-        for (uint8_t i= 0; i<=6; i++) {
-            for (uint8_t j= 0; j<=6; j++)
-            {
-                KHP[i][j] = Kfusion[i] * extNavP[stateIndex][j];
-            }
-        }
-
-        // Check that we are not going to drive any variances negative and skip the update if so
-        for (uint8_t i= 0; i<=6; i++) {
-            if (KHP[i][i] > extNavP[i][i]) {
-                 return;
-            }
-        }
-
-        // update the covariance matrix
-        for (uint8_t i= 0; i<=6; i++) {
-            for (uint8_t j= 0; j<=6; j++) {
-                extNavP[i][j] = extNavP[i][j] - KHP[i][j];
-            }
-            extNavP[i][i] = MAX(extNavP[i][i] , 1e-12f);
-        }
-
-        // force the covariance matrix to be symmetrical and limit the variances to prevent ill-condiioning.
-        for (uint8_t i=1; i<=6; i++) {
-            for (uint8_t j=0; j<=i-1; j++) {
-                float temp = 0.5f*(extNavP[i][j] + extNavP[j][i]);
-                extNavP[i][j] = temp;
-                extNavP[j][i] = temp;
-            }
-        }
-    }
-
-    extNavScaleFuseTime_ms = imuDataDelayed.time_ms;
 }
 
 /*
@@ -1104,7 +901,7 @@ void NavEKF3_core::CovariancePrediction()
 
     // calculate covariance prediction process noise added to diagonals of predicted covariance matrix
     // error growth of first 10 kinematic states is built into auto-code for covariance prediction and driven by IMU noise parameters
-    Vector14 processNoiseVariance = {};
+    Vector15 processNoiseVariance = {};
 
     if (!inhibitDelAngBiasStates) {
         float dAngBiasVar = sq(sq(dt) * constrain_float(frontend->_gyroBiasProcessNoise, 0.0f, 1.0f));
@@ -1131,9 +928,13 @@ void NavEKF3_core::CovariancePrediction()
         for (uint8_t i=9; i<=11; i++) processNoiseVariance[i] = magBodyVar;
     }
 
+    if (!inhibitScaleFactorState) {
+        processNoiseVariance[12] = sq(frontend->_extNavLogScaleNse);
+    }
+
     if (!inhibitWindStates) {
         float windVelVar  = sq(dt * constrain_float(frontend->_windVelProcessNoise, 0.0f, 1.0f) * (1.0f + constrain_float(frontend->_wndVarHgtRateScale, 0.0f, 1.0f) * fabsf(hgtRate)));
-        for (uint8_t i=12; i<=13; i++) processNoiseVariance[i] = windVelVar;
+        for (uint8_t i=13; i<=14; i++) processNoiseVariance[i] = windVelVar;
     }
 
     // set variables used to calculate covariance growth
@@ -1220,7 +1021,6 @@ void NavEKF3_core::CovariancePrediction()
     SPP[8] = 2*q0*q3 + 2*q1*q2;
     SPP[9] = 2*q0*q2 + 2*q1*q3;
     SPP[10] = SF[16];
-
 
     nextP[0][0] = P[0][0] + P[1][0]*SF[9] + P[2][0]*SF[11] + P[3][0]*SF[10] + P[10][0]*SF[14] + P[11][0]*SF[15] + P[12][0]*SPP[10] + (daxVar*SQ[10])/4 + SF[9]*(P[0][1] + P[1][1]*SF[9] + P[2][1]*SF[11] + P[3][1]*SF[10] + P[10][1]*SF[14] + P[11][1]*SF[15] + P[12][1]*SPP[10]) + SF[11]*(P[0][2] + P[1][2]*SF[9] + P[2][2]*SF[11] + P[3][2]*SF[10] + P[10][2]*SF[14] + P[11][2]*SF[15] + P[12][2]*SPP[10]) + SF[10]*(P[0][3] + P[1][3]*SF[9] + P[2][3]*SF[11] + P[3][3]*SF[10] + P[10][3]*SF[14] + P[11][3]*SF[15] + P[12][3]*SPP[10]) + SF[14]*(P[0][10] + P[1][10]*SF[9] + P[2][10]*SF[11] + P[3][10]*SF[10] + P[10][10]*SF[14] + P[11][10]*SF[15] + P[12][10]*SPP[10]) + SF[15]*(P[0][11] + P[1][11]*SF[9] + P[2][11]*SF[11] + P[3][11]*SF[10] + P[10][11]*SF[14] + P[11][11]*SF[15] + P[12][11]*SPP[10]) + SPP[10]*(P[0][12] + P[1][12]*SF[9] + P[2][12]*SF[11] + P[3][12]*SF[10] + P[10][12]*SF[14] + P[11][12]*SF[15] + P[12][12]*SPP[10]) + (dayVar*sq(q2))/4 + (dazVar*sq(q3))/4;
     nextP[0][1] = P[0][1] + SQ[8] + P[1][1]*SF[9] + P[2][1]*SF[11] + P[3][1]*SF[10] + P[10][1]*SF[14] + P[11][1]*SF[15] + P[12][1]*SPP[10] + SF[8]*(P[0][0] + P[1][0]*SF[9] + P[2][0]*SF[11] + P[3][0]*SF[10] + P[10][0]*SF[14] + P[11][0]*SF[15] + P[12][0]*SPP[10]) + SF[7]*(P[0][2] + P[1][2]*SF[9] + P[2][2]*SF[11] + P[3][2]*SF[10] + P[10][2]*SF[14] + P[11][2]*SF[15] + P[12][2]*SPP[10]) + SF[11]*(P[0][3] + P[1][3]*SF[9] + P[2][3]*SF[11] + P[3][3]*SF[10] + P[10][3]*SF[14] + P[11][3]*SF[15] + P[12][3]*SPP[10]) - SF[15]*(P[0][12] + P[1][12]*SF[9] + P[2][12]*SF[11] + P[3][12]*SF[10] + P[10][12]*SF[14] + P[11][12]*SF[15] + P[12][12]*SPP[10]) + SPP[10]*(P[0][11] + P[1][11]*SF[9] + P[2][11]*SF[11] + P[3][11]*SF[10] + P[10][11]*SF[14] + P[11][11]*SF[15] + P[12][11]*SPP[10]) - (q0*(P[0][10] + P[1][10]*SF[9] + P[2][10]*SF[11] + P[3][10]*SF[10] + P[10][10]*SF[14] + P[11][10]*SF[15] + P[12][10]*SPP[10]))/2;
@@ -1482,7 +1282,7 @@ void NavEKF3_core::CovariancePrediction()
                 nextP[20][21] = P[20][21];
                 nextP[21][21] = P[21][21];
 
-                if (stateIndexLim > 21) {
+                if (stateIndexLim > 22) {
                     nextP[0][22] = P[0][22] + P[1][22]*SF[9] + P[2][22]*SF[11] + P[3][22]*SF[10] + P[10][22]*SF[14] + P[11][22]*SF[15] + P[12][22]*SPP[10];
                     nextP[1][22] = P[1][22] + P[0][22]*SF[8] + P[2][22]*SF[7] + P[3][22]*SF[11] - P[12][22]*SF[15] + P[11][22]*SPP[10] - (P[10][22]*q0)/2;
                     nextP[2][22] = P[2][22] + P[0][22]*SF[6] + P[1][22]*SF[10] + P[3][22]*SF[8] + P[12][22]*SF[14] - P[10][22]*SPP[10] - (P[11][22]*q0)/2;
@@ -1506,30 +1306,58 @@ void NavEKF3_core::CovariancePrediction()
                     nextP[20][22] = P[20][22];
                     nextP[21][22] = P[21][22];
                     nextP[22][22] = P[22][22];
-                    nextP[0][23] = P[0][23] + P[1][23]*SF[9] + P[2][23]*SF[11] + P[3][23]*SF[10] + P[10][23]*SF[14] + P[11][23]*SF[15] + P[12][23]*SPP[10];
-                    nextP[1][23] = P[1][23] + P[0][23]*SF[8] + P[2][23]*SF[7] + P[3][23]*SF[11] - P[12][23]*SF[15] + P[11][23]*SPP[10] - (P[10][23]*q0)/2;
-                    nextP[2][23] = P[2][23] + P[0][23]*SF[6] + P[1][23]*SF[10] + P[3][23]*SF[8] + P[12][23]*SF[14] - P[10][23]*SPP[10] - (P[11][23]*q0)/2;
-                    nextP[3][23] = P[3][23] + P[0][23]*SF[7] + P[1][23]*SF[6] + P[2][23]*SF[9] + P[10][23]*SF[15] - P[11][23]*SF[14] - (P[12][23]*q0)/2;
-                    nextP[4][23] = P[4][23] + P[0][23]*SF[5] + P[1][23]*SF[3] - P[3][23]*SF[4] + P[2][23]*SPP[0] + P[13][23]*SPP[3] + P[14][23]*SPP[6] - P[15][23]*SPP[9];
-                    nextP[5][23] = P[5][23] + P[0][23]*SF[4] + P[2][23]*SF[3] + P[3][23]*SF[5] - P[1][23]*SPP[0] - P[13][23]*SPP[8] + P[14][23]*SPP[2] + P[15][23]*SPP[5];
-                    nextP[6][23] = P[6][23] + P[1][23]*SF[4] - P[2][23]*SF[5] + P[3][23]*SF[3] + P[0][23]*SPP[0] + P[13][23]*SPP[4] - P[14][23]*SPP[7] - P[15][23]*SPP[1];
-                    nextP[7][23] = P[7][23] + P[4][23]*dt;
-                    nextP[8][23] = P[8][23] + P[5][23]*dt;
-                    nextP[9][23] = P[9][23] + P[6][23]*dt;
-                    nextP[10][23] = P[10][23];
-                    nextP[11][23] = P[11][23];
-                    nextP[12][23] = P[12][23];
-                    nextP[13][23] = P[13][23];
-                    nextP[14][23] = P[14][23];
-                    nextP[15][23] = P[15][23];
-                    nextP[16][23] = P[16][23];
-                    nextP[17][23] = P[17][23];
-                    nextP[18][23] = P[18][23];
-                    nextP[19][23] = P[19][23];
-                    nextP[20][23] = P[20][23];
-                    nextP[21][23] = P[21][23];
-                    nextP[22][23] = P[22][23];
-                    nextP[23][23] = P[23][23];
+
+                    if (stateIndexLim > 23) {
+                        nextP[0][23] = P[0][23] + P[1][23]*SF[9] + P[2][23]*SF[11] + P[3][23]*SF[10] + P[10][23]*SF[14] + P[11][23]*SF[15] + P[12][23]*SPP[10];
+                        nextP[1][23] = P[1][23] + P[0][23]*SF[8] + P[2][23]*SF[7] + P[3][23]*SF[11] - P[12][23]*SF[15] + P[11][23]*SPP[10] - (P[10][23]*q0)/2;
+                        nextP[2][23] = P[2][23] + P[0][23]*SF[6] + P[1][23]*SF[10] + P[3][23]*SF[8] + P[12][23]*SF[14] - P[10][23]*SPP[10] - (P[11][23]*q0)/2;
+                        nextP[3][23] = P[3][23] + P[0][23]*SF[7] + P[1][23]*SF[6] + P[2][23]*SF[9] + P[10][23]*SF[15] - P[11][23]*SF[14] - (P[12][23]*q0)/2;
+                        nextP[4][23] = P[4][23] + P[0][23]*SF[5] + P[1][23]*SF[3] - P[3][23]*SF[4] + P[2][23]*SPP[0] + P[13][23]*SPP[3] + P[14][23]*SPP[6] - P[15][23]*SPP[9];
+                        nextP[5][23] = P[5][23] + P[0][23]*SF[4] + P[2][23]*SF[3] + P[3][23]*SF[5] - P[1][23]*SPP[0] - P[13][23]*SPP[8] + P[14][23]*SPP[2] + P[15][23]*SPP[5];
+                        nextP[6][23] = P[6][23] + P[1][23]*SF[4] - P[2][23]*SF[5] + P[3][23]*SF[3] + P[0][23]*SPP[0] + P[13][23]*SPP[4] - P[14][23]*SPP[7] - P[15][23]*SPP[1];
+                        nextP[7][23] = P[7][23] + P[4][23]*dt;
+                        nextP[8][23] = P[8][23] + P[5][23]*dt;
+                        nextP[9][23] = P[9][23] + P[6][23]*dt;
+                        nextP[10][23] = P[10][23];
+                        nextP[11][23] = P[11][23];
+                        nextP[12][23] = P[12][23];
+                        nextP[13][23] = P[13][23];
+                        nextP[14][23] = P[14][23];
+                        nextP[15][23] = P[15][23];
+                        nextP[16][23] = P[16][23];
+                        nextP[17][23] = P[17][23];
+                        nextP[18][23] = P[18][23];
+                        nextP[19][23] = P[19][23];
+                        nextP[20][23] = P[20][23];
+                        nextP[21][23] = P[21][23];
+                        nextP[22][23] = P[22][23];
+                        nextP[23][23] = P[23][23];
+                        nextP[0][24] = P[0][24] + P[1][24]*SF[9] + P[2][24]*SF[11] + P[3][24]*SF[10] + P[10][24]*SF[14] + P[11][24]*SF[15] + P[12][24]*SPP[10];
+                        nextP[1][24] = P[1][24] + P[0][24]*SF[8] + P[2][24]*SF[7] + P[3][24]*SF[11] - P[12][24]*SF[15] + P[11][24]*SPP[10] - (P[10][24]*q0)/2;
+                        nextP[2][24] = P[2][24] + P[0][24]*SF[6] + P[1][24]*SF[10] + P[3][24]*SF[8] + P[12][24]*SF[14] - P[10][24]*SPP[10] - (P[11][24]*q0)/2;
+                        nextP[3][24] = P[3][24] + P[0][24]*SF[7] + P[1][24]*SF[6] + P[2][24]*SF[9] + P[10][24]*SF[15] - P[11][24]*SF[14] - (P[12][24]*q0)/2;
+                        nextP[4][24] = P[4][24] + P[0][24]*SF[5] + P[1][24]*SF[3] - P[3][24]*SF[4] + P[2][24]*SPP[0] + P[13][24]*SPP[3] + P[14][24]*SPP[6] - P[15][24]*SPP[9];
+                        nextP[5][24] = P[5][24] + P[0][24]*SF[4] + P[2][24]*SF[3] + P[3][24]*SF[5] - P[1][24]*SPP[0] - P[13][24]*SPP[8] + P[14][24]*SPP[2] + P[15][24]*SPP[5];
+                        nextP[6][24] = P[6][24] + P[1][24]*SF[4] - P[2][24]*SF[5] + P[3][24]*SF[3] + P[0][24]*SPP[0] + P[13][24]*SPP[4] - P[14][24]*SPP[7] - P[15][24]*SPP[1];
+                        nextP[7][24] = P[7][24] + P[4][24]*dt;
+                        nextP[8][24] = P[8][24] + P[5][24]*dt;
+                        nextP[9][24] = P[9][24] + P[6][24]*dt;
+                        nextP[10][24] = P[10][24];
+                        nextP[11][24] = P[11][24];
+                        nextP[12][24] = P[12][24];
+                        nextP[13][24] = P[13][24];
+                        nextP[14][24] = P[14][24];
+                        nextP[15][24] = P[15][24];
+                        nextP[16][24] = P[16][24];
+                        nextP[17][24] = P[17][24];
+                        nextP[18][24] = P[18][24];
+                        nextP[19][24] = P[19][24];
+                        nextP[20][24] = P[20][24];
+                        nextP[21][24] = P[21][24];
+                        nextP[22][24] = P[22][24];
+                        nextP[23][24] = P[23][24];
+                        nextP[24][24] = P[24][24];
+                    }
                 }
             }
         }
@@ -1575,20 +1403,20 @@ void NavEKF3_core::CovariancePrediction()
 }
 
 // zero specified range of rows in the state covariance matrix
-void NavEKF3_core::zeroRows(Matrix24 &covMat, uint8_t first, uint8_t last)
+void NavEKF3_core::zeroRows(Matrix25 &covMat, uint8_t first, uint8_t last)
 {
     uint8_t row;
     for (row=first; row<=last; row++)
     {
-        memset(&covMat[row][0], 0, sizeof(covMat[0][0])*24);
+        memset(&covMat[row][0], 0, sizeof(covMat[0][0])*25);
     }
 }
 
 // zero specified range of columns in the state covariance matrix
-void NavEKF3_core::zeroCols(Matrix24 &covMat, uint8_t first, uint8_t last)
+void NavEKF3_core::zeroCols(Matrix25 &covMat, uint8_t first, uint8_t last)
 {
     uint8_t row;
-    for (row=0; row<=23; row++)
+    for (row=0; row<=25; row++)
     {
         memset(&covMat[row][first], 0, sizeof(covMat[0][0])*(1+last-first));
     }
@@ -1711,11 +1539,17 @@ void NavEKF3_core::ConstrainVariances()
         zeroRows(P,16,21);
     }
 
-    if (!inhibitWindStates) {
-        for (uint8_t i=22; i<=23; i++) P[i][i] = constrain_float(P[i][i],0.0f,1.0e3f);
+    if (!inhibitScaleFactorState) {
+        P[22][22] = constrain_float(P[22][22],0.0f,1.0f);
     } else {
-        zeroCols(P,22,23);
-        zeroRows(P,22,23);
+        zeroCols(P,22,22);
+    }
+
+    if (!inhibitWindStates) {
+        for (uint8_t i=22; i<=24; i++) P[i][i] = constrain_float(P[i][i],0.0f,1.0e3f);
+    } else {
+        zeroCols(P,23,24);
+        zeroRows(P,23,24);
     }
 }
 
@@ -1738,8 +1572,10 @@ void NavEKF3_core::ConstrainStates()
     for (uint8_t i=16; i<=18; i++) statesArray[i] = constrain_float(statesArray[i],-1.0f,1.0f);
     // body magnetic field limit
     for (uint8_t i=19; i<=21; i++) statesArray[i] = constrain_float(statesArray[i],-0.5f,0.5f);
+    // scale factor log equivalent to a sacle factor between 0.1 and 10
+    stateStruct.scaleFactorLog = constrain_float(stateStruct.scaleFactorLog,-2.3f,2.3f);
     // wind velocity limit 100 m/s (could be based on some multiple of max airspeed * EAS2TAS) - TODO apply circular limit
-    for (uint8_t i=22; i<=23; i++) statesArray[i] = constrain_float(statesArray[i],-100.0f,100.0f);
+    for (uint8_t i=23; i<=24; i++) statesArray[i] = constrain_float(statesArray[i],-100.0f,100.0f);
     // constrain the terrain state to be below the vehicle height unless we are using terrain as the height datum
     if (!inhibitGndState) {
         terrainState = MAX(terrainState, stateStruct.position.z + rngOnGnd);

@@ -277,7 +277,7 @@ public:
     bool getRangeBeaconDebug(uint8_t &ID, float &rng, float &innov, float &innovVar, float &testRatio, Vector3f &beaconPosNED,
                              float &offsetHigh, float &offsetLow, Vector3f &posNED);
 
-    bool getScaleFactorDebug(float &scaleLog, float &scaleLogSigma, Vector3f &innov, Vector3f &innovVar);
+    bool getScaleFactorDebug(float &scaleLog, float &scaleLogSigma);
 
     // called by vehicle code to specify that a takeoff is happening
     // causes the EKF to compensate for expected barometer errors due to ground effect
@@ -432,7 +432,7 @@ private:
     typedef ftype Vector28[28];
     typedef ftype Matrix3[3][3];
     typedef ftype Matrix7[7][7];
-    typedef ftype Matrix24[24][24];
+    typedef ftype Matrix25[25][25];
     typedef ftype Matrix34_50[34][50];
     typedef uint32_t Vector_u32_50[50];
 #endif
@@ -442,7 +442,7 @@ private:
     // the states are available in two forms, either as a Vector24, or
     // broken down as individual elements. Both are equivalent (same
     // memory)
-    Vector24 statesArray;
+    Vector25 statesArray;
     struct state_elements {
         Quaternion  quat;           // quaternion defining rotation from local NED earth frame to body frame
         Vector3f    velocity;       // velocity of IMU in local NED earth frame (m/sec)
@@ -451,16 +451,9 @@ private:
         Vector3f    accel_bias;     // body frame delta velocity IMU bias vector (m/sec)
         Vector3f    earth_magfield; // earth frame magnetic field vector (Gauss)
         Vector3f    body_magfield;  // body frame magnetic field vector (Gauss)
+        float       scaleFactorLog; // natural log of scale factor converting from external nav to local NED earth frame
         Vector2f    wind_vel;       // horizontal North East wind velocity vector in local NED earth frame (m/sec)
     } &stateStruct;
-
-    // state array used by the external nav scale factor estimator and able to be accessed as either an array or a function
-    Vector7 extNavStateArray;
-    struct extNavStateElements {
-        Vector3f    velocity;       // velocity of IMU in external nav world frame (length/sec)
-        Vector3f    position;       // position of IMU in external nav world frame (length)
-        float       scaleFactorLog; // natural log of scale factor to that converts from EKF nav frame to external nav world frame
-    } &extNavStateStruct;
 
     struct output_elements {
         Quaternion  quat;           // quaternion defining rotation from local NED earth frame to body frame
@@ -554,14 +547,6 @@ private:
     // update the quaternion, velocity and position states using IMU measurements
     void UpdateStrapdownEquationsNED();
 
-    // perform state and covariance prediction for the small EKF used to estimate the length
-    // scale factor that converts from navigation frame to external nav system world frame
-    void extNavScalePrediction(Vector3f delVelNED);
-
-    // perform an observation step for the small EKF used to estimate the length
-    // scale factor that converts from navigation frame to external nav system world frame
-    void extNavScaleObservation();
-
     // calculate the predicted state covariance matrix
     void CovariancePrediction();
 
@@ -599,10 +584,10 @@ private:
     void FuseSideslip();
 
     // zero specified range of rows in the state covariance matrix
-    void zeroRows(Matrix24 &covMat, uint8_t first, uint8_t last);
+    void zeroRows(Matrix25 &covMat, uint8_t first, uint8_t last);
 
     // zero specified range of columns in the state covariance matrix
-    void zeroCols(Matrix24 &covMat, uint8_t first, uint8_t last);
+    void zeroCols(Matrix25 &covMat, uint8_t first, uint8_t last);
 
     // Reset the stored output history to current data
     void StoreOutputReset(void);
@@ -871,10 +856,10 @@ private:
     bool badIMUdata;                // boolean true if the bad IMU data is detected
 
     float gpsNoiseScaler;           // Used to scale the  GPS measurement noise and consistency gates to compensate for operation with small satellite counts
-    Vector28 Kfusion;               // Kalman gain vector
-    Matrix24 KH;                    // intermediate result used for covariance updates
-    Matrix24 KHP;                   // intermediate result used for covariance updates
-    Matrix24 P;                     // covariance matrix
+    Vector25 Kfusion;               // Kalman gain vector
+    Matrix25 KH;                    // intermediate result used for covariance updates
+    Matrix25 KHP;                   // intermediate result used for covariance updates
+    Matrix25 P;                     // covariance matrix
     imu_ring_buffer_t<imu_elements> storedIMU;      // IMU data buffer
     obs_ring_buffer_t<gps_elements> storedGPS;      // GPS data buffer
     obs_ring_buffer_t<mag_elements> storedMag;      // Magnetometer data buffer
@@ -927,7 +912,7 @@ private:
     bool allMagSensorsFailed;       // true if all magnetometer sensors have timed out on this flight and we are no longer using magnetometer data
     uint32_t lastSynthYawTime_ms;   // time stamp when synthetic yaw measurement was last fused to maintain covariance health (msec)
     uint32_t ekfStartTime_ms;       // time the EKF was started (msec)
-    Matrix24 nextP;                 // Predicted covariance matrix before addition of process noise to diagonals
+    Matrix25 nextP;                 // Predicted covariance matrix before addition of process noise to diagonals
     Vector2f lastKnownPositionNE;   // last known position
     uint32_t lastDecayTime_ms;      // time of last decay of GPS position offset
     float velTestRatio;             // sum of squares of GPS velocity innovation divided by fail threshold
@@ -939,6 +924,7 @@ private:
     bool inhibitMagStates;          // true when magnetic field states are inactive
     bool inhibitDelVelBiasStates;   // true when IMU delta velocity bias states are inactive
     bool inhibitDelAngBiasStates;   // true when IMU delta angle bias states are inactive
+    bool inhibitScaleFactorState;   // true when estmation of scale factor from external nav to NED frame is inactive
     bool gpsNotAvailable;           // bool true when valid GPS data is not available
     struct Location EKF_origin;     // LLH origin of the NED axis system
     bool validOrigin;               // true when the EKF origin is valid
@@ -1162,12 +1148,6 @@ private:
     // Estimation of external nav scale factor using a 7 state EKF to estimate
     // States can be accessed as either an array 'statesArray' or a struct 'stateStruct'
     // See stateStruct(*reinterpret_cast<struct extNavStateElements *>(&statesArray)) in constructor
-    bool estimateScaleFactor;           // true when the scale factor from navigation to world frame length units needs to be estimated
-    Matrix7 extNavP;                    // Covariance matrix
-    Vector3f extNavScaleInnovVar;        // innovation variance
-    Vector3f extNavScaleInnov;           // innovation
-    uint32_t extNavScaleFuseTime_ms;    // last time external position measurements fused (msec)
-    float extNavScaleFactor;            // scale factor that converts from nav frame to world frame length units
     bool extNavScaleEkfInit;            // true when the EKF has been initialised
     bool logScaleFactorFusion;          // true when there is a scale factor fusion update to be logged
 

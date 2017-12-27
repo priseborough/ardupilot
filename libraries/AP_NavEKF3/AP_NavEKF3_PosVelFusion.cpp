@@ -671,13 +671,20 @@ void NavEKF3_core::FuseVelPosNED()
                     memset(&Kfusion[16], 0, 24);
                 }
 
+                // inhibit scale factor estimation by setting Kalman gains to zero
+                if (!inhibitScaleFactorState) {
+                    Kfusion[22] = P[22][stateIndex]*SK;
+                } else {
+                    Kfusion[22] = 0.0f;
+                }
+
                 // inhibit wind state estimation by setting Kalman gains to zero
                 if (!inhibitWindStates) {
-                    Kfusion[22] = P[22][stateIndex]*SK;
                     Kfusion[23] = P[23][stateIndex]*SK;
+                    Kfusion[24] = P[24][stateIndex]*SK;
                 } else {
-                    // zero indexes 22 to 23 = 2*4 bytes
-                    memset(&Kfusion[22], 0, 8);
+                    // zero indexes 23 to 24 = 2*4 bytes
+                    memset(&Kfusion[23], 0, 8);
                 }
 
                 // update the covariance - take advantage of direct observation of a single state at index = stateIndex to reduce computations
@@ -933,7 +940,7 @@ void NavEKF3_core::selectHeightForFusion()
 */
 void NavEKF3_core::FuseBodyVel()
 {
-    Vector24 H_VEL;
+    Vector25 H_VEL;
     Vector3f bodyVelPred;
 
     // Copy required states to local variable names
@@ -1126,12 +1133,18 @@ void NavEKF3_core::FuseBodyVel()
                 memset(&Kfusion[16], 0, 24);
             }
 
-            if (!inhibitWindStates) {
+            if (!inhibitScaleFactorState) {
                 Kfusion[22] = t77*(P[22][5]*t4+P[22][4]*t9+P[22][0]*t14-P[22][6]*t11+P[22][1]*t18-P[22][2]*t21+P[22][3]*t24);
-                Kfusion[23] = t77*(P[23][5]*t4+P[23][4]*t9+P[23][0]*t14-P[23][6]*t11+P[23][1]*t18-P[23][2]*t21+P[23][3]*t24);
             } else {
-                // zero indexes 22 to 23 = 2*4 bytes
-                memset(&Kfusion[22], 0, 8);
+                Kfusion[22] = 0.0f;
+            }
+
+            if (!inhibitWindStates) {
+                Kfusion[23] = t77*(P[23][5]*t4+P[23][4]*t9+P[23][0]*t14-P[23][6]*t11+P[23][1]*t18-P[23][2]*t21+P[23][3]*t24);
+                Kfusion[24] = t77*(P[24][5]*t4+P[24][4]*t9+P[24][0]*t14-P[24][6]*t11+P[24][1]*t18-P[24][2]*t21+P[24][3]*t24);
+            } else {
+                // zero indexes 23 to 24 = 2*4 bytes
+                memset(&Kfusion[23], 0, 8);
             }
         } else if (obsIndex == 1) {
             // calculate Y axis observation Jacobian
@@ -1298,12 +1311,18 @@ void NavEKF3_core::FuseBodyVel()
                 memset(&Kfusion[16], 0, 24);
             }
 
-            if (!inhibitWindStates) {
+            if (!inhibitScaleFactorState) {
                 Kfusion[22] = t77*(-P[22][4]*t3+P[22][5]*t8+P[22][0]*t15+P[22][6]*t12+P[22][1]*t18+P[22][2]*t22-P[22][3]*t25);
-                Kfusion[23] = t77*(-P[23][4]*t3+P[23][5]*t8+P[23][0]*t15+P[23][6]*t12+P[23][1]*t18+P[23][2]*t22-P[23][3]*t25);
             } else {
-                // zero indexes 22 to 23 = 2*4 bytes
-                memset(&Kfusion[22], 0, 8);
+                Kfusion[22] = 0.0f;
+            }
+
+            if (!inhibitWindStates) {
+                Kfusion[23] = t77*(-P[23][4]*t3+P[23][5]*t8+P[23][0]*t15+P[23][6]*t12+P[23][1]*t18+P[23][2]*t22-P[23][3]*t25);
+                Kfusion[24] = t77*(-P[24][4]*t3+P[24][5]*t8+P[24][0]*t15+P[24][6]*t12+P[24][1]*t18+P[24][2]*t22-P[24][3]*t25);
+            } else {
+                // zero indexes 23 to 24 = 2*4 bytes
+                memset(&Kfusion[23], 0, 8);
             }
         } else if (obsIndex == 2) {
             // calculate Z axis observation Jacobian
@@ -1471,12 +1490,18 @@ void NavEKF3_core::FuseBodyVel()
                 memset(&Kfusion[16], 0, 24);
             }
 
-            if (!inhibitWindStates) {
+            if (!inhibitScaleFactorState) {
                 Kfusion[22] = t77*(P[22][4]*t4+P[22][0]*t14+P[22][6]*t9-P[22][5]*t11-P[22][1]*t17+P[22][2]*t20+P[22][3]*t24);
-                Kfusion[23] = t77*(P[23][4]*t4+P[23][0]*t14+P[23][6]*t9-P[23][5]*t11-P[23][1]*t17+P[23][2]*t20+P[23][3]*t24);
             } else {
-                // zero indexes 22 to 23 = 2*4 bytes
-                memset(&Kfusion[22], 0, 8);
+                Kfusion[22] = 0.0f;
+            }
+
+            if (!inhibitWindStates) {
+                Kfusion[23] = t77*(P[23][4]*t4+P[23][0]*t14+P[23][6]*t9-P[23][5]*t11-P[23][1]*t17+P[23][2]*t20+P[23][3]*t24);
+                Kfusion[24] = t77*(P[24][4]*t4+P[24][0]*t14+P[24][6]*t9-P[24][5]*t11-P[24][1]*t17+P[24][2]*t20+P[24][3]*t24);
+            } else {
+                // zero indexes 23 to 24 = 2*4 bytes
+                memset(&Kfusion[23], 0, 8);
             }
         } else {
             return;
@@ -1638,17 +1663,11 @@ void NavEKF3_core::SelectExtNavFusion()
     // Check for data at the fusion time horizon
     if (storedExtNav.recall(extNavDataDelayed, imuDataDelayed.time_ms)) {
 
-        useExtNavRelPosMethod = !extNavDataDelayed.frameIsNED || estimateScaleFactor || filterStatus.flags.using_gps;
+        useExtNavRelPosMethod = !extNavDataDelayed.frameIsNED || !inhibitScaleFactorState || filterStatus.flags.using_gps;
 
         // If external nav is not using NED, calculate the rotation required to convert measurements
         if (!extNavDataDelayed.frameIsNED) {
             calcExtVisRotMat();
-        }
-
-        // Run the scale factor estimator if required
-        if (estimateScaleFactor) {
-            extNavScaleObservation();
-            logScaleFactorFusion = true;
         }
 
         fusePosData = true;
@@ -1667,7 +1686,7 @@ void NavEKF3_core::SelectExtNavFusion()
                 return;
 
             } else {
-                float scaleFactorInv = 1.0f / extNavScaleFactor;
+                float scaleFactorInv = 1.0f / expf(stateStruct.scaleFactorLog);
                 Vector3f relPosMea = (extNavDataDelayed.pos - extNavPosMeasPrev) * scaleFactorInv;
                 if (!extNavDataDelayed.frameIsNED) {
                     relPosMea = extNavToEkfRotMat * relPosMea;
