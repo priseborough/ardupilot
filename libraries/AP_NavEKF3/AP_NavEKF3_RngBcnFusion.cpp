@@ -89,7 +89,7 @@ void NavEKF3_core::FuseRngBcn()
     if (rngPred > 0.1f)
     {
         // calculate observation jacobians
-        float H_BCN[24];
+        float H_BCN[25];
         memset(H_BCN, 0, sizeof(H_BCN));
         float t2 = bcn_pd-pd;
         float t3 = bcn_pe-pe;
@@ -187,12 +187,18 @@ void NavEKF3_core::FuseRngBcn()
             memset(&Kfusion[16], 0, 24);
         }
 
-        if (!inhibitWindStates) {
+        if (!inhibitScaleFactorState) {
             Kfusion[22] = -t26*(P[22][7]*t4*t9+P[22][8]*t3*t9+P[22][9]*t2*t9);
-            Kfusion[23] = -t26*(P[23][7]*t4*t9+P[23][8]*t3*t9+P[23][9]*t2*t9);
         } else {
-            // zero indexes 22 to 23 = 2*4 bytes
-            memset(&Kfusion[22], 0, 8);
+            Kfusion[22] = 0.0f;
+        }
+
+        if (!inhibitWindStates) {
+            Kfusion[23] = -t26*(P[23][7]*t4*t9+P[23][8]*t3*t9+P[23][9]*t2*t9);
+            Kfusion[24] = -t26*(P[24][7]*t4*t9+P[24][8]*t3*t9+P[24][9]*t2*t9);
+        } else {
+            // zero indexes 23 to 24 = 2*4 bytes
+            memset(&Kfusion[23], 0, 8);
         }
 
         // Calculate innovation using the selected offset value
@@ -221,7 +227,7 @@ void NavEKF3_core::FuseRngBcn()
                 for (unsigned j = 7; j<=9; j++) {
                     KH[i][j] = Kfusion[i] * H_BCN[j];
                 }
-                for (unsigned j = 10; j<=23; j++) {
+                for (unsigned j = 10; j<=24; j++) {
                     KH[i][j] = 0.0f;
                 }
             }
