@@ -576,6 +576,14 @@ const AP_Param::GroupInfo NavEKF3::var_info[] = {
     // @Units: m/s
     AP_GROUPINFO("WENC_VERR", 53, NavEKF3, _wencOdmVelErr, 0.1f),
 
+    // @Param: SCL_NSE
+    // @DisplayName: External nav scale process noise
+    // @Description: This noise controls the growth of the vertical accelerometer delta velocity bias state error estimate. Increasing it makes accelerometer bias estimation faster and noisier.
+    // @Range: 0.00001 0.001
+    // @User: Advanced
+    // @Units: 1/s
+    AP_GROUPINFO("SCL_NSE", 54, NavEKF3, _extNavLogScaleNse, 0.001f),
+
     AP_GROUPEND
 };
 
@@ -1133,7 +1141,7 @@ void NavEKF3::getVariances(int8_t instance, float &velVar, float &posVar, float 
 }
 
 // return the diagonals from the covariance matrix for the specified instance
-void NavEKF3::getStateVariances(int8_t instance, float stateVar[24])
+void NavEKF3::getStateVariances(int8_t instance, float stateVar[25])
 {
     if (instance < 0 || instance >= num_cores) instance = primary;
     if (core) {
@@ -1197,6 +1205,29 @@ void NavEKF3::writeBodyFrameOdom(float quality, const Vector3f &delPos, const Ve
 }
 
 /*
+ * Write position and quaternion data from an external navigation system
+ *
+ * scaleUnknown : Boolean set to true when the position scaling is unknown or not in metres
+ * frameIsNED : Boolean set to true if the external mavigaton system is using a NED coordinate frame
+ * pos        : position in the RH navigation frame. Frame is assumed to be NED if frameIsNED is true. (m)
+ * quat       : quaternion desribing the the rotation from navigation frame to body frame
+ * posErr     : 1-sigma spherical position error (m)
+ * angErr     : 1-sigma spherical angle error (rad)
+ * timeStamp_ms : system time the measurement was taken, not the time it was received (mSec)
+ * resetTime_ms : system time of the last position reset request (mSec)
+ *
+*/
+void NavEKF3::writeExtNavData(bool scaleUnknown, bool frameIsNED, const Vector3f &sensOffset, const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint32_t resetTime_ms)
+{
+    if (core) {
+        for (uint8_t i=0; i<num_cores; i++) {
+            core[i].writeExtNavData(scaleUnknown, frameIsNED, sensOffset, pos, quat, posErr, angErr, timeStamp_ms, resetTime_ms);
+        }
+    }
+}
+
+
+/*
  * Write odometry data from a wheel encoder. The axis of rotation is assumed to be parallel to the vehicle body axis
  *
  * delAng is the measured change in angular position from the previous measurement where a positive rotation is produced by forward motion of the vehicle (rad)
@@ -1235,6 +1266,16 @@ bool NavEKF3::getRangeBeaconDebug(int8_t instance, uint8_t &ID, float &rng, floa
     if (instance < 0 || instance >= num_cores) instance = primary;
     if (core) {
         return core[instance].getRangeBeaconDebug(ID, rng, innov, innovVar, testRatio, beaconPosNED, offsetHigh, offsetLow, posNED);
+    } else {
+        return false;
+    }
+}
+
+bool NavEKF3::getScaleFactorDebug(int8_t instance, float &scaleLog, float &scaleLogSigma)
+{
+    if (instance < 0 || instance >= num_cores) instance = primary;
+    if (core) {
+        return core[instance].getScaleFactorDebug(scaleLog, scaleLogSigma);
     } else {
         return false;
     }
@@ -1585,6 +1626,15 @@ void NavEKF3::getTimingStatistics(int8_t instance, struct ekf_timing &timing)
         core[instance].getTimingStatistics(timing);
     } else {
         memset(&timing, 0, sizeof(timing));
+    }
+}
+
+// return the quaternions defining the rotation from the EKF to the external nav reference frame
+void NavEKF3::getEkfToExtNavQuat(int8_t instance, Quaternion &quat) const
+{
+    if (instance < 0 || instance >= num_cores) instance = primary;
+    if (core) {
+        core[instance].getEkfToExtNavQuat(quat);
     }
 }
 

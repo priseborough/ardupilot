@@ -105,6 +105,18 @@ bool NavEKF3_core::getRangeBeaconDebug(uint8_t &ID, float &rng, float &innov, fl
     return true;
 }
 
+bool NavEKF3_core::getScaleFactorDebug(float &scaleLog, float &scaleLogSigma)
+{
+    scaleLog = stateStruct.scaleFactorLog;
+    scaleLogSigma = sqrtf(P[22][22]);
+    if (logScaleFactorFusion) {
+        logScaleFactorFusion = false;
+        return true;
+    } else {
+        return false;
+    }
+}
+
 // provides the height limit to be observed by the control loops
 // returns false if no height limiting is required
 // this is needed to ensure the vehicle does not fly too high when using optical flow navigation
@@ -465,9 +477,9 @@ void  NavEKF3_core::getVariances(float &velVar, float &posVar, float &hgtVar, Ve
 }
 
 // return the diagonals from the covariance matrix
-void  NavEKF3_core::getStateVariances(float stateVar[24])
+void  NavEKF3_core::getStateVariances(float stateVar[25])
 {
-    for (uint8_t i=0; i<24; i++) {
+    for (uint8_t i=0; i<25; i++) {
         stateVar[i] = P[i][i];
     }
 }
@@ -624,6 +636,14 @@ uint8_t NavEKF3_core::getFramesSincePredict(void) const
 void NavEKF3_core::getOutputTrackingError(Vector3f &error) const
 {
     error = outputTrackError;
+}
+
+// return the quaternion defining the rotation from the EKF to the external nav reference frame
+void NavEKF3_core::getEkfToExtNavQuat(Quaternion& ret) const
+{
+    Quaternion quat;
+    quat.from_axis_angle(ekfToExtNavRotVecFilt);
+    ret = quat;
 }
 
 #endif // HAL_CPU_CLASS
