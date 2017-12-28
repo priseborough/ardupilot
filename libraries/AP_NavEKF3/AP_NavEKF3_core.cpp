@@ -389,6 +389,8 @@ void NavEKF3_core::InitialiseVariables()
     memset(&extNavPosTestRatio, 0, sizeof(extNavPosTestRatio));
     memset(&varInnovExtNavPos, 0, sizeof(varInnovExtNavPos));
     innovExtNavPos.zero();
+    extNavScale = 1.0f;
+    extNavScaleInv = 1.0f;
     extNavMeasTime_ms = 0;
     ekfToExtNavRotVecFilt.zero();
     memset(&extNavToEkfRotMat, 0, sizeof(extNavToEkfRotMat));
@@ -402,6 +404,7 @@ void NavEKF3_core::InitialiseVariables()
     extNavPosEstPrev.zero();
     extNavPrevAvailable = false;
     extNavLastPosResetTime_ms = 0;
+    extNavDelPosFuseTime_ms = 0;
 
     // external nav scale factor estimation
     logScaleFactorFusion = false;

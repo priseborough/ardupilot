@@ -150,8 +150,6 @@ void NavEKF3_core::writeExtNavData(bool scaleUnknown ,bool frameIsNED, const Vec
         extNavDataNew.posReset = false;
     }
 
-    inhibitScaleFactorState = !scaleUnknown;
-
     extNavDataNew.frameIsNED = frameIsNED;
     extNavDataNew.pos = pos;
     extNavDataNew.quat = quat;
