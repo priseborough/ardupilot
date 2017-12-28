@@ -275,7 +275,7 @@ public:
     bool getRangeBeaconDebug(uint8_t &ID, float &rng, float &innov, float &innovVar, float &testRatio, Vector3f &beaconPosNED,
                              float &offsetHigh, float &offsetLow, Vector3f &posNED);
 
-    bool getScaleFactorDebug(float &scaleLog, float &scaleLogSigma);
+    bool getScaleFactorDebug(float &scaleLog, float &scaleLogSigma, Vector3f &innov, Vector3f &innovVar);
 
     // called by vehicle code to specify that a takeoff is happening
     // causes the EKF to compensate for expected barometer errors due to ground effect
@@ -550,6 +550,9 @@ private:
 
     // fuse selected position, velocity and height measurements
     void FuseVelPosNED();
+
+    // fuse position measurements with an arbitrary scale factor
+    void FuseDeltaPosUnscaled();
 
     // fuse body frame velocity measurements
     void FuseBodyVel();
@@ -1121,8 +1124,13 @@ private:
     ext_nav_elements extNavDataNew;     // External nav data at the current time horizon
     ext_nav_elements extNavDataDelayed; // External nav at the fusion time horizon
     Vector3 extNavPosTestRatio;         // Innovation test ratios for external nav position measurements
-    Vector3 varInnovExtNavPos;          // External nav position XYZ innovation variances (m)^2
-    Vector3f innovExtNavPos;            // External nav position XYZ innovations (m)
+    Vector3 varInnovExtNavPos;          // External nav position NED innovation variances (m)^2
+    Vector3f innovExtNavPos;            // External nav position NED innovations (m)
+    Vector3f extNavDelPosPred;          // External nav predicted NED delta position (m)
+    Vector3f extNavDelPosMea;           // External nav measured NED delta position (m)
+    float extNavScale;                  // scale factor from NED to external nav world frame
+    float extNavScaleInv;               // inverse of scale factor from NED to external nav world frame
+    Vector3f extNavDelPosObsVar;        // Exernal nav NED delta position observation variance (m/s)^2
     uint32_t extNavMeasTime_ms;         // time external measurements were accepted for input to the data buffer (msec)
     Vector3f ekfToExtNavRotVecFilt;     // filtered rotation vector defining the rotation from EKF to external nav reference frme (rad)
     Matrix3f extNavToEkfRotMat;         // transformation matrix that rotates observations from the external nav to the EKF reference frame
@@ -1133,6 +1141,7 @@ private:
     Vector3f extNavPosEstPrev;          // value of NED position state used by the last odometry fusion (m)
     bool extNavPrevAvailable;           // true when previous values of the estimate and measurement are available for use
     uint32_t extNavLastPosResetTime_ms; // last time the external nav systen performed a position reset (msec)
+    uint32_t extNavDelPosFuseTime_ms;   // last time external nav delta position observations were fused (msec)
 
     // Estimation of external nav scale factor using a 7 state EKF to estimate
     // States can be accessed as either an array 'statesArray' or a struct 'stateStruct'
@@ -1245,6 +1254,9 @@ private:
         bool bad_xvel:1;
         bool bad_yvel:1;
         bool bad_zvel:1;
+        bool bad_xpos:1;
+        bool bad_ypos:1;
+        bool bad_zpos:1;
     } faultStatus;
 
     // flags indicating which GPS quality checks are failing
