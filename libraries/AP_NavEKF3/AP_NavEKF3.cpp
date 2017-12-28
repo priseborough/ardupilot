@@ -1267,11 +1267,11 @@ bool NavEKF3::getRangeBeaconDebug(int8_t instance, uint8_t &ID, float &rng, floa
     }
 }
 
-bool NavEKF3::getScaleFactorDebug(int8_t instance, float &scaleLog, float &scaleLogSigma)
+bool NavEKF3::getScaleFactorDebug(int8_t instance, float &scaleLog, float &scaleLogSigma, Vector3f &innov, Vector3f &innovVar)
 {
     if (instance < 0 || instance >= num_cores) instance = primary;
     if (core) {
-        return core[instance].getScaleFactorDebug(scaleLog, scaleLogSigma);
+        return core[instance].getScaleFactorDebug(scaleLog, scaleLogSigma, innov, innovVar);
     } else {
         return false;
     }
