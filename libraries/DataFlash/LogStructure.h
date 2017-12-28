@@ -579,6 +579,12 @@ struct PACKED log_ekfExtNavScaleDebug {
     uint64_t time_us;
     float scaleLog;
     float scaleLogSigma;
+    float innovX;
+    float innovY;
+    float innovZ;
+    float innovVarX;
+    float innovVarY;
+    float innovVarZ;
 };
 
 struct PACKED log_ekfStateVar {
@@ -1279,7 +1285,7 @@ Format characters in the format string for binary log messages
     { LOG_XKFD_MSG, sizeof(log_ekfBodyOdomDebug), \
       "XKFD","Qffffff","TimeUS,IX,IY,IZ,IVX,IVY,IVZ", "s------", "F------" }, \
     { LOG_XKFR_MSG, sizeof(log_ekfExtNavScaleDebug), \
-      "XKFR","Qff","TimeUS,LS,LSS", "s--", "F--" }, \
+      "XKFR","Qffffffff","TimeUS,LS,LSS,IX,IY,IZ,IVX,IVY,IVZ", "s--------", "F--------" }, \
     { LOG_XKV1_MSG, sizeof(log_ekfStateVar), \
             "XKV1","Qffffffffffff","TimeUS,V00,V01,V02,V03,V04,V05,V06,V07,V08,V09,V10,V11", "s------------", "F------------" }, \
     { LOG_XKV2_MSG, sizeof(log_ekfStateVar), \
