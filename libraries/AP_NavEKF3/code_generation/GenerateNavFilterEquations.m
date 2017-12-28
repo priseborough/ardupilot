@@ -261,7 +261,7 @@ K_LOSX = (P*transpose(H_LOSX))/(H_LOSX*P*transpose(H_LOSX) + R_LOS); % Kalman ga
 K_LOSX = simplify(K_LOSX);
 save('temp2.mat','H_LOSX','K_LOSX');
 ccode([H_LOSX;transpose(K_LOSX)],'file','./c_code/LOSX.c');
-fix_c_code('LOSX.c');
+fix_c_code('./c_code/LOSX.c');
 
 clear all;
 reset(symengine);
@@ -275,7 +275,7 @@ K_LOSY = (P*transpose(H_LOSY))/(H_LOSY*P*transpose(H_LOSY) + R_LOS); % Kalman ga
 K_LOSY = simplify(K_LOSY);
 save('temp3.mat','H_LOSY','K_LOSY');
 ccode([H_LOSY;transpose(K_LOSY)],'file','./c_code/LOSY.c');
-fix_c_code('LOSY.c');
+fix_c_code('./c_code/LOSY.c');
 
 % reset workspace
 clear all;
@@ -300,7 +300,7 @@ H_VELX = jacobian(relVelBody(1),stateVector); % measurement Jacobian
 H_VELX = simplify(H_VELX);
 save('temp2.mat','H_VELX');
 ccode(H_VELX,'file','./c_code/H_VELX.c');
-fix_c_code('H_VELX.c');
+fix_c_code('./c_code/H_VELX.c');
 
 clear all;
 reset(symengine);
@@ -312,7 +312,7 @@ H_VELY = jacobian(relVelBody(2),stateVector); % measurement Jacobian
 H_VELY = simplify(H_VELY);
 save('temp3.mat','H_VELY');
 ccode(H_VELY,'file','./c_code/H_VELY.c');
-fix_c_code('H_VELY.c');
+fix_c_code('./c_code/H_VELY.c');
 
 clear all;
 reset(symengine);
@@ -324,7 +324,7 @@ H_VELZ = jacobian(relVelBody(3),stateVector); % measurement Jacobian
 H_VELZ = simplify(H_VELZ);
 save('temp4.mat','H_VELZ');
 ccode(H_VELZ,'file','./c_code/H_VELZ.c');
-fix_c_code('H_VELZ.c');
+fix_c_code('./c_code/H_VELZ.c');
 
 clear all;
 reset(symengine);
@@ -337,7 +337,7 @@ load('temp2.mat');
 K_VELX = (P*transpose(H_VELX))/(H_VELX*P*transpose(H_VELX) + R_VEL); % Kalman gain vector
 K_VELX = simplify(K_VELX);
 ccode(K_VELX,'file','./c_code/K_VELX.c');
-fix_c_code('K_VELX.c');
+fix_c_code('./c_code/K_VELX.c');
 
 clear all;
 reset(symengine);
@@ -350,7 +350,7 @@ load('temp3.mat');
 K_VELY = (P*transpose(H_VELY))/(H_VELY*P*transpose(H_VELY) + R_VEL); % Kalman gain vector
 K_VELY = simplify(K_VELY);
 ccode(K_VELY,'file','./c_code/K_VELY.c');
-fix_c_code('K_VELY.c');
+fix_c_code('./c_code/K_VELY.c');
 
 clear all;
 reset(symengine);
@@ -363,7 +363,7 @@ load('temp4.mat');
 K_VELZ = (P*transpose(H_VELZ))/(H_VELZ*P*transpose(H_VELZ) + R_VEL); % Kalman gain vector
 K_VELZ = simplify(K_VELZ);
 ccode(K_VELZ,'file','./c_code/K_VELZ.c');
-fix_c_code('K_VELZ.c');
+fix_c_code('./c_code/K_VELZ.c');
 
 % reset workspace
 clear all;
@@ -381,7 +381,7 @@ K_VELY = (P*transpose(H_VELY))/(H_VELY*P*transpose(H_VELY) + R_VEL); % Kalman ga
 K_VELZ = (P*transpose(H_VELZ))/(H_VELZ*P*transpose(H_VELZ) + R_VEL); % Kalman gain vector
 K_VEL = simplify([K_VELX,K_VELY,K_VELZ]);
 ccode(K_VEL,'file','./c_code/K_VEL.c');
-fix_c_code('K_VEL.c');
+fix_c_code('./c_code/K_VEL.c');
 
 %% derive equations for sequential fusion of external nav frame position measurements
 load('StatePrediction.mat');
@@ -397,7 +397,7 @@ H_POSX = jacobian(pos(1),stateVector); % measurement Jacobian
 H_POSX = simplify(H_POSX);
 save('temp2.mat','H_POSX');
 ccode(H_POSX,'file','./c_code/H_POSX.c');
-fix_c_code('H_POSX.c');
+fix_c_code('./c_code/H_POSX.c');
 
 clear all;
 reset(symengine);
@@ -409,7 +409,7 @@ H_POSY = jacobian(pos(2),stateVector); % measurement Jacobian
 H_POSY = simplify(H_POSY);
 save('temp3.mat','H_POSY');
 ccode(H_POSY,'file','./c_code/H_POSY.c');
-fix_c_code('H_POSY.c');
+fix_c_code('./c_code/H_POSY.c');
 
 clear all;
 reset(symengine);
@@ -421,7 +421,7 @@ H_POSZ = jacobian(pos(3),stateVector); % measurement Jacobian
 H_POSZ = simplify(H_POSZ);
 save('temp4.mat','H_POSZ');
 ccode(H_POSZ,'file','./c_code/H_POSZ.c');
-fix_c_code('H_POSZ.c');
+fix_c_code('./c_code/H_POSZ.c');
 
 clear all;
 reset(symengine);
@@ -434,7 +434,7 @@ load('temp2.mat');
 K_POSX = (P*transpose(H_POSX))/(H_POSX*P*transpose(H_POSX) + R_POS); % Kalman gain vector
 K_POSX = simplify(K_POSX);
 ccode(K_POSX,'file','./c_code/K_POSX.c');
-fix_c_code('K_POSX.c');
+fix_c_code('./c_code/K_POSX.c');
 
 clear all;
 reset(symengine);
@@ -447,7 +447,7 @@ load('temp3.mat');
 K_POSY = (P*transpose(H_POSY))/(H_POSY*P*transpose(H_POSY) + R_POS); % Kalman gain vector
 K_POSY = simplify(K_POSY);
 ccode(K_POSY,'file','./c_code/K_POSY.c');
-fix_c_code('K_POSY.c');
+fix_c_code('./c_code/K_POSY.c');
 
 clear all;
 reset(symengine);
@@ -460,7 +460,7 @@ load('temp4.mat');
 K_POSZ = (P*transpose(H_POSZ))/(H_POSZ*P*transpose(H_POSZ) + R_POS); % Kalman gain vector
 K_POSZ = simplify(K_POSZ);
 ccode(K_POSZ,'file','./c_code/K_POSZ.c');
-fix_c_code('K_POSZ.c');
+fix_c_code('./c_code/K_POSZ.c');
 
 % reset workspace
 clear all;
@@ -478,7 +478,90 @@ K_POSY = (P*transpose(H_POSY))/(H_POSY*P*transpose(H_POSY) + R_POS); % Kalman ga
 K_POSZ = (P*transpose(H_POSZ))/(H_POSZ*P*transpose(H_POSZ) + R_POS); % Kalman gain vector
 K_POS = simplify([K_POSX,K_POSY,K_POSZ]);
 ccode(K_POS,'file','./c_code/K_POS.c');
-fix_c_code('K_POS.c');
+fix_c_code('./c_code/K_POS.c');
+
+%% derive equations for sequential fusion of external nav frame velocity measurements
+load('StatePrediction.mat');
+
+syms R_VEL real;
+
+vel = exp(scaleLog) * [vn;ve;vd];
+
+save('temp1.mat','vel','R_VEL');
+
+% calculate the observation Jacobian for the N axis
+H_VELN = jacobian(vel(1),stateVector); % measurement Jacobian
+H_VELN = simplify(H_VELN);
+save('temp2.mat','H_VELN');
+ccode(H_VELN,'file','./c_code/H_VELN.c');
+fix_c_code('./c_code/H_VELN.c');
+
+clear all;
+reset(symengine);
+load('StatePrediction.mat');
+load('temp1.mat');
+
+% calculate the observation Jacobian for the E axis
+H_VELE = jacobian(vel(2),stateVector); % measurement Jacobian
+H_VELE = simplify(H_VELE);
+save('temp3.mat','H_VELE');
+ccode(H_VELE,'file','./c_code/H_VELE.c');
+fix_c_code('./c_code/H_VELE.c');
+
+clear all;
+reset(symengine);
+load('StatePrediction.mat');
+load('temp1.mat');
+
+% calculate the observation Jacobian for the D axis
+H_VELD = jacobian(vel(3),stateVector); % measurement Jacobian
+H_VELD = simplify(H_VELD);
+save('temp4.mat','H_VELD');
+ccode(H_VELD,'file','./c_code/H_VELD.c');
+fix_c_code('./c_code/H_VELD.c');
+
+clear all;
+reset(symengine);
+
+% calculate Kalman gain vector for the N axis
+load('StatePrediction.mat');
+load('temp1.mat');
+load('temp2.mat');
+
+K_VELN = (P*transpose(H_VELN))/(H_VELN*P*transpose(H_VELN) + R_VEL); % Kalman gain vector
+K_VELN = simplify(K_VELN);
+ccode(K_VELN,'file','./c_code/K_VELN.c');
+fix_c_code('./c_code/K_VELN.c');
+
+clear all;
+reset(symengine);
+
+% calculate Kalman gain vector for the E axis
+load('StatePrediction.mat');
+load('temp1.mat');
+load('temp3.mat');
+
+K_VELE = (P*transpose(H_VELE))/(H_VELE*P*transpose(H_VELE) + R_VEL); % Kalman gain vector
+K_VELE = simplify(K_VELE);
+ccode(K_VELE,'file','./c_code/K_VELE.c');
+fix_c_code('./c_code/K_VELE.c');
+
+clear all;
+reset(symengine);
+
+% calculate Kalman gain vector for the D axis
+load('StatePrediction.mat');
+load('temp1.mat');
+load('temp4.mat');
+
+K_VELD = (P*transpose(H_VELD))/(H_VELD*P*transpose(H_VELD) + R_VEL); % Kalman gain vector
+K_VELD = simplify(K_VELD);
+ccode(K_VELD,'file','./c_code/K_VELD.c');
+fix_c_code('./c_code/K_VELD.c');
+
+% reset workspace
+clear all;
+reset(symengine);
 
 %% derive equations for fusion of 321 sequence yaw measurement
 load('StatePrediction.mat');
@@ -488,7 +571,7 @@ angMeas = atan(Tbn(2,1)/Tbn(1,1));
 H_YAW321 = jacobian(angMeas,stateVector); % measurement Jacobian
 H_YAW321 = simplify(H_YAW321);
 ccode(H_YAW321,'file','./c_code/calcH_YAW321.c');
-fix_c_code('calcH_YAW321.c');
+fix_c_code('./c_code/calcH_YAW321.c');
 
 % reset workspace
 clear all;
@@ -502,7 +585,7 @@ angMeas = atan(-Tbn(1,2)/Tbn(2,2));
 H_YAW312 = jacobian(angMeas,stateVector); % measurement Jacobianclea
 H_YAW312 = simplify(H_YAW312);
 ccode(H_YAW312,'file','./c_code/calcH_YAW312.c');
-fix_c_code('calcH_YAW312.c');
+fix_c_code('./c_code/calcH_YAW312.c');
 
 % reset workspace
 clear all;
@@ -519,7 +602,7 @@ H_MAGD = simplify(H_MAGD);
 K_MAGD = (P*transpose(H_MAGD))/(H_MAGD*P*transpose(H_MAGD) + R_DECL);
 K_MAGD = simplify(K_MAGD);
 ccode([K_MAGD,H_MAGD'],'file','./c_code/calcMAGD.c');
-fix_c_code('calcMAGD.c');
+fix_c_code('./c_code/calcMAGD.c');
 
 % reset workspace
 clear all;
