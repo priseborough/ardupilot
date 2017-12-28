@@ -1375,12 +1375,19 @@ void DataFlash_Class::Log_Write_EKF3(AP_AHRS_NavEKF &ahrs)
     // write debug data for external nav scale factor estimation
     float scaleLog;
     float scaleLogSigma;
-    if (ahrs.get_NavEKF3().getScaleFactorDebug(-1, scaleLog, scaleLogSigma)) {
+    Vector3f delPosInnov,delPosInnovVar;
+    if (ahrs.get_NavEKF3().getScaleFactorDebug(-1, scaleLog, scaleLogSigma, delPosInnov, delPosInnovVar)) {
         struct log_ekfExtNavScaleDebug pkt12 = {
             LOG_PACKET_HEADER_INIT(LOG_XKFR_MSG),
             time_us : time_us,
             scaleLog : scaleLog,
             scaleLogSigma : scaleLogSigma,
+            innovX : delPosInnov.x,
+            innovY : delPosInnov.y,
+            innovZ : delPosInnov.z,
+            innovVarX : delPosInnovVar.x,
+            innovVarY : delPosInnovVar.y,
+            innovVarZ : delPosInnovVar.z
          };
         WriteBlock(&pkt12, sizeof(pkt12));
 
