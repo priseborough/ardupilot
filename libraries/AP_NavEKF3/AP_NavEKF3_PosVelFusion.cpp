@@ -241,6 +241,8 @@ void NavEKF3_core::SelectVelPosFusion()
     gpsDataToFuse = storedGPS.recall(gpsDataDelayed,imuDataDelayed.time_ms);
     // Determine if we need to fuse position and velocity data on this time step
     if (gpsDataToFuse && PV_AidingMode == AID_ABSOLUTE) {
+        horizPosMea.x = gpsDataDelayed.pos.x;
+        horizPosMea.y = gpsDataDelayed.pos.y;
         // correct GPS data for position offset of antenna phase centre relative to the IMU
         Vector3f posOffsetBody = AP::gps().get_antenna_offset(gpsDataDelayed.sensor_idx) - accelPosOffset;
         if (!posOffsetBody.is_zero()) {
@@ -252,8 +254,8 @@ void NavEKF3_core::SelectVelPosFusion()
                 gpsDataDelayed.vel -= velOffsetEarth;
             }
             Vector3f posOffsetEarth = prevTnb.mul_transpose(posOffsetBody);
-            horizPosMea.x = gpsDataDelayed.pos.x -= posOffsetEarth.x;
-            horizPosMea.y = gpsDataDelayed.pos.y -= posOffsetEarth.y;
+            horizPosMea.x -= -posOffsetEarth.x;
+            horizPosMea.y -= posOffsetEarth.y;
             gpsDataDelayed.hgt += posOffsetEarth.z;
         }
 
