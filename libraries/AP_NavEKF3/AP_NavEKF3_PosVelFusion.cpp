@@ -2002,20 +2002,25 @@ void NavEKF3_core::SelectExtNavFusion()
                 return;
 
             } else {
+                // calculate scale factor from NED to external nav axes
                 extNavScale = expf(stateStruct.scaleFactorLog);
                 extNavScaleInv = 1.0f / extNavScale;
+
+                // calculate delta position from previous to current measurement
                 extNavDelPosMea = (extNavDataDelayed.pos - extNavPosMeasPrev) * extNavScaleInv;
                 if (!extNavDataDelayed.frameIsNED) {
                     extNavDelPosMea = extNavToEkfRotMat * extNavDelPosMea;
                 }
                 extNavDelPosPred = stateStruct.position - extNavPosEstPrev;
                 innovExtNavPos = extNavDelPosPred - extNavDelPosMea;
+
+                // save prevoous frame values
                 extNavPosMeasPrev = extNavDataDelayed.pos;
                 extNavPosEstPrev = stateStruct.position;
+
                 extNavDelPosObsVar.x = sq(extNavDataDelayed.posErr * extNavScaleInv);
                 extNavDelPosObsVar.y = sq(extNavDataDelayed.posErr * extNavScaleInv);
                 extNavDelPosObsVar.z = sq(extNavDataDelayed.posErr * extNavScaleInv);
-
                 FuseDeltaPosUnscaled();
             }
         } else {
