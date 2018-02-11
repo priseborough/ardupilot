@@ -513,6 +513,7 @@ private:
 
     struct ext_nav_elements {
         bool            frameIsNED; // true if the data is in a NED navigation frame
+        bool            unitsAreSI; // true if the data length units are scaled in metres
         Vector3f        pos;        // XYZ position measured in a RH navigation frame (m)
         Quaternion      quat;       // quaternion describing the rotation from navigation to body frame
         float           posErr;     // spherical poition measurement error 1-std (m)

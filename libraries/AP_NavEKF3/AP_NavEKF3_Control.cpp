@@ -215,21 +215,25 @@ void NavEKF3_core::setAidingMode()
             // GPS aiding is the preferred option unless excluded by the user
             if(readyToUseGPS() || readyToUseRangeBeacon()) {
                 PV_AidingMode = AID_ABSOLUTE;
-            } else if (readyToUseOptFlow() || readyToUseBodyOdm()) {
+            } else if (readyToUseOptFlow() || readyToUseBodyOdm() || (readyToUseExtNav() && useExtNavRelPosMethod)) {
                 PV_AidingMode = AID_RELATIVE;
             }
             break;
         }
         case AID_RELATIVE: {
+            // Find the minimum time without data required to trigger any check
+            uint16_t minTestTime_ms = MIN(frontend->tiltDriftTimeMax_ms, MIN(frontend->posRetryTimeNoVel_ms,frontend->posRetryTimeUseVel_ms));
             // Check if the fusion has timed out (flow measurements have been rejected for too long)
-            bool flowFusionTimeout = ((imuSampleTime_ms - prevFlowFuseTime_ms) > 5000);
+            bool flowFusionTimeout = ((imuSampleTime_ms - prevFlowFuseTime_ms) > minTestTime_ms);
             // Check if the fusion has timed out (body odometry measurements have been rejected for too long)
-            bool bodyOdmFusionTimeout = ((imuSampleTime_ms - prevBodyVelFuseTime_ms) > 5000);
+            bool bodyOdmFusionTimeout = ((imuSampleTime_ms - prevBodyVelFuseTime_ms) > minTestTime_ms);
+            // Check if the fusion has timed out (body odometry measurements have been rejected for too long)
+            bool extNavFusionTimeout = ((imuSampleTime_ms - extNavDelPosFuseTime_ms) > minTestTime_ms);
             // Enable switch to absolute position mode if GPS or range beacon data is available
             // If GPS or range beacons data is not available and flow fusion has timed out, then fall-back to no-aiding
             if(readyToUseGPS() || readyToUseRangeBeacon()) {
                 PV_AidingMode = AID_ABSOLUTE;
-            } else if (flowFusionTimeout && bodyOdmFusionTimeout) {
+            } else if (flowFusionTimeout && bodyOdmFusionTimeout && extNavFusionTimeout) {
                 PV_AidingMode = AID_NONE;
             }
             break;
@@ -250,15 +254,18 @@ void NavEKF3_core::setAidingMode()
             // Check if range beacon data is being used
             bool rngBcnUsed = (imuSampleTime_ms - lastRngBcnPassTime_ms <= minTestTime_ms);
 
+            // Check if external nav data is being used
+            bool extNavUsed = (imuSampleTime_ms - extNavDelPosFuseTime_ms <= minTestTime_ms);
+
             // Check if GPS is being used
             bool gpsPosUsed = (imuSampleTime_ms - lastPosPassTime_ms <= minTestTime_ms);
             bool gpsVelUsed = (imuSampleTime_ms - lastVelPassTime_ms <= minTestTime_ms);
 
             // Check if attitude drift has been constrained by a measurement source
-            bool attAiding = gpsPosUsed || gpsVelUsed || optFlowUsed || airSpdUsed || rngBcnUsed || bodyOdmUsed;
+            bool attAiding = gpsPosUsed || gpsVelUsed || optFlowUsed || airSpdUsed || rngBcnUsed || bodyOdmUsed || extNavUsed;
 
             // check if velocity drift has been constrained by a measurement source
-            bool velAiding = gpsVelUsed || airSpdUsed || optFlowUsed || bodyOdmUsed;
+            bool velAiding = gpsVelUsed || airSpdUsed || optFlowUsed || bodyOdmUsed || extNavUsed;
 
             // check if position drift has been constrained by a measurement source
             bool posAiding = gpsPosUsed || rngBcnUsed;

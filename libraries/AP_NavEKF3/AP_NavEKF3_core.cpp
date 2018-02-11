@@ -399,7 +399,7 @@ void NavEKF3_core::InitialiseVariables()
     extNavToEkfRotMat.c.z = 1.0f;
     ekfToExtNavRotTime_ms = 0;
     extNavFusionDelayed = false;
-    useExtNavRelPosMethod = false;
+    useExtNavRelPosMethod = true;
     extNavPosMeasPrev.zero();
     extNavPosEstPrev.zero();
     extNavPrevAvailable = false;
