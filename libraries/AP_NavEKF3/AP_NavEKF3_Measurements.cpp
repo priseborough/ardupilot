@@ -133,6 +133,96 @@ void NavEKF3_core::writeBodyFrameOdom(float quality, const Vector3f &delPos, con
 
 }
 
+void NavEKF3_core::writeExtNavData(bool scaleUnknown ,bool frameIsNED, const Vector3f &sensOffset, const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint32_t resetTime_ms)
+{
+    // limit update rate to maximum allowed by sensor buffers and fusion process
+    // don't try to write to buffer until the filter has been initialised
+    if ((timeStamp_ms - extNavMeasTime_ms) < frontend->sensorIntervalMin_ms) {
+        return;
+    } else {
+        extNavMeasTime_ms = timeStamp_ms;
+    }
+
+    if (resetTime_ms > extNavLastPosResetTime_ms) {
+        extNavDataNew.posReset = true;
+        extNavLastPosResetTime_ms = resetTime_ms;
+    } else {
+        extNavDataNew.posReset = false;
+    }
+
+    extNavDataNew.frameIsNED = frameIsNED;
+    extNavDataNew.pos = pos;
+    extNavDataNew.quat = quat;
+    extNavDataNew.posErr = posErr;
+    extNavDataNew.angErr = angErr;
+    extNavDataNew.body_offset = &sensOffset;
+    extNavDataNew.time_ms = timeStamp_ms;
+
+    storedExtNav.push(extNavDataNew);
+
+}
+
+// update the estimated misalignment between the EV navigation frame and the EKF navigation frame
+// and calculate a rotation matrix which rotates EV measurements into the EKF frame of reference
+void NavEKF3_core::calcExtVisRotMat()
+{
+    // calculate the quaternion that describes the rotation from EKF to external nav earth frames at the EKF fusion time horizon
+    Quaternion quat_inv = extNavDataDelayed.quat.inverse();
+    Quaternion quatError =  stateStruct.quat * quat_inv;
+    quatError.normalize();
+
+    // convert to a delta angle and apply a spike and low pass filter
+    Vector3f rotVec;
+    float delta;
+    float scaler;
+    if (quatError[0] >= 0.0f) {
+        delta = 2.0f * acosf(quatError[0]);
+        if (delta > 1e-6f) {
+            scaler = 1.0f / sinf(0.5f * delta);
+        } else {
+            quatError[0] = 1.0f;
+            scaler = 0.0f;
+        }
+    } else {
+        delta = 2 * acosf(-quatError[0]);
+        if (delta > 1e-6f) {
+            scaler = - 1.0f / sinf(0.5f * delta);
+        } else {
+            quatError[0] = 1.0f;
+            scaler = 0.0f;
+        }
+    }
+    rotVec.x = quatError[1] * scaler;
+    rotVec.y = quatError[2] * scaler;
+    rotVec.z = quatError[3] * scaler;
+
+    float rotVecLength = rotVec.length();
+    if (rotVecLength > 1e-6f) {
+        // Final operation to esnure rotation length is consistent with the quaternion delta
+        rotVec = rotVec * (delta / rotVecLength);
+
+        // apply an input limiter to protect from spikes
+        Vector3f inputDeltaVec = rotVec - ekfToExtNavRotVecFilt;
+        float inputDeltaVecLength = inputDeltaVec.length();
+        if (inputDeltaVecLength > 0.1f) {
+            rotVec = ekfToExtNavRotVecFilt + rotVec * (0.1f / inputDeltaVecLength);
+        }
+
+        // Apply a first order IIR low pass filter
+        const float omega = 0.2e-3f; // cutoff frequency in rad/mSec
+        float alpha = constrain_float(omega * (float)(imuDataDelayed.time_ms - ekfToExtNavRotTime_ms) , 0.0f , 1.0f);
+        ekfToExtNavRotTime_ms = imuDataDelayed.time_ms;
+        ekfToExtNavRotVecFilt = ekfToExtNavRotVecFilt * (1.0f - alpha) + rotVec * alpha;
+
+    }
+
+    // convert filtered vector to a quaternion and use the inverse to calculate the rotation matrix from
+    // external navigaton system to EKF reference frames.
+    quatError.from_axis_angle(ekfToExtNavRotVecFilt);
+    quatError.inverse().rotation_matrix(extNavToEkfRotMat);
+
+}
+
 void NavEKF3_core::writeWheelOdom(float delAng, float delTime, uint32_t timeStamp_ms, const Vector3f &posOffset, float radius)
 {
     // This is a simple hack to get wheel encoder data into the EKF and verify the interface sign conventions and units

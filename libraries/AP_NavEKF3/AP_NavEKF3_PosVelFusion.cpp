@@ -173,7 +173,7 @@ void NavEKF3_core::ResetHeight(void)
     zeroCols(P,9,9);
 
     // set the variances to the measurement variance
-    P[9][9] = posDownObsNoise;
+    P[9][9] = posDownObsVar;
 
     // Reset the vertical velocity state using GPS vertical velocity if we are airborne
     // Check that GPS vertical velocity data is available and can be used
@@ -241,6 +241,8 @@ void NavEKF3_core::SelectVelPosFusion()
     gpsDataToFuse = storedGPS.recall(gpsDataDelayed,imuDataDelayed.time_ms);
     // Determine if we need to fuse position and velocity data on this time step
     if (gpsDataToFuse && PV_AidingMode == AID_ABSOLUTE) {
+        horizPosMea.x = gpsDataDelayed.pos.x;
+        horizPosMea.y = gpsDataDelayed.pos.y;
         // correct GPS data for position offset of antenna phase centre relative to the IMU
         Vector3f posOffsetBody = AP::gps().get_antenna_offset(gpsDataDelayed.sensor_idx) - accelPosOffset;
         if (!posOffsetBody.is_zero()) {
@@ -252,11 +254,21 @@ void NavEKF3_core::SelectVelPosFusion()
                 gpsDataDelayed.vel -= velOffsetEarth;
             }
             Vector3f posOffsetEarth = prevTnb.mul_transpose(posOffsetBody);
-            gpsDataDelayed.pos.x -= posOffsetEarth.x;
-            gpsDataDelayed.pos.y -= posOffsetEarth.y;
+            horizPosMea.x -= -posOffsetEarth.x;
+            horizPosMea.y -= posOffsetEarth.y;
             gpsDataDelayed.hgt += posOffsetEarth.z;
         }
 
+        // calculate additional error in GPS position caused by manoeuvring
+        float manoeuvrePosError = frontend->gpsPosVarAccScale * accNavMag;
+
+        // set the observation variance for the GPS position measurement
+        // Use GPS reported position accuracy if available and floor at value set by GPS position noise parameter
+        if (gpsPosAccuracy > 0.0f) {
+            horizPosObsVar = sq(constrain_float(gpsPosAccuracy, frontend->_gpsHorizPosNoise, 100.0f));
+        } else {
+            horizPosObsVar = sq(constrain_float(frontend->_gpsHorizPosNoise, 0.1f, 10.0f)) + sq(manoeuvrePosError);
+        }
 
         // Don't fuse velocity data if GPS doesn't support it
         if (frontend->_fusionModeGPS <= 1) {
@@ -394,9 +406,6 @@ void NavEKF3_core::FuseVelPosNED()
         observation[4] = gpsDataDelayed.pos.y;
         observation[5] = -hgtMea;
 
-        // calculate additional error in GPS position caused by manoeuvring
-        float posErr = frontend->gpsPosVarAccScale * accNavMag;
-
         // estimate the GPS Velocity, GPS horiz position and height measurement variances.
         // Use different errors if operating without external aiding using an assumed position or velocity of zero
         if (PV_AidingMode == AID_NONE) {
@@ -423,19 +432,16 @@ void NavEKF3_core::FuseVelPosNED()
                 R_OBS[2] = sq(constrain_float(frontend->_gpsVertVelNoise,  0.05f, 5.0f)) + sq(frontend->gpsDVelVarAccScale  * accNavMag);
             }
             R_OBS[1] = R_OBS[0];
-            // Use GPS reported position accuracy if available and floor at value set by GPS position noise parameter
-            if (gpsPosAccuracy > 0.0f) {
-                R_OBS[3] = sq(constrain_float(gpsPosAccuracy, frontend->_gpsHorizPosNoise, 100.0f));
-            } else {
-                R_OBS[3] = sq(constrain_float(frontend->_gpsHorizPosNoise, 0.1f, 10.0f)) + sq(posErr);
-            }
-            R_OBS[4] = R_OBS[3];
+
+            // Set NE horizontal position observaton variance elements
+            R_OBS[4] = R_OBS[3] = horizPosObsVar;
+
             // For data integrity checks we use the same measurement variances as used to calculate the Kalman gains for all measurements except GPS horizontal velocity
-            // For horizontal GPs velocity we don't want the acceptance radius to increase with reported GPS accuracy so we use a value based on best GPs perfomrance
+            // For horizontal GPs velocity we don't want the acceptance radius to increase with reported GPS accuracy so we use a value based on best GPS perfomrance
             // plus a margin for manoeuvres. It is better to reject GPS horizontal velocity errors early
             for (uint8_t i=0; i<=2; i++) R_OBS_DATA_CHECKS[i] = sq(constrain_float(frontend->_gpsHorizVelNoise, 0.05f, 5.0f)) + sq(frontend->gpsNEVelVarAccScale * accNavMag);
         }
-        R_OBS[5] = posDownObsNoise;
+        R_OBS[5] = posDownObsVar;
         for (uint8_t i=3; i<=5; i++) R_OBS_DATA_CHECKS[i] = R_OBS[i];
 
         // if vertical GPS velocity data and an independent height source is being used, check to see if the GPS vertical velocity and altimeter
@@ -457,14 +463,15 @@ void NavEKF3_core::FuseVelPosNED()
         // test position measurements
         if (fusePosData) {
             // test horizontal position measurements
-            innovVelPos[3] = stateStruct.position.x - observation[3];
-            innovVelPos[4] = stateStruct.position.y - observation[4];
+            // apply an innovation consistency threshold test, but don't fail if bad IMU data
+            innovVelPos[3] = stateStruct.position.x - horizPosMea.x;
+            innovVelPos[4] = stateStruct.position.y - horizPosMea.y;
             varInnovVelPos[3] = P[7][7] + R_OBS_DATA_CHECKS[3];
             varInnovVelPos[4] = P[8][8] + R_OBS_DATA_CHECKS[4];
-            // apply an innovation consistency threshold test, but don't fail if bad IMU data
             float maxPosInnov2 = sq(MAX(0.01f * (float)frontend->_gpsPosInnovGate, 1.0f))*(varInnovVelPos[3] + varInnovVelPos[4]);
             posTestRatio = (sq(innovVelPos[3]) + sq(innovVelPos[4])) / maxPosInnov2;
             posHealth = ((posTestRatio < 1.0f) || badIMUdata);
+
             // use position data if healthy or timed out
             if (PV_AidingMode == AID_NONE) {
                 posHealth = true;
@@ -543,12 +550,14 @@ void NavEKF3_core::FuseVelPosNED()
         // test height measurements
         if (fuseHgtData) {
             // calculate height innovations
+            // calculate the innovation consistency test ratio
             innovVelPos[5] = stateStruct.position.z - observation[5];
             varInnovVelPos[5] = P[9][9] + R_OBS_DATA_CHECKS[5];
-            // calculate the innovation consistency test ratio
             hgtTestRatio = sq(innovVelPos[5]) / (sq(MAX(0.01f * (float)frontend->_hgtInnovGate, 1.0f)) * varInnovVelPos[5]);
+
             // fail if the ratio is > 1, but don't fail if bad IMU data
             hgtHealth = ((hgtTestRatio < 1.0f) || badIMUdata);
+
             // Fuse height data if healthy or timed out or in constant position mode
             if (hgtHealth || hgtTimeout || (PV_AidingMode == AID_NONE && onGround)) {
                 // Calculate a filtered value to be used by pre-flight health checks
@@ -658,13 +667,20 @@ void NavEKF3_core::FuseVelPosNED()
                     memset(&Kfusion[16], 0, 24);
                 }
 
+                // inhibit scale factor estimation by setting Kalman gains to zero
+                if (!inhibitScaleFactorState) {
+                    Kfusion[22] = P[22][stateIndex]*SK;
+                } else {
+                    Kfusion[22] = 0.0f;
+                }
+
                 // inhibit wind state estimation by setting Kalman gains to zero
                 if (!inhibitWindStates) {
-                    Kfusion[22] = P[22][stateIndex]*SK;
                     Kfusion[23] = P[23][stateIndex]*SK;
+                    Kfusion[24] = P[24][stateIndex]*SK;
                 } else {
-                    // zero indexes 22 to 23 = 2*4 bytes
-                    memset(&Kfusion[22], 0, 8);
+                    // zero indexes 23 to 24 = 2*4 bytes
+                    memset(&Kfusion[23], 0, 8);
                 }
 
                 // update the covariance - take advantage of direct observation of a single state at index = stateIndex to reduce computations
@@ -736,6 +752,329 @@ void NavEKF3_core::FuseVelPosNED()
 
     // stop performance timer
     hal.util->perf_end(_perf_FuseVelPosNED);
+}
+
+// fuse delta position observations with an unknown scale factor
+void NavEKF3_core::FuseDeltaPosUnscaled()
+{
+    Vector25 H_POS;
+
+    // Copy required states to local variable names
+    float pn = extNavDelPosPred.x;
+    float pe = extNavDelPosPred.y;
+    float pd = extNavDelPosPred.z;
+
+    // Fuse X, Y and Z axis measurements sequentially assuming observation errors are uncorrelated
+    for (uint8_t obsIndex=0; obsIndex<=2; obsIndex++) {
+
+        // calculate observation jacobians and Kalman gains
+        if (obsIndex == 0) {
+            // calculate N axis observation Jacobian
+            memset(&H_POS, 0, sizeof(H_POS));
+            H_POS[7] = extNavScale;
+            H_POS[22] = pn*extNavScale;
+
+            // calculate N axis Kalman gains
+            float t2 = stateStruct.scaleFactorLog*2.0f;
+            float t3 = expf(t2);
+            float t4 = extNavScale;
+            float t5 = P[7][7]*t3;
+            float t6 = P[22][7]*pn*t3;
+            float t7 = P[7][22]*pn*t3;
+            float t8 = pn*pn;
+            float t9 = P[22][22]*t3*t8;
+            varInnovExtNavPos[0] = extNavDelPosObsVar.x+t5+t6+t7+t9;
+            float t11 = 1.0f/varInnovExtNavPos[0];
+
+            Kfusion[0] = t4*t11*(P[0][7]+P[0][22]*pn);
+            Kfusion[1] = t4*t11*(P[1][7]+P[1][22]*pn);
+            Kfusion[2] = t4*t11*(P[2][7]+P[2][22]*pn);
+            Kfusion[3] = t4*t11*(P[3][7]+P[3][22]*pn);
+            Kfusion[4] = t4*t11*(P[4][7]+P[4][22]*pn);
+            Kfusion[5] = t4*t11*(P[5][7]+P[5][22]*pn);
+            Kfusion[6] = t4*t11*(P[6][7]+P[6][22]*pn);
+            Kfusion[7] = t4*t11*(P[7][7]+P[7][22]*pn);
+            Kfusion[8] = t4*t11*(P[8][7]+P[8][22]*pn);
+            Kfusion[9] = t4*t11*(P[9][7]+P[9][22]*pn);
+
+            if (!inhibitDelAngBiasStates) {
+                Kfusion[10] = t4*t11*(P[10][7]+P[10][22]*pn);
+                Kfusion[11] = t4*t11*(P[11][7]+P[11][22]*pn);
+                Kfusion[12] = t4*t11*(P[12][7]+P[12][22]*pn);
+            } else {
+                // zero indexes 10 to 12 = 3*4 bytes
+                memset(&Kfusion[10], 0, 12);
+            }
+
+            if (!inhibitDelVelBiasStates) {
+                Kfusion[13] = t4*t11*(P[13][7]+P[13][22]*pn);
+                Kfusion[14] = t4*t11*(P[14][7]+P[14][22]*pn);
+                Kfusion[15] = t4*t11*(P[15][7]+P[15][22]*pn);
+            } else {
+                // zero indexes 13 to 15 = 3*4 bytes
+                memset(&Kfusion[13], 0, 12);
+            }
+
+            if (!inhibitMagStates) {
+                Kfusion[16] = t4*t11*(P[16][7]+P[16][22]*pn);
+                Kfusion[17] = t4*t11*(P[17][7]+P[17][22]*pn);
+                Kfusion[18] = t4*t11*(P[18][7]+P[18][22]*pn);
+                Kfusion[19] = t4*t11*(P[19][7]+P[19][22]*pn);
+                Kfusion[20] = t4*t11*(P[20][7]+P[20][22]*pn);
+                Kfusion[21] = t4*t11*(P[21][7]+P[21][22]*pn);
+            } else {
+                // zero indexes 16 to 21 = 6*4 bytes
+                memset(&Kfusion[16], 0, 24);
+            }
+
+            if (!inhibitScaleFactorState) {
+                Kfusion[22] = t4*t11*(P[22][7]+P[22][22]*pn);
+            } else {
+                Kfusion[22] = 0.0f;
+            }
+
+            if (!inhibitWindStates) {
+                Kfusion[23] = t4*t11*(P[23][7]+P[23][22]*pn);
+                Kfusion[24] = t4*t11*(P[24][7]+P[24][22]*pn);
+            } else {
+                // zero indexes 23 to 24 = 2*4 bytes
+                memset(&Kfusion[23], 0, 8);
+            }
+
+        } else if (obsIndex == 1) {
+            // calculate E axis observation Jacobian
+            memset(&H_POS, 0, sizeof(H_POS));
+            H_POS[8] = extNavScale;
+            H_POS[22] = pe*extNavScale;
+
+            // calculate E axis Kalman gains
+            float t2 = stateStruct.scaleFactorLog*2.0f;
+            float t3 = exp(t2);
+            float t4 = extNavScale;
+            float t5 = P[8][8]*t3;
+            float t6 = P[22][8]*pe*t3;
+            float t7 = P[8][22]*pe*t3;
+            float t8 = pe*pe;
+            float t9 = P[22][22]*t3*t8;
+            varInnovExtNavPos[1] = extNavDelPosObsVar.y +t5+t6+t7+t9;
+            float t11 = 1.0f/varInnovExtNavPos[1];
+
+            Kfusion[0] = t4*t11*(P[0][8]+P[0][22]*pe);
+            Kfusion[1] = t4*t11*(P[1][8]+P[1][22]*pe);
+            Kfusion[2] = t4*t11*(P[2][8]+P[2][22]*pe);
+            Kfusion[3] = t4*t11*(P[3][8]+P[3][22]*pe);
+            Kfusion[4] = t4*t11*(P[4][8]+P[4][22]*pe);
+            Kfusion[5] = t4*t11*(P[5][8]+P[5][22]*pe);
+            Kfusion[6] = t4*t11*(P[6][8]+P[6][22]*pe);
+            Kfusion[7] = t4*t11*(P[7][8]+P[7][22]*pe);
+            Kfusion[8] = t4*t11*(P[8][8]+P[8][22]*pe);
+            Kfusion[9] = t4*t11*(P[9][8]+P[9][22]*pe);
+
+            if (!inhibitDelAngBiasStates) {
+                Kfusion[10] = t4*t11*(P[10][8]+P[10][22]*pe);
+                Kfusion[11] = t4*t11*(P[11][8]+P[11][22]*pe);
+                Kfusion[12] = t4*t11*(P[12][8]+P[12][22]*pe);
+            } else {
+                // zero indexes 10 to 12 = 3*4 bytes
+                memset(&Kfusion[10], 0, 12);
+            }
+
+            if (!inhibitDelVelBiasStates) {
+                Kfusion[13] = t4*t11*(P[13][8]+P[13][22]*pe);
+                Kfusion[14] = t4*t11*(P[14][8]+P[14][22]*pe);
+                Kfusion[15] = t4*t11*(P[15][8]+P[15][22]*pe);
+            } else {
+                // zero indexes 13 to 15 = 3*4 bytes
+                memset(&Kfusion[13], 0, 12);
+            }
+
+            if (!inhibitMagStates) {
+                Kfusion[16] = t4*t11*(P[16][8]+P[16][22]*pe);
+                Kfusion[17] = t4*t11*(P[17][8]+P[17][22]*pe);
+                Kfusion[18] = t4*t11*(P[18][8]+P[18][22]*pe);
+                Kfusion[19] = t4*t11*(P[19][8]+P[19][22]*pe);
+                Kfusion[20] = t4*t11*(P[20][8]+P[20][22]*pe);
+                Kfusion[21] = t4*t11*(P[21][8]+P[21][22]*pe);
+            } else {
+                // zero indexes 16 to 21 = 6*4 bytes
+                memset(&Kfusion[16], 0, 24);
+            }
+
+            if (!inhibitScaleFactorState) {
+                Kfusion[22] = t4*t11*(P[22][8]+P[22][22]*pe);
+            } else {
+                Kfusion[22] = 0.0f;
+            }
+
+            if (!inhibitWindStates) {
+                Kfusion[23] = t4*t11*(P[23][8]+P[23][22]*pe);
+                Kfusion[24] = t4*t11*(P[24][8]+P[24][22]*pe);
+            } else {
+                // zero indexes 23 to 24 = 2*4 bytes
+                memset(&Kfusion[23], 0, 8);
+            }
+
+        } else if (obsIndex == 2) {
+            // calculate D axis observation Jacobian
+            memset(&H_POS, 0, sizeof(H_POS));
+            H_POS[9] = extNavScale;
+            H_POS[22] = pd*extNavScale;
+
+            // calculate D axis Kalman gains
+            float t2 = stateStruct.scaleFactorLog*2.0f;
+            float t3 = exp(t2);
+            float t4 = extNavScale;
+            float t5 = P[9][9]*t3;
+            float t6 = P[9][22]*pd*t3;
+            float t7 = P[22][9]*pd*t3;
+            float t8 = pd*pd;
+            float t9 = P[22][22]*t3*t8;
+            varInnovExtNavPos[2] = extNavDelPosObsVar.z+t5+t6+t7+t9;
+            float t11 = 1.0f/varInnovExtNavPos[2];
+
+            Kfusion[0] = t4*t11*(P[0][9]+P[0][22]*pd);
+            Kfusion[1] = t4*t11*(P[1][9]+P[1][22]*pd);
+            Kfusion[2] = t4*t11*(P[2][9]+P[2][22]*pd);
+            Kfusion[3] = t4*t11*(P[3][9]+P[3][22]*pd);
+            Kfusion[4] = t4*t11*(P[4][9]+P[4][22]*pd);
+            Kfusion[5] = t4*t11*(P[5][9]+P[5][22]*pd);
+            Kfusion[6] = t4*t11*(P[6][9]+P[6][22]*pd);
+            Kfusion[7] = t4*t11*(P[7][9]+P[7][22]*pd);
+            Kfusion[8] = t4*t11*(P[8][9]+P[8][22]*pd);
+            Kfusion[9] = t4*t11*(P[9][9]+P[9][22]*pd);
+
+            if (!inhibitDelAngBiasStates) {
+                Kfusion[10] = t4*t11*(P[10][9]+P[10][22]*pd);
+                Kfusion[11] = t4*t11*(P[11][9]+P[11][22]*pd);
+                Kfusion[12] = t4*t11*(P[12][9]+P[12][22]*pd);
+            } else {
+                // zero indexes 10 to 12 = 3*4 bytes
+                memset(&Kfusion[10], 0, 12);
+            }
+
+            if (!inhibitDelVelBiasStates) {
+                Kfusion[13] = t4*t11*(P[13][9]+P[13][22]*pd);
+                Kfusion[14] = t4*t11*(P[14][9]+P[14][22]*pd);
+                Kfusion[15] = t4*t11*(P[15][9]+P[15][22]*pd);
+            } else {
+                // zero indexes 13 to 15 = 3*4 bytes
+                memset(&Kfusion[13], 0, 12);
+            }
+
+            if (!inhibitMagStates) {
+                Kfusion[16] = t4*t11*(P[16][9]+P[16][22]*pd);
+                Kfusion[17] = t4*t11*(P[17][9]+P[17][22]*pd);
+                Kfusion[18] = t4*t11*(P[18][9]+P[18][22]*pd);
+                Kfusion[19] = t4*t11*(P[19][9]+P[19][22]*pd);
+                Kfusion[20] = t4*t11*(P[20][9]+P[20][22]*pd);
+                Kfusion[21] = t4*t11*(P[21][9]+P[21][22]*pd);
+            } else {
+                // zero indexes 16 to 21 = 6*4 bytes
+                memset(&Kfusion[16], 0, 24);
+            }
+
+            if (!inhibitScaleFactorState) {
+                Kfusion[22] = t4*t11*(P[22][9]+P[22][22]*pd);
+            } else {
+                Kfusion[22] = 0.0f;
+            }
+
+            if (!inhibitWindStates) {
+                Kfusion[23] = t4*t11*(P[23][9]+P[23][22]*pd);
+                Kfusion[24] = t4*t11*(P[24][9]+P[24][22]*pd);
+            } else {
+                // zero indexes 23 to 24 = 2*4 bytes
+                memset(&Kfusion[23], 0, 8);
+            }
+
+        } else {
+            return;
+
+        }
+
+        // calculate the innovation consistency test ratio
+        // TODO add tuning parameter for gate
+        extNavPosTestRatio[obsIndex] = sq(innovExtNavPos[obsIndex]) / (sq(5.0f) * varInnovExtNavPos[obsIndex]);
+
+        // Check the innovation for consistency and don't fuse if out of bounds
+        // TODO also apply angular velocity magnitude check
+        if ((extNavPosTestRatio[obsIndex]) < 1.0f) {
+            // notify first time only
+            if (extNavDelPosFuseTime_ms == 0) {
+                gcs().send_text(MAV_SEVERITY_INFO, "EKF3 IMU%u fusing delta position data",(unsigned)imu_index);
+            }
+
+            // record the last time observations were accepted for fusion
+            extNavDelPosFuseTime_ms = imuSampleTime_ms;
+
+            // correct the covariance P = (I - K*H)*P
+            // take advantage of the empty columns in KH to reduce the
+            // number of operations
+            for (unsigned i = 0; i<=stateIndexLim; i++) {
+                for (unsigned j = 0; j<=6; j++) {
+                    KH[i][j] = 0.0f;
+                }
+                for (unsigned j = 7; j<=9; j++) {
+                    KH[i][j] = Kfusion[i] * H_POS[j];
+                }
+                for (unsigned j = 10; j<=21; j++) {
+                    KH[i][j] = 0.0f;
+                }
+                KH[i][22] = Kfusion[i] * H_POS[22];
+                for (unsigned j = 23; j<=24; j++) {
+                    KH[i][j] = 0.0f;
+                }
+            }
+            for (unsigned j = 0; j<=stateIndexLim; j++) {
+                for (unsigned i = 0; i<=stateIndexLim; i++) {
+                    ftype res = 0;
+                    res += KH[i][7] * P[7][j];
+                    res += KH[i][8] * P[8][j];
+                    res += KH[i][9] * P[9][j];
+                    res += KH[i][22] * P[22][j];
+                    KHP[i][j] = res;
+                }
+            }
+
+            // Check that we are not going to drive any variances negative and skip the update if so
+            bool healthyFusion = true;
+            for (uint8_t i= 0; i<=stateIndexLim; i++) {
+                if (KHP[i][i] > P[i][i]) {
+                    healthyFusion = false;
+                }
+            }
+
+            if (healthyFusion) {
+                // update the covariance matrix
+                for (uint8_t i= 0; i<=stateIndexLim; i++) {
+                    for (uint8_t j= 0; j<=stateIndexLim; j++) {
+                        P[i][j] = P[i][j] - KHP[i][j];
+                    }
+                }
+
+                // force the covariance matrix to be symmetrical and limit the variances to prevent ill-condiioning.
+                ForceSymmetry();
+                ConstrainVariances();
+
+                // correct the state vector
+                for (uint8_t j= 0; j<=stateIndexLim; j++) {
+                    statesArray[j] = statesArray[j] - Kfusion[j] * innovExtNavPos[obsIndex];
+                }
+                stateStruct.quat.normalize();
+
+            } else {
+                // record bad axis
+                if (obsIndex == 0) {
+                    faultStatus.bad_xpos = true;
+                } else if (obsIndex == 1) {
+                    faultStatus.bad_ypos = true;
+                } else if (obsIndex == 2) {
+                    faultStatus.bad_zpos = true;
+                }
+
+            }
+        }
+    }
 }
 
 /********************************************************
@@ -865,9 +1204,9 @@ void NavEKF3_core::selectHeightForFusion()
             // enable fusion
             fuseHgtData = true;
             // set the observation noise
-            posDownObsNoise = sq(constrain_float(frontend->_rngNoise, 0.1f, 10.0f));
+            posDownObsVar = sq(constrain_float(frontend->_rngNoise, 0.1f, 10.0f));
             // add uncertainty created by terrain gradient and vehicle tilt
-            posDownObsNoise += sq(rangeDataDelayed.rng * frontend->_terrGradMax) * MAX(0.0f , (1.0f - sq(prevTnb.c.z)));
+            posDownObsVar += sq(rangeDataDelayed.rng * frontend->_terrGradMax) * MAX(0.0f , (1.0f - sq(prevTnb.c.z)));
         } else {
             // disable fusion if tilted too far
             fuseHgtData = false;
@@ -879,9 +1218,9 @@ void NavEKF3_core::selectHeightForFusion()
         fuseHgtData = true;
         // set the observation noise using receiver reported accuracy or the horizontal noise scaled for typical VDOP/HDOP ratio
         if (gpsHgtAccuracy > 0.0f) {
-            posDownObsNoise = sq(constrain_float(gpsHgtAccuracy, 1.5f * frontend->_gpsHorizPosNoise, 100.0f));
+            posDownObsVar = sq(constrain_float(gpsHgtAccuracy, 1.5f * frontend->_gpsHorizPosNoise, 100.0f));
         } else {
-            posDownObsNoise = sq(constrain_float(1.5f * frontend->_gpsHorizPosNoise, 0.1f, 10.0f));
+            posDownObsVar = sq(constrain_float(1.5f * frontend->_gpsHorizPosNoise, 0.1f, 10.0f));
         }
     } else if (baroDataToFuse && (activeHgtSource == HGT_SOURCE_BARO)) {
         // using Baro data
@@ -889,10 +1228,10 @@ void NavEKF3_core::selectHeightForFusion()
         // enable fusion
         fuseHgtData = true;
         // set the observation noise
-        posDownObsNoise = sq(constrain_float(frontend->_baroAltNoise, 0.1f, 10.0f));
+        posDownObsVar = sq(constrain_float(frontend->_baroAltNoise, 0.1f, 10.0f));
         // reduce weighting (increase observation noise) on baro if we are likely to be in ground effect
         if (getTakeoffExpected() || getTouchdownExpected()) {
-            posDownObsNoise *= frontend->gndEffectBaroScaler;
+            posDownObsVar *= frontend->gndEffectBaroScaler;
         }
         // If we are in takeoff mode, the height measurement is limited to be no less than the measurement at start of takeoff
         // This prevents negative baro disturbances due to copter downwash corrupting the EKF altitude during initial ascent
@@ -920,7 +1259,7 @@ void NavEKF3_core::selectHeightForFusion()
 */
 void NavEKF3_core::FuseBodyVel()
 {
-    Vector24 H_VEL;
+    Vector25 H_VEL;
     Vector3f bodyVelPred;
 
     // Copy required states to local variable names
@@ -957,7 +1296,7 @@ void NavEKF3_core::FuseBodyVel()
             H_VEL[4] = q0*q0+q1*q1-q2*q2-q3*q3;
             H_VEL[5] = q0*q3*2.0f+q1*q2*2.0f;
             H_VEL[6] = q0*q2*-2.0f+q1*q3*2.0f;
-            for (uint8_t index = 7; index < 24; index++) {
+            for (uint8_t index = 7; index <= 24; index++) {
                 H_VEL[index] = 0.0f;
             }
 
@@ -1113,12 +1452,18 @@ void NavEKF3_core::FuseBodyVel()
                 memset(&Kfusion[16], 0, 24);
             }
 
-            if (!inhibitWindStates) {
+            if (!inhibitScaleFactorState) {
                 Kfusion[22] = t77*(P[22][5]*t4+P[22][4]*t9+P[22][0]*t14-P[22][6]*t11+P[22][1]*t18-P[22][2]*t21+P[22][3]*t24);
-                Kfusion[23] = t77*(P[23][5]*t4+P[23][4]*t9+P[23][0]*t14-P[23][6]*t11+P[23][1]*t18-P[23][2]*t21+P[23][3]*t24);
             } else {
-                // zero indexes 22 to 23 = 2*4 bytes
-                memset(&Kfusion[22], 0, 8);
+                Kfusion[22] = 0.0f;
+            }
+
+            if (!inhibitWindStates) {
+                Kfusion[23] = t77*(P[23][5]*t4+P[23][4]*t9+P[23][0]*t14-P[23][6]*t11+P[23][1]*t18-P[23][2]*t21+P[23][3]*t24);
+                Kfusion[24] = t77*(P[24][5]*t4+P[24][4]*t9+P[24][0]*t14-P[24][6]*t11+P[24][1]*t18-P[24][2]*t21+P[24][3]*t24);
+            } else {
+                // zero indexes 23 to 24 = 2*4 bytes
+                memset(&Kfusion[23], 0, 8);
             }
         } else if (obsIndex == 1) {
             // calculate Y axis observation Jacobian
@@ -1129,7 +1474,7 @@ void NavEKF3_core::FuseBodyVel()
             H_VEL[4] = q0*q3*-2.0f+q1*q2*2.0f;
             H_VEL[5] = q0*q0-q1*q1+q2*q2-q3*q3;
             H_VEL[6] = q0*q1*2.0f+q2*q3*2.0f;
-            for (uint8_t index = 7; index < 24; index++) {
+            for (uint8_t index = 7; index <= 24; index++) {
                 H_VEL[index] = 0.0f;
             }
 
@@ -1285,12 +1630,18 @@ void NavEKF3_core::FuseBodyVel()
                 memset(&Kfusion[16], 0, 24);
             }
 
-            if (!inhibitWindStates) {
+            if (!inhibitScaleFactorState) {
                 Kfusion[22] = t77*(-P[22][4]*t3+P[22][5]*t8+P[22][0]*t15+P[22][6]*t12+P[22][1]*t18+P[22][2]*t22-P[22][3]*t25);
-                Kfusion[23] = t77*(-P[23][4]*t3+P[23][5]*t8+P[23][0]*t15+P[23][6]*t12+P[23][1]*t18+P[23][2]*t22-P[23][3]*t25);
             } else {
-                // zero indexes 22 to 23 = 2*4 bytes
-                memset(&Kfusion[22], 0, 8);
+                Kfusion[22] = 0.0f;
+            }
+
+            if (!inhibitWindStates) {
+                Kfusion[23] = t77*(-P[23][4]*t3+P[23][5]*t8+P[23][0]*t15+P[23][6]*t12+P[23][1]*t18+P[23][2]*t22-P[23][3]*t25);
+                Kfusion[24] = t77*(-P[24][4]*t3+P[24][5]*t8+P[24][0]*t15+P[24][6]*t12+P[24][1]*t18+P[24][2]*t22-P[24][3]*t25);
+            } else {
+                // zero indexes 23 to 24 = 2*4 bytes
+                memset(&Kfusion[23], 0, 8);
             }
         } else if (obsIndex == 2) {
             // calculate Z axis observation Jacobian
@@ -1301,7 +1652,7 @@ void NavEKF3_core::FuseBodyVel()
             H_VEL[4] = q0*q2*2.0f+q1*q3*2.0f;
             H_VEL[5] = q0*q1*-2.0f+q2*q3*2.0f;
             H_VEL[6] = q0*q0-q1*q1-q2*q2+q3*q3;
-            for (uint8_t index = 7; index < 24; index++) {
+            for (uint8_t index = 7; index <= 24; index++) {
                 H_VEL[index] = 0.0f;
             }
 
@@ -1458,12 +1809,18 @@ void NavEKF3_core::FuseBodyVel()
                 memset(&Kfusion[16], 0, 24);
             }
 
-            if (!inhibitWindStates) {
+            if (!inhibitScaleFactorState) {
                 Kfusion[22] = t77*(P[22][4]*t4+P[22][0]*t14+P[22][6]*t9-P[22][5]*t11-P[22][1]*t17+P[22][2]*t20+P[22][3]*t24);
-                Kfusion[23] = t77*(P[23][4]*t4+P[23][0]*t14+P[23][6]*t9-P[23][5]*t11-P[23][1]*t17+P[23][2]*t20+P[23][3]*t24);
             } else {
-                // zero indexes 22 to 23 = 2*4 bytes
-                memset(&Kfusion[22], 0, 8);
+                Kfusion[22] = 0.0f;
+            }
+
+            if (!inhibitWindStates) {
+                Kfusion[23] = t77*(P[23][4]*t4+P[23][0]*t14+P[23][6]*t9-P[23][5]*t11-P[23][1]*t17+P[23][2]*t20+P[23][3]*t24);
+                Kfusion[24] = t77*(P[24][4]*t4+P[24][0]*t14+P[24][6]*t9-P[24][5]*t11-P[24][1]*t17+P[24][2]*t20+P[24][3]*t24);
+            } else {
+                // zero indexes 23 to 24 = 2*4 bytes
+                memset(&Kfusion[23], 0, 8);
             }
         } else {
             return;
@@ -1606,6 +1963,87 @@ void NavEKF3_core::SelectBodyOdomFusion()
 
         }
 
+    }
+}
+
+// select fusion of external navigation measurements
+void NavEKF3_core::SelectExtNavFusion()
+{
+    // Check if the magnetometer has been fused on that time step and the filter is running at faster than 200 Hz
+    // If so, don't fuse measurements on this time step to reduce frame over-runs
+    // Only allow one time slip to prevent high rate magnetometer data preventing fusion of other measurements
+    if (magFusePerformed && (dtIMUavg < 0.005f) && !extNavFusionDelayed) {
+        extNavFusionDelayed = true;
+        return;
+    } else {
+        extNavFusionDelayed = false;
+    }
+
+    // Check for data at the fusion time horizon
+    if (storedExtNav.recall(extNavDataDelayed, imuDataDelayed.time_ms)) {
+
+        useExtNavRelPosMethod = !extNavDataDelayed.frameIsNED || !inhibitScaleFactorState || filterStatus.flags.using_gps;
+
+        // If external nav is not using NED, calculate the rotation required to convert measurements
+        if (!extNavDataDelayed.frameIsNED) {
+            calcExtVisRotMat();
+        }
+
+        if (useExtNavRelPosMethod) {
+            if ((imuDataDelayed.time_ms - extNavDelPosFuseTime_ms) > 1000) {
+                // Need to reinitialise the previous values used to calculate odometry delta
+                extNavPosMeasPrev = extNavDataDelayed.pos;
+                extNavPosEstPrev = stateStruct.position;
+                gcs().send_text(MAV_SEVERITY_INFO, "EKF3 IMU%u reset ext nav odometry",(unsigned)imu_index);
+                inhibitScaleFactorState = false;
+                zeroRows(P,22,22);
+                zeroCols(P,22,22);
+                P[22][22] = 1.0f;
+                extNavDelPosFuseTime_ms = imuSampleTime_ms;
+                return;
+
+            } else {
+                // calculate scale factor from NED to external nav axes
+                extNavScale = expf(stateStruct.scaleFactorLog);
+                extNavScaleInv = 1.0f / extNavScale;
+
+                // calculate delta position from previous to current measurement
+                extNavDelPosMea = (extNavDataDelayed.pos - extNavPosMeasPrev) * extNavScaleInv;
+                if (!extNavDataDelayed.frameIsNED) {
+                    extNavDelPosMea = extNavToEkfRotMat * extNavDelPosMea;
+                }
+                extNavDelPosPred = stateStruct.position - extNavPosEstPrev;
+                innovExtNavPos = extNavDelPosPred - extNavDelPosMea;
+
+                // save prevoous frame values
+                extNavPosMeasPrev = extNavDataDelayed.pos;
+                extNavPosEstPrev = stateStruct.position;
+
+                extNavDelPosObsVar.x = sq(extNavDataDelayed.posErr * extNavScaleInv);
+                extNavDelPosObsVar.y = sq(extNavDataDelayed.posErr * extNavScaleInv);
+                extNavDelPosObsVar.z = sq(extNavDataDelayed.posErr * extNavScaleInv);
+
+                FuseDeltaPosUnscaled();
+
+                logScaleFactorFusion = true;
+            }
+        } else {
+            horizPosMea.x = extNavDataDelayed.pos.x;
+            horizPosMea.y = extNavDataDelayed.pos.y;
+            horizPosObsVar = sq(extNavDataDelayed.posErr);
+            hgtMea = - extNavDataDelayed.pos.x;
+            posDownObsVar = sq(extNavDataDelayed.posErr);
+
+            fusePosData = true;
+            fuseHgtData = true;
+            fuseVelData = false;
+
+            FuseVelPosNED();
+
+            fusePosData = false;
+            fuseHgtData = false;
+            fuseVelData = false;
+        }
     }
 }
 

@@ -265,7 +265,7 @@ void NavEKF3_core::EstimateTerrainOffset()
 */
 void NavEKF3_core::FuseOptFlow()
 {
-    Vector24 H_LOS;
+    Vector25 H_LOS;
     Vector3f relVelSensor;
     Vector14 SH_LOS;
     Vector2 losPred;
@@ -485,12 +485,18 @@ void NavEKF3_core::FuseOptFlow()
                 memset(&Kfusion[16], 0, 24);
             }
 
-            if (!inhibitWindStates) {
+            if (!inhibitScaleFactorState) {
                 Kfusion[22] = t78*(P[22][0]*t2*t5-P[22][4]*t2*t7+P[22][1]*t2*t15+P[22][6]*t2*t10+P[22][2]*t2*t19-P[22][3]*t2*t22+P[22][5]*t2*t27);
-                Kfusion[23] = t78*(P[23][0]*t2*t5-P[23][4]*t2*t7+P[23][1]*t2*t15+P[23][6]*t2*t10+P[23][2]*t2*t19-P[23][3]*t2*t22+P[23][5]*t2*t27);
             } else {
-                // zero indexes 22 to 23 = 2*4 bytes
-                memset(&Kfusion[22], 0, 8);
+                Kfusion[22] = 0.0f;
+            }
+
+            if (!inhibitWindStates) {
+                Kfusion[23] = t78*(P[23][0]*t2*t5-P[23][4]*t2*t7+P[23][1]*t2*t15+P[23][6]*t2*t10+P[23][2]*t2*t19-P[23][3]*t2*t22+P[23][5]*t2*t27);
+                Kfusion[24] = t78*(P[24][0]*t2*t5-P[24][4]*t2*t7+P[24][1]*t2*t15+P[24][6]*t2*t10+P[24][2]*t2*t19-P[24][3]*t2*t22+P[24][5]*t2*t27);
+            } else {
+                // zero indexes 23 to 24 = 2*4 bytes
+                memset(&Kfusion[23], 0, 8);
             }
 
         } else {
@@ -657,12 +663,18 @@ void NavEKF3_core::FuseOptFlow()
                 memset(&Kfusion[16], 0, 24);
             }
 
-            if (!inhibitWindStates) {
+            if (!inhibitScaleFactorState) {
                 Kfusion[22] = -t78*(P[22][0]*t2*t5+P[22][5]*t2*t8-P[22][6]*t2*t10+P[22][1]*t2*t16-P[22][2]*t2*t19+P[22][3]*t2*t22+P[22][4]*t2*t27);
-                Kfusion[23] = -t78*(P[23][0]*t2*t5+P[23][5]*t2*t8-P[23][6]*t2*t10+P[23][1]*t2*t16-P[23][2]*t2*t19+P[23][3]*t2*t22+P[23][4]*t2*t27);
             } else {
-                // zero indexes 22 to 23 = 2*4 bytes
-                memset(&Kfusion[22], 0, 8);
+                Kfusion[22] = 0.0f;
+            }
+
+            if (!inhibitWindStates) {
+                Kfusion[23] = -t78*(P[23][0]*t2*t5+P[23][5]*t2*t8-P[23][6]*t2*t10+P[23][1]*t2*t16-P[23][2]*t2*t19+P[23][3]*t2*t22+P[23][4]*t2*t27);
+                Kfusion[24] = -t78*(P[24][0]*t2*t5+P[24][5]*t2*t8-P[24][6]*t2*t10+P[24][1]*t2*t16-P[24][2]*t2*t19+P[24][3]*t2*t22+P[24][4]*t2*t27);
+            } else {
+                // zero indexes 23 to 24 = 2*4 bytes
+                memset(&Kfusion[23], 0, 8);
             }
         }
 
