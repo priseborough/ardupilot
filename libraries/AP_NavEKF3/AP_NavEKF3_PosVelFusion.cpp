@@ -1982,11 +1982,19 @@ void NavEKF3_core::SelectExtNavFusion()
     // Check for data at the fusion time horizon
     if (storedExtNav.recall(extNavDataDelayed, imuDataDelayed.time_ms)) {
 
-        useExtNavRelPosMethod = !extNavDataDelayed.frameIsNED || !inhibitScaleFactorState || filterStatus.flags.using_gps;
+        useExtNavRelPosMethod = !extNavDataDelayed.unitsAreSI || !extNavDataDelayed.frameIsNED || !inhibitScaleFactorState || filterStatus.flags.using_gps;
 
         // If external nav is not using NED, calculate the rotation required to convert measurements
         if (!extNavDataDelayed.frameIsNED) {
             calcExtVisRotMat();
+        }
+
+        // If units are SI, set scale factor to unity and disable scale factor state
+        if (extNavDataDelayed.unitsAreSI) {
+            inhibitScaleFactorState = true;
+            stateStruct.scaleFactorLog = 0.0f;
+        } else {
+            inhibitScaleFactorState = false;
         }
 
         if (useExtNavRelPosMethod) {
@@ -1995,10 +2003,13 @@ void NavEKF3_core::SelectExtNavFusion()
                 extNavPosMeasPrev = extNavDataDelayed.pos;
                 extNavPosEstPrev = stateStruct.position;
                 gcs().send_text(MAV_SEVERITY_INFO, "EKF3 IMU%u reset ext nav odometry",(unsigned)imu_index);
-                inhibitScaleFactorState = false;
                 zeroRows(P,22,22);
                 zeroCols(P,22,22);
-                P[22][22] = 1.0f;
+                if (extNavDataDelayed.unitsAreSI) {
+                    P[22][22] = 0.0f;
+                } else {
+                    P[22][22] = 1.0f;
+                }
                 extNavDelPosFuseTime_ms = imuSampleTime_ms;
                 return;
 

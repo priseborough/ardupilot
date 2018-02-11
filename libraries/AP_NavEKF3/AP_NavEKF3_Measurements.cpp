@@ -151,6 +151,7 @@ void NavEKF3_core::writeExtNavData(bool scaleUnknown ,bool frameIsNED, const Vec
     }
 
     extNavDataNew.frameIsNED = frameIsNED;
+    extNavDataNew.unitsAreSI = !scaleUnknown;
     extNavDataNew.pos = pos;
     extNavDataNew.quat = quat;
     extNavDataNew.posErr = posErr;
