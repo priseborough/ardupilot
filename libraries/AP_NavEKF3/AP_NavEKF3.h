@@ -181,6 +181,9 @@ public:
     // return the quaternions defining the rotation from NED to XYZ (body) axes
     void getQuaternion(int8_t instance, Quaternion &quat) const;
 
+    // return the quaternions defining the rotation from the EKF to the external nav reference frame
+    void getEkfToExtNavQuat(int8_t instance, Quaternion &quat) const;
+
     // return the innovations for the specified instance
     // An out of range instance (eg -1) returns data for the the primary instance
     void getInnovations(int8_t index, Vector3f &velInnov, Vector3f &posInnov, Vector3f &magInnov, float &tasInnov, float &yawInnov);
@@ -193,7 +196,7 @@ public:
     void getVariances(int8_t instance, float &velVar, float &posVar, float &hgtVar, Vector3f &magVar, float &tasVar, Vector2f &offset);
 
     // return the diagonals from the covariance matrix for the specified instance
-    void getStateVariances(int8_t instance, float stateVar[24]);
+    void getStateVariances(int8_t instance, float stateVar[25]);
 
     // should we use the compass? This is public so it can be used for
     // reporting via ahrs.use_compass()
@@ -219,6 +222,21 @@ public:
      * posOffset is the XYZ body frame position of the camera focal point (m)
     */
     void writeBodyFrameOdom(float quality, const Vector3f &delPos, const Vector3f &delAng, float delTime, uint32_t timeStamp_ms, const Vector3f &posOffset);
+
+    /*
+     * Write position and quaternion data from an external navigation system
+     *
+     * scaleUnknown : Boolean set to true when the position scaling is unknown or not in metres
+     * frameIsNED : Boolean set to true if the external mavigaton system is using a NED coordinate frame
+     * pos        : position in the RH navigation frame. Frame is assumed to be NED if frameIsNED is true. (m)
+     * quat       : quaternion desribing the the rotation from navigation frame to body frame
+     * posErr     : 1-sigma spherical position error (m)
+     * angErr     : 1-sigma spherical angle error (rad)
+     * timeStamp_ms : system time the measurement was taken, not the time it was received (mSec)
+     * resetTime_ms : system time of the last position reset request (mSec)
+     *
+    */
+    void writeExtNavData(bool scaleUnknown ,bool frameIsNED, const Vector3f &sensOffset, const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint32_t resetTime_ms);
 
     /*
      * Write odometry data from a wheel encoder. The axis of rotation is assumed to be parallel to the vehicle body axis
@@ -261,6 +279,8 @@ public:
     */
     bool getRangeBeaconDebug(int8_t instance, uint8_t &ID, float &rng, float &innov, float &innovVar, float &testRatio, Vector3f &beaconPosNED,
                              float &offsetHigh, float &offsetLow, Vector3f &posNED);
+
+    bool getScaleFactorDebug(int8_t instance, float &scaleLog, float &scaleLogSigma, Vector3f &innov, Vector3f &innovVar);
 
     // called by vehicle code to specify that a takeoff is happening
     // causes the EKF to compensate for expected barometer errors due to ground effect
@@ -417,6 +437,7 @@ private:
     AP_Float _visOdmVelErrMax;      // Observation 1-STD velocity error assumed for visual odometry sensor at lowest reported quality (m/s)
     AP_Float _visOdmVelErrMin;      // Observation 1-STD velocity error assumed for visual odometry sensor at highest reported quality (m/s)
     AP_Float _wencOdmVelErr;        // Observation 1-STD velocity error assumed for wheel odometry sensor (m/s)
+    AP_Float _extNavLogScaleNse;    // Process noise for natural log of scale factor converting from external nav to local NED earth frame
 
 
     // Tuning parameters
