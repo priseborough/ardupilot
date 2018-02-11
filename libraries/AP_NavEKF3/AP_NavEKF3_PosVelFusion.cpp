@@ -1990,7 +1990,7 @@ void NavEKF3_core::SelectExtNavFusion()
         }
 
         if (useExtNavRelPosMethod) {
-            if ((imuDataDelayed.time_ms - extNavDataDelayed.time_ms) > 1000) {
+            if ((imuDataDelayed.time_ms - extNavDelPosFuseTime_ms) > 1000) {
                 // Need to reinitialise the previous values used to calculate odometry delta
                 extNavPosMeasPrev = extNavDataDelayed.pos;
                 extNavPosEstPrev = stateStruct.position;
@@ -1999,6 +1999,7 @@ void NavEKF3_core::SelectExtNavFusion()
                 zeroRows(P,22,22);
                 zeroCols(P,22,22);
                 P[22][22] = 1.0f;
+                extNavDelPosFuseTime_ms = imuSampleTime_ms;
                 return;
 
             } else {
