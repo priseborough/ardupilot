@@ -993,7 +993,8 @@ void NavEKF3_core::FuseDeltaPosUnscaled()
         }
 
         // calculate the innovation consistency test ratio
-        // TODO add tuning parameter for gate
+        // use 5-sigma as harcoded default
+        // TODO add tuning parameter for gate -
         extNavPosTestRatio[obsIndex] = sq(innovExtNavPos[obsIndex]) / (sq(5.0f) * varInnovExtNavPos[obsIndex]);
 
         // Check the innovation for consistency and don't fuse if out of bounds

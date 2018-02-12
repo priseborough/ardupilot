@@ -579,7 +579,7 @@ const AP_Param::GroupInfo NavEKF3::var_info[] = {
     // @Param: SCL_NSE
     // @DisplayName: External nav scale process noise
     // @Description: This noise controls the growth of the vertical accelerometer delta velocity bias state error estimate. Increasing it makes accelerometer bias estimation faster and noisier.
-    // @Range: 0.00001 0.001
+    // @Range: 0.00001 0.01
     // @User: Advanced
     // @Units: 1/s
     AP_GROUPINFO("SCL_NSE", 54, NavEKF3, _extNavLogScaleNse, 0.001f),
