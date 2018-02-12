@@ -562,6 +562,7 @@ void  NavEKF3_core::updateFilterStatus(void)
     // init return value
     filterStatus.value = 0;
     bool doingBodyVelNav = (PV_AidingMode != AID_NONE) && (imuSampleTime_ms - prevBodyVelFuseTime_ms < 5000);
+    bool doingRelExtNav = (PV_AidingMode != AID_NONE) && (imuSampleTime_ms - extNavDelPosFuseTime_ms < 5000);
     bool doingFlowNav = (PV_AidingMode != AID_NONE) && flowDataValid;
     bool doingWindRelNav = !tasTimeout && assume_zero_sideslip();
     bool doingNormalGpsNav = !posTimeout && (PV_AidingMode == AID_ABSOLUTE);
@@ -576,7 +577,7 @@ void  NavEKF3_core::updateFilterStatus(void)
     filterStatus.flags.attitude = !stateStruct.quat.is_nan() && filterHealthy;   // attitude valid (we need a better check)
     filterStatus.flags.horiz_vel = someHorizRefData && filterHealthy;      // horizontal velocity estimate valid
     filterStatus.flags.vert_vel = someVertRefData && filterHealthy;        // vertical velocity estimate valid
-    filterStatus.flags.horiz_pos_rel = ((doingFlowNav && gndOffsetValid) || doingWindRelNav || doingNormalGpsNav || doingBodyVelNav) && filterHealthy;   // relative horizontal position estimate valid
+    filterStatus.flags.horiz_pos_rel = ((doingFlowNav && gndOffsetValid) || doingWindRelNav || doingNormalGpsNav || doingBodyVelNav || doingRelExtNav) && filterHealthy;   // relative horizontal position estimate valid
     filterStatus.flags.horiz_pos_abs = doingNormalGpsNav && filterHealthy; // absolute horizontal position estimate valid
     filterStatus.flags.vert_pos = !hgtTimeout && filterHealthy && !hgtNotAccurate; // vertical position estimate valid
     filterStatus.flags.terrain_alt = gndOffsetValid && filterHealthy;		// terrain height estimate valid

@@ -2026,7 +2026,7 @@ void NavEKF3_core::SelectExtNavFusion()
                 extNavDelPosPred = stateStruct.position - extNavPosEstPrev;
                 innovExtNavPos = extNavDelPosPred - extNavDelPosMea;
 
-                // save prevoous frame values
+                // save previous frame values
                 extNavPosMeasPrev = extNavDataDelayed.pos;
                 extNavPosEstPrev = stateStruct.position;
 
