@@ -934,7 +934,7 @@ void NavEKF3_core::CovariancePrediction()
     }
 
     if (!inhibitScaleFactorState) {
-        processNoiseVariance[12] = sq(frontend->_extNavLogScaleNse);
+        processNoiseVariance[12] = sq(dt * frontend->_extNavLogScaleNse);
     }
 
     if (!inhibitWindStates) {
