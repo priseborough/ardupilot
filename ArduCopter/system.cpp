@@ -341,40 +341,42 @@ bool Copter::ekf_position_ok()
 // optflow_position_ok - returns true if optical flow based position estimate is ok
 bool Copter::optflow_position_ok()
 {
-#if OPTFLOW != ENABLED && VISUAL_ODOMETRY_ENABLED != ENABLED
-    return false;
-#else
-    // return immediately if EKF not used
-    if (!ahrs.have_inertial_nav()) {
-        return false;
-    }
-
-    // return immediately if neither optflow nor visual odometry is enabled
-    bool enabled = false;
-#if OPTFLOW == ENABLED
-    if (optflow.enabled()) {
-        enabled = true;
-    }
-#endif
-#if VISUAL_ODOMETRY_ENABLED == ENABLED
-    if (g2.visual_odom.enabled()) {
-        enabled = true;
-    }
-#endif
-    if (!enabled) {
-        return false;
-    }
-
-    // get filter status from EKF
     nav_filter_status filt_status = inertial_nav.get_filter_status();
+    return (filt_status.flags.pred_horiz_pos_rel);
+//#if OPTFLOW != ENABLED && VISUAL_ODOMETRY_ENABLED != ENABLED
+//    return false;
+//#else
+//    // return immediately if EKF not used
+//    if (!ahrs.have_inertial_nav()) {
+//        return false;
+//    }
 
-    // if disarmed we accept a predicted horizontal relative position
-    if (!motors->armed()) {
-        return (filt_status.flags.pred_horiz_pos_rel);
-    } else {
-        return (filt_status.flags.horiz_pos_rel && !filt_status.flags.const_pos_mode);
-    }
-#endif
+//    // return immediately if neither optflow nor visual odometry is enabled
+//    bool enabled = false;
+//#if OPTFLOW == ENABLED
+//    if (optflow.enabled()) {
+//        enabled = true;
+//    }
+//#endif
+//#if VISUAL_ODOMETRY_ENABLED == ENABLED
+//    if (g2.visual_odom.enabled()) {
+//        enabled = true;
+//    }
+//#endif
+//    if (!enabled) {
+//        return false;
+//    }
+
+//    // get filter status from EKF
+//    nav_filter_status filt_status = inertial_nav.get_filter_status();
+
+//    // if disarmed we accept a predicted horizontal relative position
+//    if (!motors->armed()) {
+//        return (filt_status.flags.pred_horiz_pos_rel);
+//    } else {
+//        return (filt_status.flags.horiz_pos_rel && !filt_status.flags.const_pos_mode);
+//    }
+//#endif
 }
 
 // update_auto_armed - update status of auto_armed flag
