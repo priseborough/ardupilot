@@ -55,8 +55,8 @@ uint8_t NavEKF3_core::effective_magCal(void) const
 // avoid unnecessary operations
 void NavEKF3_core::setWindMagStateLearningMode()
 {
-    // If we are on ground, or in constant position mode, or don't have the right vehicle and sensing to estimate wind, inhibit wind states
-    bool setWindInhibit = (!useAirspeed() && !assume_zero_sideslip()) || onGround || (PV_AidingMode == AID_NONE);
+    // If we are not in flight, or in constant position mode, or don't have the right vehicle and sensing to estimate wind, inhibit wind states
+    bool setWindInhibit = !assume_zero_sideslip() || !inFlight || (PV_AidingMode == AID_NONE);
     if (!inhibitWindStates && setWindInhibit) {
         inhibitWindStates = true;
         updateStateIndexLim();
