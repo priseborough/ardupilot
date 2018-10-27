@@ -507,11 +507,11 @@ void NavEKF2_core::FuseVelPosNED()
             if (PV_AidingMode == AID_NONE) {
                 posHealth = true;
                 lastPosPassTime_ms = imuSampleTime_ms;
-            } else if (posHealth || posTimeout) {
+            } else if (posHealth || posTimeout || delVelClipReset) {
                 posHealth = true;
                 lastPosPassTime_ms = imuSampleTime_ms;
                 // if timed out or outside the specified uncertainty radius, reset to the GPS
-                if (posTimeout || ((P[6][6] + P[7][7]) > sq(float(frontend->_gpsGlitchRadiusMax)))) {
+                if (posTimeout || ((P[6][6] + P[7][7]) > sq(float(frontend->_gpsGlitchRadiusMax))) || delVelClipReset) {
                     // reset the position to the current GPS position
                     ResetPosition();
                     // reset the velocity to the GPS velocity
@@ -588,7 +588,7 @@ void NavEKF2_core::FuseVelPosNED()
             // fail if the ratio is > 1, but don't fail if bad IMU data
             hgtHealth = ((hgtTestRatio < 1.0f) || badIMUdata);
             // Fuse height data if healthy or timed out or in constant position mode
-            if (hgtHealth || hgtTimeout || (PV_AidingMode == AID_NONE && onGround)) {
+            if (hgtHealth || hgtTimeout || (PV_AidingMode == AID_NONE && onGround) || delVelClipReset) {
                 // Calculate a filtered value to be used by pre-flight health checks
                 // We need to filter because wind gusts can generate significant baro noise and we want to be able to detect bias errors in the inertial solution
                 if (onGround) {
@@ -601,7 +601,7 @@ void NavEKF2_core::FuseVelPosNED()
                 }
 
                 // if timed out, reset the height
-                if (hgtTimeout) {
+                if (hgtTimeout || delVelClipReset) {
                     ResetHeight();
                 }
 

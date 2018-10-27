@@ -256,6 +256,10 @@ void NavEKF2_core::InitialiseVariables()
     velOffsetNED.zero();
     posOffsetNED.zero();
     memset(&velPosObs, 0, sizeof(velPosObs));
+    delVelUseInhibit = false;
+    delVelClipReset = false;
+    delAngClipTime_ms = 0;
+
 
     // range beacon fusion variables
     memset(&rngBcnDataNew, 0, sizeof(rngBcnDataNew));
@@ -376,6 +380,11 @@ bool NavEKF2_core::InitialiseFilterBootstrap(void)
         readGpsData();
         readBaroData();
         return storedIMU.is_filled();
+    }
+
+    // don't align if accel data has been saturating recently
+    if (imuSampleTime_ms - delAngClipTime_ms < 500) {
+        return false;
     }
 
     // set re-used variables to zero
@@ -536,23 +545,28 @@ void NavEKF2_core::UpdateFilter(bool predict)
         // Predict the covariance growth
         CovariancePrediction();
 
-        // Update states using  magnetometer data
-        SelectMagFusion();
+        // don't run fusion steps when IMU is saturated
+        if (!delVelUseInhibit) {
 
-        // Update states using GPS and altimeter data
-        SelectVelPosFusion();
+            // Update states using  magnetometer data
+            SelectMagFusion();
 
-        // Update states using range beacon data
-        SelectRngBcnFusion();
+            // Update states using GPS and altimeter data
+            SelectVelPosFusion();
 
-        // Update states using optical flow data
-        SelectFlowFusion();
+            // Update states using range beacon data
+            SelectRngBcnFusion();
 
-        // Update states using airspeed data
-        SelectTasFusion();
+            // Update states using optical flow data
+            SelectFlowFusion();
 
-        // Update states using sideslip constraint assumption for fly-forward vehicles
-        SelectBetaFusion();
+            // Update states using airspeed data
+            SelectTasFusion();
+
+            // Update states using sideslip constraint assumption for fly-forward vehicles
+            SelectBetaFusion();
+
+        }
 
         // Update the filter status
         updateFilterStatus();
@@ -602,8 +616,12 @@ void NavEKF2_core::UpdateStrapdownEquationsNED()
     // have been rotated into that frame
     // * and + operators have been overloaded
     Vector3f delVelNav;  // delta velocity vector in earth axes
-    delVelNav  = prevTnb.mul_transpose(delVelCorrected);
-    delVelNav.z += GRAVITY_MSS*imuDataDelayed.delVelDT;
+    if (!delVelUseInhibit) {
+        delVelNav  = prevTnb.mul_transpose(delVelCorrected);
+        delVelNav.z += GRAVITY_MSS*imuDataDelayed.delVelDT;
+    } else {
+        delVelNav.zero();
+    }
 
     // calculate the body to nav cosine matrix
     stateStruct.quat.inverse().rotation_matrix(prevTnb);
@@ -635,6 +653,7 @@ void NavEKF2_core::UpdateStrapdownEquationsNED()
 
     // apply a trapezoidal integration to velocities to calculate position
     stateStruct.position += (stateStruct.velocity + lastVelocity) * (imuDataDelayed.delVelDT*0.5f);
+
 
     // accumulate the bias delta angle and time since last reset by an OF measurement arrival
     delAngBodyOF += delAngCorrected;
@@ -864,9 +883,13 @@ void NavEKF2_core::CovariancePrediction()
     for (uint8_t i= 0; i<=stateIndexLim; i++) processNoise[i] = sq(processNoise[i]);
 
     // set variables used to calculate covariance growth
-    dvx = imuDataDelayed.delVel.x;
-    dvy = imuDataDelayed.delVel.y;
-    dvz = imuDataDelayed.delVel.z;
+    if (!delVelUseInhibit) {
+        dvx = imuDataDelayed.delVel.x;
+        dvy = imuDataDelayed.delVel.y;
+        dvz = imuDataDelayed.delVel.z;
+    } else {
+        dvx = dvy = dvz = 0.0f;
+    }
     dax = imuDataDelayed.delAng.x;
     day = imuDataDelayed.delAng.y;
     daz = imuDataDelayed.delAng.z;

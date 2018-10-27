@@ -544,6 +544,24 @@ const AP_Param::GroupInfo NavEKF2::var_info[] = {
     // @RebootRequired: True
     AP_GROUPINFO("OGN_HGT_MASK", 49, NavEKF2, _originHgtMode, 0),
 
+    // @Param: ACC_CLIP_LIM
+    // @DisplayName: Accelermeter clip/saturation limit
+    // @Description: The accel data will not be used if any axis exceeds this value. Set to a valaue less than the accelerometer can measure
+    // @Range: 50.0 150.0
+    // @Increment: 10.0
+    // @User: Advanced
+    // @Units: m/s/s
+    AP_GROUPINFO("ACC_CLIP_LIM", 50, NavEKF2, _accClipLimit, 100.0f),
+
+    // @Param: ACC_CLIP_MS
+    // @DisplayName: Accelermeter clip recovery time
+    // @Description: Number of msec after last saturated IMU data before resuming use
+    // @Range: 300 3000
+    // @Increment: 100
+    // @User: Advanced
+    // @Units: mSec
+    AP_GROUPINFO("ACC_CLIP_MS", 51, NavEKF2, _accClipTime_ms, 1000),
+
     AP_GROUPEND
 };
 

@@ -931,6 +931,9 @@ private:
     Vector3f outputTrackError;      // attitude (rad), velocity (m/s) and position (m) tracking error magnitudes from the output observer
     Vector3f velOffsetNED;          // This adds to the earth frame velocity estimate at the IMU to give the velocity at the body origin (m/s)
     Vector3f posOffsetNED;          // This adds to the earth frame position estimate at the IMU to give the position at the body origin (m)
+    uint32_t delAngClipTime_ms;     // last time the IMU delta angle data exceeded the clip limit (msec)
+    bool  delVelUseInhibit;         // true if delts velocity data should not be used
+    bool  delVelClipReset;          // true if _delVelUseInhibit has been cleared on this frame and therefore a reset of position and velocity is required
 
     // variables used to calculate a vertical velocity that is kinematically consistent with the verical position
     float posDownDerivative;        // Rate of chage of vertical position (dPosD/dt) in m/s. This is the first time derivative of PosD.

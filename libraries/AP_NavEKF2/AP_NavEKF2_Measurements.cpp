@@ -323,6 +323,15 @@ void NavEKF2_core::readIMUData()
     // Get current time stamp
     imuDataNew.time_ms = imuSampleTime_ms;
 
+    float accel_lim = frontend->_accClipLimit * imuDataNew.delVelDT;
+    if (fabsf(imuDataNew.delVel.x) > accel_lim) {
+        delAngClipTime_ms = imuSampleTime_ms;
+    } else if (fabsf(imuDataNew.delVel.y) > accel_lim) {
+        delAngClipTime_ms = imuSampleTime_ms;
+    } else if (fabsf(imuDataNew.delVel.z) > accel_lim) {
+        delAngClipTime_ms = imuSampleTime_ms;
+    }
+
     // Accumulate the measurement time interval for the delta velocity and angle data
     imuDataDownSampledNew.delAngDT += imuDataNew.delAngDT;
     imuDataDownSampledNew.delVelDT += imuDataNew.delVelDT;
@@ -394,6 +403,19 @@ void NavEKF2_core::readIMUData()
         delVelCorrected = imuDataDelayed.delVel;
         correctDeltaAngle(delAngCorrected, imuDataDelayed.delAngDT);
         correctDeltaVelocity(delVelCorrected, imuDataDelayed.delVelDT);
+
+        // let filter know accel data has  been clipping recently and should not be used
+        if ((int32_t)(imuSampleTime_ms - delAngClipTime_ms) < (int32_t)frontend->_accClipTime_ms) {
+            delVelUseInhibit = true;
+            delVelClipReset = false;
+        } else {
+            if (delVelUseInhibit) {
+                delVelClipReset = true;
+            } else {
+                delVelClipReset = false;
+            }
+            delVelUseInhibit = false;
+        }
 
     } else {
         // we don't have new IMU data in the buffer so don't run filter updates on this time step
