@@ -238,6 +238,14 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
     // @Values: 0:Disable,1:Enable
     // @User: Advanced
     AP_GROUPINFO("SYNAIRSPEED", 27, AP_TECS, _use_synthetic_airspeed, 0),
+
+    // @Param: DASH_THR
+    // @DisplayName: Dash throttle increment (percentage)
+    // @Description: Use this parameter if your platform does not have an airspeed sensor.  It is the additional throttle above TRIM_THROTTLE required to fly straight and level at ARSPD_FBW_MAX. Set THROTTLE_NUDGE = 0 when using this. Adjust TRIM_THROTTLE so that the vehicle flies at ARSPD_FBW_MIN and adjust TECS_DASH_THR so that the vehicle flies at ARSPD_FBW_MAX when that speed is demanded. If TECS_DASH_THR is negative then the ability to control airspeed without an airspeed sensor is disabled and THROTTLE_NUDGE should be set to 1.
+    // @Range: -1 100
+    // @Increment: 0.1
+    // @User: User
+    AP_GROUPINFO("DASH_THR", 28, AP_TECS, _dashThrIncr, -1.0f),
     
     AP_GROUPEND
 };
@@ -340,7 +348,7 @@ void AP_TECS::_update_speed(float load_factor)
 
     // Convert equivalent airspeeds to true airspeeds
 
-    float EAS2TAS = _ahrs.get_EAS2TAS();
+    float EAS2TAS = constrain_float(_ahrs.get_EAS2TAS(), 0.1f, 1.1f);
     _TAS_dem = _EAS_dem * EAS2TAS;
     _TASmax   = aparm.airspeed_max * EAS2TAS;
     _TASmin   = aparm.airspeed_min * EAS2TAS;
@@ -706,15 +714,14 @@ float AP_TECS::_get_i_gain(void)
 void AP_TECS::_update_throttle_without_airspeed(int16_t throttle_nudge)
 {
     // Calculate throttle demand by interpolating between pitch and throttle limits
+    // If landing and we don't have an airspeed sensor and we have a non-zero
+    // TECS_LAND_THR param then use it
     float nomThr;
-    //If landing and we don't have an airspeed sensor and we have a non-zero
-    //TECS_LAND_THR param then use it
     if (_flags.is_doing_auto_land && _landThrottle >= 0) {
-        nomThr = (_landThrottle + throttle_nudge) * 0.01f;
+        nomThr = 0.01f * _landThrottle;
     } else { //not landing or not using TECS_LAND_THR parameter
-        nomThr = (aparm.throttle_cruise + throttle_nudge)* 0.01f;
+        nomThr = 0.01f * aparm.throttle_cruise;
     }
-
     if (_pitch_dem > 0.0f && _PITCHmaxf > 0.0f)
     {
         _throttle_dem = nomThr + (_THRmaxf - nomThr) * _pitch_dem / _PITCHmaxf;
@@ -728,14 +735,28 @@ void AP_TECS::_update_throttle_without_airspeed(int16_t throttle_nudge)
         _throttle_dem = nomThr;
     }
 
-    // Calculate additional throttle for turn drag compensation including throttle nudging
-    const Matrix3f &rotMat = _ahrs.get_rotation_body_to_ned();
     // Use the demanded rate of change of total energy as the feed-forward demand, but add
-    // additional component which scales with (1/cos(bank angle) - 1) to compensate for induced
-    // drag increase during turns.
+    // component which scales with (1/cos(bank angle) - 1) to compensate for induced
+    // drag increase and reduced stall margin during turns.
+    const Matrix3f &rotMat = _ahrs.get_rotation_body_to_ned();
     float cosPhi = sqrtf((rotMat.a.y*rotMat.a.y) + (rotMat.b.y*rotMat.b.y));
     float STEdot_dem = _rollComp * (1.0f/constrain_float(cosPhi * cosPhi , 0.1f, 1.0f) - 1.0f);
-    _throttle_dem = _throttle_dem + STEdot_dem / (_STEdot_max - _STEdot_min) * (_THRmaxf - _THRminf);
+
+    // if enabled, calculate throttle increment required to fly at demanded speed
+    float thrSpdIncr;
+    if (_dashThrIncr > 0.0f) {
+        thrSpdIncr = 0.01f * _dashThrIncr * MAX(_TAS_dem_adj - _TASmin, 0.0f) / MAX(_TASmax - _TASmin, 1.0f);
+    } else {
+        thrSpdIncr = 0.0f;
+    }
+
+    // Use throttle nudge to set the minimum throttle increment rather than being additve to the turn
+    // throttle increment. This improves endurance during loiter.
+    float turn_thr_inc = STEdot_dem / (_STEdot_max - _STEdot_min) * (_THRmaxf - _THRminf);
+    _throttle_dem += MAX(turn_thr_inc, MAX(0.01f * (float)throttle_nudge, thrSpdIncr));
+
+    // Constrain throttle demand but adjust upper limit to allow for additonal throttle required in turns
+    _throttle_dem = constrain_float(_throttle_dem, _THRminf, (_THRmaxf + turn_thr_inc));
 }
 
 void AP_TECS::_detect_bad_descent(void)
