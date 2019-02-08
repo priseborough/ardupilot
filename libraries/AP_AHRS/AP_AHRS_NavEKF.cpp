@@ -461,7 +461,17 @@ Vector3f AP_AHRS_NavEKF::wind_estimate(void) const
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
     case EKF_TYPE_SITL:
-        wind.zero();
+        {
+            bool ret = false;
+            if (EKF3.getWind(-1,wind)) {
+                 ret = true;
+            } else if (EKF2.getWind(-1,wind)) {
+                ret = true;
+            }
+            if (!ret) {
+                wind.zero();
+            }
+        }
         break;
 #endif
 
@@ -481,7 +491,65 @@ Vector3f AP_AHRS_NavEKF::wind_estimate(void) const
 // if we have an estimate
 bool AP_AHRS_NavEKF::airspeed_estimate(float *airspeed_ret) const
 {
-    return AP_AHRS_DCM::airspeed_estimate(airspeed_ret);
+    bool ret = false;
+    if (airspeed_sensor_enabled()) {
+        *airspeed_ret = _airspeed->get_airspeed();
+        return true;
+    }
+
+    if (!_flags.wind_estimation) {
+        return false;
+    }
+
+    // estimate it via nav velocity and wind estimates
+
+    // get wind estimates
+    Vector3f wind_vel;
+    switch (active_EKF_type()) {
+    case EKF_TYPE_NONE:
+        wind_vel = AP_AHRS_DCM::wind_estimate();
+        break;
+
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+    case EKF_TYPE_SITL:
+        if (EKF3.getWind(-1,wind_vel)) {
+             ret = true;
+        } else if (EKF2.getWind(-1,wind_vel)) {
+            ret = true;
+        } else {
+            ret = false;
+        }
+        break;
+#endif
+
+    case EKF_TYPE2:
+        ret = EKF2.getWind(-1,wind_vel);
+        break;
+
+    case EKF_TYPE3:
+        ret = EKF3.getWind(-1,wind_vel);
+        break;
+
+    }
+
+    // estimate it via nav velocity and wind estimates
+    Vector3f nav_vel;
+    float true_airspeed;
+    if (ret && have_inertial_nav() && get_velocity_NED(nav_vel)) {
+        Vector3f true_airspeed_vec = nav_vel - wind_vel;
+        true_airspeed = true_airspeed_vec.length();
+        float gnd_speed = nav_vel.length();
+        if (_wind_max > 0) {
+            float tas_lim_lower = MAX(0.0f, (gnd_speed - _wind_max));
+            float tas_lim_upper = MAX(tas_lim_lower, (gnd_speed + _wind_max));
+            true_airspeed = constrain_float(true_airspeed, tas_lim_lower, tas_lim_upper);
+        } else {
+            true_airspeed = MAX(0.0f, true_airspeed);
+        }
+        *airspeed_ret = true_airspeed / get_EAS2TAS();
+    }
+
+    return ret;
 }
 
 // true if compass is being used
