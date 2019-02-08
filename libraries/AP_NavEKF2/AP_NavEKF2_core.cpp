@@ -321,6 +321,10 @@ void NavEKF2_core::InitialiseVariables()
     yawAlignComplete = false;
 
     InitialiseVariablesMag();
+
+    // control of airspeed fusion
+    externalEasDefault = frontend->_easDefault;
+    airDataFusionWindOnly = false;
 }
 
 

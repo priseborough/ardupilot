@@ -554,6 +554,16 @@ const AP_Param::GroupInfo NavEKF2::var_info[] = {
     // @RebootRequired: True
     AP_GROUPINFO("EXTNAV_DELAY", 50, NavEKF2, _extnavDelay_ms, 10),
 
+    // @Param: EAS_DEFAULT
+    // @DisplayName: Default airspeed measurement (m/s)
+    // @Description: Set it to the nominal cruise equivalent airspeed to improve wind estimation and enable GPS denied dead-reckoning when there is no airspeed sensor fitted. Parameter values 5.0 m/s or lower will be ignored.
+    // @Range: 0.0 25.0
+    // @Increment: 0.5
+    // @User: Advanced
+    // @Units: m/s
+    // @RebootRequired: True
+    AP_GROUPINFO("EAS_DEFAULT", 51, NavEKF2, _easDefault, 0.0f),
+
     AP_GROUPEND
 };
 
@@ -922,12 +932,15 @@ void NavEKF2::getAccelZBias(int8_t instance, float &zbias) const
 }
 
 // return the NED wind speed estimates in m/s (positive is air moving in the direction of the axis)
-void NavEKF2::getWind(int8_t instance, Vector3f &wind) const
+// returns true if wind state estimation is active
+bool NavEKF2::getWind(int8_t instance, Vector3f &wind) const
 {
+    bool ret = false;
     if (instance < 0 || instance >= num_cores) instance = primary;
     if (core) {
-        core[instance].getWind(wind);
+        ret = core[instance].getWind(wind);
     }
+    return ret;
 }
 
 // return earth magnetic field estimates in measurement units / 1000
@@ -1492,5 +1505,16 @@ void NavEKF2::writeExtNavData(const Vector3f &sensOffset, const Vector3f &pos, c
         }
     }
 }
+
+// set value of default airspeed to be assumed when there is no airspeed measurement and we are doing wind estimation
+void NavEKF2::set_default_airspeed(float spd)
+{
+    if (core) {
+        for (uint8_t i=0; i<num_cores; i++) {
+            core[i].set_default_airspeed(spd);
+        }
+    }
+}
+
 
 #endif //HAL_CPU_CLASS

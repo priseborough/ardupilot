@@ -857,4 +857,10 @@ void NavEKF2_core::writeExtNavData(const Vector3f &sensOffset, const Vector3f &p
 
 }
 
+// set value of default airspeed to be assumed when there is no airspeed measurement and we are doing wind estimation
+void NavEKF2_core::set_default_airspeed(float spd)
+{
+    externalEasDefault = spd;
+}
+
 #endif // HAL_CPU_CLASS

@@ -197,11 +197,20 @@ uint32_t NavEKF2_core::getLastVelNorthEastReset(Vector2f &vel) const
 }
 
 // return the NED wind speed estimates in m/s (positive is air moving in the direction of the axis)
-void NavEKF2_core::getWind(Vector3f &wind) const
+// returns true if wind state estimation is active
+bool NavEKF2_core::getWind(Vector3f &wind) const
 {
-    wind.x = stateStruct.wind_vel.x;
-    wind.y = stateStruct.wind_vel.y;
-    wind.z = 0.0f; // currently don't estimate this
+    if (!inhibitWindStates) {
+        wind.x = stateStruct.wind_vel.x;
+        wind.y = stateStruct.wind_vel.y;
+        wind.z = 0.0f; // currently don't estimate this
+        return true;
+    } else {
+        wind.x = 0.0f;
+        wind.y = 0.0f;
+        wind.z = 0.0f;
+        return false;
+    }
 }
 
 

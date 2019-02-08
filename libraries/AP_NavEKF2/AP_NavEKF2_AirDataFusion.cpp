@@ -80,26 +80,29 @@ void NavEKF2_core::FuseAirspeed()
             faultStatus.bad_airspeed = true;
             return;
         }
-        Kfusion[0] = SK_TAS*(P[0][3]*SH_TAS[2] - P[0][22]*SH_TAS[2] + P[0][4]*SH_TAS[1] - P[0][23]*SH_TAS[1] + P[0][5]*vd*SH_TAS[0]);
-        Kfusion[1] = SK_TAS*(P[1][3]*SH_TAS[2] - P[1][22]*SH_TAS[2] + P[1][4]*SH_TAS[1] - P[1][23]*SH_TAS[1] + P[1][5]*vd*SH_TAS[0]);
-        Kfusion[2] = SK_TAS*(P[2][3]*SH_TAS[2] - P[2][22]*SH_TAS[2] + P[2][4]*SH_TAS[1] - P[2][23]*SH_TAS[1] + P[2][5]*vd*SH_TAS[0]);
-        Kfusion[3] = SK_TAS*(P[3][3]*SH_TAS[2] - P[3][22]*SH_TAS[2] + P[3][4]*SH_TAS[1] - P[3][23]*SH_TAS[1] + P[3][5]*vd*SH_TAS[0]);
-        Kfusion[4] = SK_TAS*(P[4][3]*SH_TAS[2] - P[4][22]*SH_TAS[2] + P[4][4]*SH_TAS[1] - P[4][23]*SH_TAS[1] + P[4][5]*vd*SH_TAS[0]);
-        Kfusion[5] = SK_TAS*(P[5][3]*SH_TAS[2] - P[5][22]*SH_TAS[2] + P[5][4]*SH_TAS[1] - P[5][23]*SH_TAS[1] + P[5][5]*vd*SH_TAS[0]);
-        Kfusion[6] = SK_TAS*(P[6][3]*SH_TAS[2] - P[6][22]*SH_TAS[2] + P[6][4]*SH_TAS[1] - P[6][23]*SH_TAS[1] + P[6][5]*vd*SH_TAS[0]);
-        Kfusion[7] = SK_TAS*(P[7][3]*SH_TAS[2] - P[7][22]*SH_TAS[2] + P[7][4]*SH_TAS[1] - P[7][23]*SH_TAS[1] + P[7][5]*vd*SH_TAS[0]);
-        Kfusion[8] = SK_TAS*(P[8][3]*SH_TAS[2] - P[8][22]*SH_TAS[2] + P[8][4]*SH_TAS[1] - P[8][23]*SH_TAS[1] + P[8][5]*vd*SH_TAS[0]);
-        Kfusion[9] = SK_TAS*(P[9][3]*SH_TAS[2] - P[9][22]*SH_TAS[2] + P[9][4]*SH_TAS[1] - P[9][23]*SH_TAS[1] + P[9][5]*vd*SH_TAS[0]);
-        Kfusion[10] = SK_TAS*(P[10][3]*SH_TAS[2] - P[10][22]*SH_TAS[2] + P[10][4]*SH_TAS[1] - P[10][23]*SH_TAS[1] + P[10][5]*vd*SH_TAS[0]);
-        Kfusion[11] = SK_TAS*(P[11][3]*SH_TAS[2] - P[11][22]*SH_TAS[2] + P[11][4]*SH_TAS[1] - P[11][23]*SH_TAS[1] + P[11][5]*vd*SH_TAS[0]);
-        Kfusion[12] = SK_TAS*(P[12][3]*SH_TAS[2] - P[12][22]*SH_TAS[2] + P[12][4]*SH_TAS[1] - P[12][23]*SH_TAS[1] + P[12][5]*vd*SH_TAS[0]);
-        Kfusion[13] = SK_TAS*(P[13][3]*SH_TAS[2] - P[13][22]*SH_TAS[2] + P[13][4]*SH_TAS[1] - P[13][23]*SH_TAS[1] + P[13][5]*vd*SH_TAS[0]);
-        Kfusion[14] = SK_TAS*(P[14][3]*SH_TAS[2] - P[14][22]*SH_TAS[2] + P[14][4]*SH_TAS[1] - P[14][23]*SH_TAS[1] + P[14][5]*vd*SH_TAS[0]);
-        Kfusion[15] = SK_TAS*(P[15][3]*SH_TAS[2] - P[15][22]*SH_TAS[2] + P[15][4]*SH_TAS[1] - P[15][23]*SH_TAS[1] + P[15][5]*vd*SH_TAS[0]);
-        Kfusion[22] = SK_TAS*(P[22][3]*SH_TAS[2] - P[22][22]*SH_TAS[2] + P[22][4]*SH_TAS[1] - P[22][23]*SH_TAS[1] + P[22][5]*vd*SH_TAS[0]);
-        Kfusion[23] = SK_TAS*(P[23][3]*SH_TAS[2] - P[23][22]*SH_TAS[2] + P[23][4]*SH_TAS[1] - P[23][23]*SH_TAS[1] + P[23][5]*vd*SH_TAS[0]);
+        if (!airDataFusionWindOnly) {
+            Kfusion[0] = SK_TAS*(P[0][3]*SH_TAS[2] - P[0][22]*SH_TAS[2] + P[0][4]*SH_TAS[1] - P[0][23]*SH_TAS[1] + P[0][5]*vd*SH_TAS[0]);
+            Kfusion[1] = SK_TAS*(P[1][3]*SH_TAS[2] - P[1][22]*SH_TAS[2] + P[1][4]*SH_TAS[1] - P[1][23]*SH_TAS[1] + P[1][5]*vd*SH_TAS[0]);
+            Kfusion[2] = SK_TAS*(P[2][3]*SH_TAS[2] - P[2][22]*SH_TAS[2] + P[2][4]*SH_TAS[1] - P[2][23]*SH_TAS[1] + P[2][5]*vd*SH_TAS[0]);
+            Kfusion[3] = SK_TAS*(P[3][3]*SH_TAS[2] - P[3][22]*SH_TAS[2] + P[3][4]*SH_TAS[1] - P[3][23]*SH_TAS[1] + P[3][5]*vd*SH_TAS[0]);
+            Kfusion[4] = SK_TAS*(P[4][3]*SH_TAS[2] - P[4][22]*SH_TAS[2] + P[4][4]*SH_TAS[1] - P[4][23]*SH_TAS[1] + P[4][5]*vd*SH_TAS[0]);
+            Kfusion[5] = SK_TAS*(P[5][3]*SH_TAS[2] - P[5][22]*SH_TAS[2] + P[5][4]*SH_TAS[1] - P[5][23]*SH_TAS[1] + P[5][5]*vd*SH_TAS[0]);
+            Kfusion[6] = SK_TAS*(P[6][3]*SH_TAS[2] - P[6][22]*SH_TAS[2] + P[6][4]*SH_TAS[1] - P[6][23]*SH_TAS[1] + P[6][5]*vd*SH_TAS[0]);
+            Kfusion[7] = SK_TAS*(P[7][3]*SH_TAS[2] - P[7][22]*SH_TAS[2] + P[7][4]*SH_TAS[1] - P[7][23]*SH_TAS[1] + P[7][5]*vd*SH_TAS[0]);
+            Kfusion[8] = SK_TAS*(P[8][3]*SH_TAS[2] - P[8][22]*SH_TAS[2] + P[8][4]*SH_TAS[1] - P[8][23]*SH_TAS[1] + P[8][5]*vd*SH_TAS[0]);
+            Kfusion[9] = SK_TAS*(P[9][3]*SH_TAS[2] - P[9][22]*SH_TAS[2] + P[9][4]*SH_TAS[1] - P[9][23]*SH_TAS[1] + P[9][5]*vd*SH_TAS[0]);
+            Kfusion[10] = SK_TAS*(P[10][3]*SH_TAS[2] - P[10][22]*SH_TAS[2] + P[10][4]*SH_TAS[1] - P[10][23]*SH_TAS[1] + P[10][5]*vd*SH_TAS[0]);
+            Kfusion[11] = SK_TAS*(P[11][3]*SH_TAS[2] - P[11][22]*SH_TAS[2] + P[11][4]*SH_TAS[1] - P[11][23]*SH_TAS[1] + P[11][5]*vd*SH_TAS[0]);
+            Kfusion[12] = SK_TAS*(P[12][3]*SH_TAS[2] - P[12][22]*SH_TAS[2] + P[12][4]*SH_TAS[1] - P[12][23]*SH_TAS[1] + P[12][5]*vd*SH_TAS[0]);
+            Kfusion[13] = SK_TAS*(P[13][3]*SH_TAS[2] - P[13][22]*SH_TAS[2] + P[13][4]*SH_TAS[1] - P[13][23]*SH_TAS[1] + P[13][5]*vd*SH_TAS[0]);
+            Kfusion[14] = SK_TAS*(P[14][3]*SH_TAS[2] - P[14][22]*SH_TAS[2] + P[14][4]*SH_TAS[1] - P[14][23]*SH_TAS[1] + P[14][5]*vd*SH_TAS[0]);
+            Kfusion[15] = SK_TAS*(P[15][3]*SH_TAS[2] - P[15][22]*SH_TAS[2] + P[15][4]*SH_TAS[1] - P[15][23]*SH_TAS[1] + P[15][5]*vd*SH_TAS[0]);
+        }  else {
+            // zero indexes 0 to 15 = 16*4 bytes
+            memset(&Kfusion[0], 0, 64);
+        }
         // zero Kalman gains to inhibit magnetic field state estimation
-        if (!inhibitMagStates) {
+        if (!inhibitMagStates && !airDataFusionWindOnly) {
             Kfusion[16] = SK_TAS*(P[16][3]*SH_TAS[2] - P[16][22]*SH_TAS[2] + P[16][4]*SH_TAS[1] - P[16][23]*SH_TAS[1] + P[16][5]*vd*SH_TAS[0]);
             Kfusion[17] = SK_TAS*(P[17][3]*SH_TAS[2] - P[17][22]*SH_TAS[2] + P[17][4]*SH_TAS[1] - P[17][23]*SH_TAS[1] + P[17][5]*vd*SH_TAS[0]);
             Kfusion[18] = SK_TAS*(P[18][3]*SH_TAS[2] - P[18][22]*SH_TAS[2] + P[18][4]*SH_TAS[1] - P[18][23]*SH_TAS[1] + P[18][5]*vd*SH_TAS[0]);
@@ -111,12 +114,18 @@ void NavEKF2_core::FuseAirspeed()
                 Kfusion[i] = 0.0f;
             }
         }
+        Kfusion[22] = SK_TAS*(P[22][3]*SH_TAS[2] - P[22][22]*SH_TAS[2] + P[22][4]*SH_TAS[1] - P[22][23]*SH_TAS[1] + P[22][5]*vd*SH_TAS[0]);
+        Kfusion[23] = SK_TAS*(P[23][3]*SH_TAS[2] - P[23][22]*SH_TAS[2] + P[23][4]*SH_TAS[1] - P[23][23]*SH_TAS[1] + P[23][5]*vd*SH_TAS[0]);
 
         // calculate measurement innovation variance
         varInnovVtas = 1.0f/SK_TAS;
 
         // calculate measurement innovation
-        innovVtas = VtasPred - tasDataDelayed.tas;
+        if ((externalEasDefault >= 5.0f) && (externalEasDefault >= 0.0f)) {
+            innovVtas = VtasPred - externalEasDefault;
+        } else {
+            innovVtas = VtasPred - tasDataDelayed.tas;
+        }
 
         // calculate the innovation consistency test ratio
         tasTestRatio = sq(innovVtas) / (sq(MAX(0.01f * (float)frontend->_tasInnovGate, 1.0f)) * varInnovVtas);
@@ -130,7 +139,6 @@ void NavEKF2_core::FuseAirspeed()
 
             // restart the counter
             lastTasPassTime_ms = imuSampleTime_ms;
-
 
             // zero the attitude error state - by definition it is assumed to be zero before each observaton fusion
             stateStruct.angErr.zero();
@@ -204,11 +212,6 @@ void NavEKF2_core::SelectTasFusion()
     // get true airspeed measurement
     readAirSpdData();
 
-    // If we haven't received airspeed data for a while, then declare the airspeed data as being timed out
-    if (imuSampleTime_ms - tasDataNew.time_ms > frontend->tasRetryTime_ms) {
-        tasTimeout = true;
-    }
-
     // if the filter is initialised, wind states are not inhibited and we have data to fuse, then perform TAS fusion
     if (tasDataToFuse && statesInitialised && !inhibitWindStates) {
         FuseAirspeed();
@@ -234,12 +237,26 @@ void NavEKF2_core::SelectBetaFusion()
 
     // set true when the fusion time interval has triggered
     bool f_timeTrigger = ((imuSampleTime_ms - prevBetaStep_ms) >= frontend->betaAvg_ms);
-    // set true when use of synthetic sideslip fusion is necessary because we have limited sensor data or are dead reckoning position
-    bool f_required = !(use_compass() && useAirspeed() && ((imuSampleTime_ms - lastPosPassTime_ms) < frontend->posRetryTimeNoVel_ms));
+    // set true when use of air data to constrain drift is necessary because we have limited sensor data or are doing inertial dead reckoning
+    bool is_dead_reckoning = ((imuSampleTime_ms - lastPosPassTime_ms) > frontend->deadReckonDeclare_ms) && ((imuSampleTime_ms - lastVelPassTime_ms) > frontend->deadReckonDeclare_ms);
+    bool f_required = !use_compass() || is_dead_reckoning;
     // set true when sideslip fusion is feasible (requires zero sideslip assumption to be valid and use of wind states)
     bool f_feasible = (assume_zero_sideslip() && !inhibitWindStates);
-    // use synthetic sideslip fusion if feasible, required and enough time has lapsed since the last fusion
-    if (f_feasible && f_required && f_timeTrigger) {
+    // use synthetic sideslip fusion if feasible and enough time has lapsed since the last fusion
+    if (f_feasible && f_timeTrigger) {
+        // unless air data is required to constrain drift, it is only used to update wind state estimates
+        if (f_required) {
+            // we are required to correct all states
+            airDataFusionWindOnly = false;
+        } else {
+            // we are required to corrrect only wind states
+            airDataFusionWindOnly = true;
+        }
+        // Fuse estimated airspeed to aid wind estimation
+        if (frontend->_easDefault >= 5.0f) {
+            frontend->_easNoise = 0.33f * frontend->_easDefault;
+            FuseAirspeed();
+        }
         FuseSideslip();
         prevBetaStep_ms = imuSampleTime_ms;
     }
@@ -340,26 +357,29 @@ void NavEKF2_core::FuseSideslip()
         SK_BETA[2] = SH_BETA[6]*SH_BETA[9] + SH_BETA[1]*SH_BETA[3]*SH_BETA[5];
         SK_BETA[3] = SH_BETA[4] - SH_BETA[1]*SH_BETA[3]*SH_BETA[8];
         SK_BETA[4] = sq(SH_BETA[1])*SH_BETA[3] + 1;
-        Kfusion[0] = SK_BETA[0]*(P[0][5]*SK_BETA[1] - P[0][2]*SK_BETA[4] - P[0][3]*SK_BETA[2] + P[0][4]*SK_BETA[3] + P[0][22]*SK_BETA[2] - P[0][23]*SK_BETA[3] + P[0][0]*SH_BETA[6]*SH_BETA[2] + P[0][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
-        Kfusion[1] = SK_BETA[0]*(P[1][5]*SK_BETA[1] - P[1][2]*SK_BETA[4] - P[1][3]*SK_BETA[2] + P[1][4]*SK_BETA[3] + P[1][22]*SK_BETA[2] - P[1][23]*SK_BETA[3] + P[1][0]*SH_BETA[6]*SH_BETA[2] + P[1][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
-        Kfusion[2] = SK_BETA[0]*(P[2][5]*SK_BETA[1] - P[2][2]*SK_BETA[4] - P[2][3]*SK_BETA[2] + P[2][4]*SK_BETA[3] + P[2][22]*SK_BETA[2] - P[2][23]*SK_BETA[3] + P[2][0]*SH_BETA[6]*SH_BETA[2] + P[2][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
-        Kfusion[3] = SK_BETA[0]*(P[3][5]*SK_BETA[1] - P[3][2]*SK_BETA[4] - P[3][3]*SK_BETA[2] + P[3][4]*SK_BETA[3] + P[3][22]*SK_BETA[2] - P[3][23]*SK_BETA[3] + P[3][0]*SH_BETA[6]*SH_BETA[2] + P[3][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
-        Kfusion[4] = SK_BETA[0]*(P[4][5]*SK_BETA[1] - P[4][2]*SK_BETA[4] - P[4][3]*SK_BETA[2] + P[4][4]*SK_BETA[3] + P[4][22]*SK_BETA[2] - P[4][23]*SK_BETA[3] + P[4][0]*SH_BETA[6]*SH_BETA[2] + P[4][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
-        Kfusion[5] = SK_BETA[0]*(P[5][5]*SK_BETA[1] - P[5][2]*SK_BETA[4] - P[5][3]*SK_BETA[2] + P[5][4]*SK_BETA[3] + P[5][22]*SK_BETA[2] - P[5][23]*SK_BETA[3] + P[5][0]*SH_BETA[6]*SH_BETA[2] + P[5][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
-        Kfusion[6] = SK_BETA[0]*(P[6][5]*SK_BETA[1] - P[6][2]*SK_BETA[4] - P[6][3]*SK_BETA[2] + P[6][4]*SK_BETA[3] + P[6][22]*SK_BETA[2] - P[6][23]*SK_BETA[3] + P[6][0]*SH_BETA[6]*SH_BETA[2] + P[6][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
-        Kfusion[7] = SK_BETA[0]*(P[7][5]*SK_BETA[1] - P[7][2]*SK_BETA[4] - P[7][3]*SK_BETA[2] + P[7][4]*SK_BETA[3] + P[7][22]*SK_BETA[2] - P[7][23]*SK_BETA[3] + P[7][0]*SH_BETA[6]*SH_BETA[2] + P[7][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
-        Kfusion[8] = SK_BETA[0]*(P[8][5]*SK_BETA[1] - P[8][2]*SK_BETA[4] - P[8][3]*SK_BETA[2] + P[8][4]*SK_BETA[3] + P[8][22]*SK_BETA[2] - P[8][23]*SK_BETA[3] + P[8][0]*SH_BETA[6]*SH_BETA[2] + P[8][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
-        Kfusion[9] = SK_BETA[0]*(P[9][5]*SK_BETA[1] - P[9][2]*SK_BETA[4] - P[9][3]*SK_BETA[2] + P[9][4]*SK_BETA[3] + P[9][22]*SK_BETA[2] - P[9][23]*SK_BETA[3] + P[9][0]*SH_BETA[6]*SH_BETA[2] + P[9][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
-        Kfusion[10] = SK_BETA[0]*(P[10][5]*SK_BETA[1] - P[10][2]*SK_BETA[4] - P[10][3]*SK_BETA[2] + P[10][4]*SK_BETA[3] + P[10][22]*SK_BETA[2] - P[10][23]*SK_BETA[3] + P[10][0]*SH_BETA[6]*SH_BETA[2] + P[10][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
-        Kfusion[11] = SK_BETA[0]*(P[11][5]*SK_BETA[1] - P[11][2]*SK_BETA[4] - P[11][3]*SK_BETA[2] + P[11][4]*SK_BETA[3] + P[11][22]*SK_BETA[2] - P[11][23]*SK_BETA[3] + P[11][0]*SH_BETA[6]*SH_BETA[2] + P[11][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
-        Kfusion[12] = SK_BETA[0]*(P[12][5]*SK_BETA[1] - P[12][2]*SK_BETA[4] - P[12][3]*SK_BETA[2] + P[12][4]*SK_BETA[3] + P[12][22]*SK_BETA[2] - P[12][23]*SK_BETA[3] + P[12][0]*SH_BETA[6]*SH_BETA[2] + P[12][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
-        Kfusion[13] = SK_BETA[0]*(P[13][5]*SK_BETA[1] - P[13][2]*SK_BETA[4] - P[13][3]*SK_BETA[2] + P[13][4]*SK_BETA[3] + P[13][22]*SK_BETA[2] - P[13][23]*SK_BETA[3] + P[13][0]*SH_BETA[6]*SH_BETA[2] + P[13][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
-        Kfusion[14] = SK_BETA[0]*(P[14][5]*SK_BETA[1] - P[14][2]*SK_BETA[4] - P[14][3]*SK_BETA[2] + P[14][4]*SK_BETA[3] + P[14][22]*SK_BETA[2] - P[14][23]*SK_BETA[3] + P[14][0]*SH_BETA[6]*SH_BETA[2] + P[14][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
-        Kfusion[15] = SK_BETA[0]*(P[15][5]*SK_BETA[1] - P[15][2]*SK_BETA[4] - P[15][3]*SK_BETA[2] + P[15][4]*SK_BETA[3] + P[15][22]*SK_BETA[2] - P[15][23]*SK_BETA[3] + P[15][0]*SH_BETA[6]*SH_BETA[2] + P[15][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
-        Kfusion[22] = SK_BETA[0]*(P[22][5]*SK_BETA[1] - P[22][2]*SK_BETA[4] - P[22][3]*SK_BETA[2] + P[22][4]*SK_BETA[3] + P[22][22]*SK_BETA[2] - P[22][23]*SK_BETA[3] + P[22][0]*SH_BETA[6]*SH_BETA[2] + P[22][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
-        Kfusion[23] = SK_BETA[0]*(P[23][5]*SK_BETA[1] - P[23][2]*SK_BETA[4] - P[23][3]*SK_BETA[2] + P[23][4]*SK_BETA[3] + P[23][22]*SK_BETA[2] - P[23][23]*SK_BETA[3] + P[23][0]*SH_BETA[6]*SH_BETA[2] + P[23][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
+        if (!airDataFusionWindOnly) {
+            Kfusion[0] = SK_BETA[0]*(P[0][5]*SK_BETA[1] - P[0][2]*SK_BETA[4] - P[0][3]*SK_BETA[2] + P[0][4]*SK_BETA[3] + P[0][22]*SK_BETA[2] - P[0][23]*SK_BETA[3] + P[0][0]*SH_BETA[6]*SH_BETA[2] + P[0][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
+            Kfusion[1] = SK_BETA[0]*(P[1][5]*SK_BETA[1] - P[1][2]*SK_BETA[4] - P[1][3]*SK_BETA[2] + P[1][4]*SK_BETA[3] + P[1][22]*SK_BETA[2] - P[1][23]*SK_BETA[3] + P[1][0]*SH_BETA[6]*SH_BETA[2] + P[1][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
+            Kfusion[2] = SK_BETA[0]*(P[2][5]*SK_BETA[1] - P[2][2]*SK_BETA[4] - P[2][3]*SK_BETA[2] + P[2][4]*SK_BETA[3] + P[2][22]*SK_BETA[2] - P[2][23]*SK_BETA[3] + P[2][0]*SH_BETA[6]*SH_BETA[2] + P[2][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
+            Kfusion[3] = SK_BETA[0]*(P[3][5]*SK_BETA[1] - P[3][2]*SK_BETA[4] - P[3][3]*SK_BETA[2] + P[3][4]*SK_BETA[3] + P[3][22]*SK_BETA[2] - P[3][23]*SK_BETA[3] + P[3][0]*SH_BETA[6]*SH_BETA[2] + P[3][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
+            Kfusion[4] = SK_BETA[0]*(P[4][5]*SK_BETA[1] - P[4][2]*SK_BETA[4] - P[4][3]*SK_BETA[2] + P[4][4]*SK_BETA[3] + P[4][22]*SK_BETA[2] - P[4][23]*SK_BETA[3] + P[4][0]*SH_BETA[6]*SH_BETA[2] + P[4][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
+            Kfusion[5] = SK_BETA[0]*(P[5][5]*SK_BETA[1] - P[5][2]*SK_BETA[4] - P[5][3]*SK_BETA[2] + P[5][4]*SK_BETA[3] + P[5][22]*SK_BETA[2] - P[5][23]*SK_BETA[3] + P[5][0]*SH_BETA[6]*SH_BETA[2] + P[5][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
+            Kfusion[6] = SK_BETA[0]*(P[6][5]*SK_BETA[1] - P[6][2]*SK_BETA[4] - P[6][3]*SK_BETA[2] + P[6][4]*SK_BETA[3] + P[6][22]*SK_BETA[2] - P[6][23]*SK_BETA[3] + P[6][0]*SH_BETA[6]*SH_BETA[2] + P[6][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
+            Kfusion[7] = SK_BETA[0]*(P[7][5]*SK_BETA[1] - P[7][2]*SK_BETA[4] - P[7][3]*SK_BETA[2] + P[7][4]*SK_BETA[3] + P[7][22]*SK_BETA[2] - P[7][23]*SK_BETA[3] + P[7][0]*SH_BETA[6]*SH_BETA[2] + P[7][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
+            Kfusion[8] = SK_BETA[0]*(P[8][5]*SK_BETA[1] - P[8][2]*SK_BETA[4] - P[8][3]*SK_BETA[2] + P[8][4]*SK_BETA[3] + P[8][22]*SK_BETA[2] - P[8][23]*SK_BETA[3] + P[8][0]*SH_BETA[6]*SH_BETA[2] + P[8][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
+            Kfusion[9] = SK_BETA[0]*(P[9][5]*SK_BETA[1] - P[9][2]*SK_BETA[4] - P[9][3]*SK_BETA[2] + P[9][4]*SK_BETA[3] + P[9][22]*SK_BETA[2] - P[9][23]*SK_BETA[3] + P[9][0]*SH_BETA[6]*SH_BETA[2] + P[9][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
+            Kfusion[10] = SK_BETA[0]*(P[10][5]*SK_BETA[1] - P[10][2]*SK_BETA[4] - P[10][3]*SK_BETA[2] + P[10][4]*SK_BETA[3] + P[10][22]*SK_BETA[2] - P[10][23]*SK_BETA[3] + P[10][0]*SH_BETA[6]*SH_BETA[2] + P[10][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
+            Kfusion[11] = SK_BETA[0]*(P[11][5]*SK_BETA[1] - P[11][2]*SK_BETA[4] - P[11][3]*SK_BETA[2] + P[11][4]*SK_BETA[3] + P[11][22]*SK_BETA[2] - P[11][23]*SK_BETA[3] + P[11][0]*SH_BETA[6]*SH_BETA[2] + P[11][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
+            Kfusion[12] = SK_BETA[0]*(P[12][5]*SK_BETA[1] - P[12][2]*SK_BETA[4] - P[12][3]*SK_BETA[2] + P[12][4]*SK_BETA[3] + P[12][22]*SK_BETA[2] - P[12][23]*SK_BETA[3] + P[12][0]*SH_BETA[6]*SH_BETA[2] + P[12][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
+            Kfusion[13] = SK_BETA[0]*(P[13][5]*SK_BETA[1] - P[13][2]*SK_BETA[4] - P[13][3]*SK_BETA[2] + P[13][4]*SK_BETA[3] + P[13][22]*SK_BETA[2] - P[13][23]*SK_BETA[3] + P[13][0]*SH_BETA[6]*SH_BETA[2] + P[13][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
+            Kfusion[14] = SK_BETA[0]*(P[14][5]*SK_BETA[1] - P[14][2]*SK_BETA[4] - P[14][3]*SK_BETA[2] + P[14][4]*SK_BETA[3] + P[14][22]*SK_BETA[2] - P[14][23]*SK_BETA[3] + P[14][0]*SH_BETA[6]*SH_BETA[2] + P[14][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
+            Kfusion[15] = SK_BETA[0]*(P[15][5]*SK_BETA[1] - P[15][2]*SK_BETA[4] - P[15][3]*SK_BETA[2] + P[15][4]*SK_BETA[3] + P[15][22]*SK_BETA[2] - P[15][23]*SK_BETA[3] + P[15][0]*SH_BETA[6]*SH_BETA[2] + P[15][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
+        } else {
+            // zero indexes 0 to 15 = 16*4 bytes
+            memset(&Kfusion[0], 0, 64);
+        }
         // zero Kalman gains to inhibit magnetic field state estimation
-        if (!inhibitMagStates) {
+        if (!inhibitMagStates && !airDataFusionWindOnly) {
             Kfusion[16] = SK_BETA[0]*(P[16][5]*SK_BETA[1] - P[16][2]*SK_BETA[4] - P[16][3]*SK_BETA[2] + P[16][4]*SK_BETA[3] + P[16][22]*SK_BETA[2] - P[16][23]*SK_BETA[3] + P[16][0]*SH_BETA[6]*SH_BETA[2] + P[16][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
             Kfusion[17] = SK_BETA[0]*(P[17][5]*SK_BETA[1] - P[17][2]*SK_BETA[4] - P[17][3]*SK_BETA[2] + P[17][4]*SK_BETA[3] + P[17][22]*SK_BETA[2] - P[17][23]*SK_BETA[3] + P[17][0]*SH_BETA[6]*SH_BETA[2] + P[17][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
             Kfusion[18] = SK_BETA[0]*(P[18][5]*SK_BETA[1] - P[18][2]*SK_BETA[4] - P[18][3]*SK_BETA[2] + P[18][4]*SK_BETA[3] + P[18][22]*SK_BETA[2] - P[18][23]*SK_BETA[3] + P[18][0]*SH_BETA[6]*SH_BETA[2] + P[18][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
@@ -371,6 +391,8 @@ void NavEKF2_core::FuseSideslip()
                 Kfusion[i] = 0.0f;
             }
         }
+        Kfusion[22] = SK_BETA[0]*(P[22][5]*SK_BETA[1] - P[22][2]*SK_BETA[4] - P[22][3]*SK_BETA[2] + P[22][4]*SK_BETA[3] + P[22][22]*SK_BETA[2] - P[22][23]*SK_BETA[3] + P[22][0]*SH_BETA[6]*SH_BETA[2] + P[22][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
+        Kfusion[23] = SK_BETA[0]*(P[23][5]*SK_BETA[1] - P[23][2]*SK_BETA[4] - P[23][3]*SK_BETA[2] + P[23][4]*SK_BETA[3] + P[23][22]*SK_BETA[2] - P[23][23]*SK_BETA[3] + P[23][0]*SH_BETA[6]*SH_BETA[2] + P[23][1]*SH_BETA[1]*SH_BETA[3]*SH_BETA[2]);
 
         // calculate predicted sideslip angle and innovation using small angle approximation
         innovBeta = vel_rel_wind.y / vel_rel_wind.x;

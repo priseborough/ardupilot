@@ -140,7 +140,8 @@ public:
 
     // return the NED wind speed estimates in m/s (positive is air moving in the direction of the axis)
     // An out of range instance (eg -1) returns data for the the primary instance
-    void getWind(int8_t instance, Vector3f &wind) const;
+    // returns true if wind state estimation is active
+    bool getWind(int8_t instance, Vector3f &wind) const;
 
     // return earth magnetic field estimates in measurement units / 1000 for the specified instance
     // An out of range instance (eg -1) returns data for the the primary instance
@@ -336,6 +337,9 @@ public:
     */
     void writeExtNavData(const Vector3f &sensOffset, const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint32_t resetTime_ms);
 
+    // set value of default airspeed to be assumed when there is no airspeed measurement and we are doing wind estimation
+    void set_default_airspeed(float spd);
+
 private:
     uint8_t num_cores; // number of allocated cores
     uint8_t primary;   // current primary core
@@ -396,6 +400,7 @@ private:
     AP_Int8 _magMask;               // Bitmask forcng specific EKF core instances to use simple heading magnetometer fusion.
     AP_Int8 _originHgtMode;         // Bitmask controlling post alignment correction and reporting of the EKF origin height.
     AP_Int8 _extnavDelay_ms;        // effective average delay of external nav system measurements relative to inertial measurements (msec)
+    AP_Float _easDefault;           // Default cruise equivalent airspeed (m/s)
 
     // Tuning parameters
     const float gpsNEVelVarAccScale = 0.05f;       // Scale factor applied to NE velocity measurement variance due to manoeuvre acceleration
@@ -424,6 +429,7 @@ private:
     const float gndEffectBaroScaler = 4.0f;        // scaler applied to the barometer observation variance when ground effect mode is active
     const uint8_t gndGradientSigma = 50;           // RMS terrain gradient percentage assumed by the terrain height estimation
     const uint8_t fusionTimeStep_ms = 10;          // The minimum time interval between covariance predictions and measurement fusions in msec
+    const uint16_t deadReckonDeclare_ms = 1000;    // Time without equivalent position or velocity observation to constrain drift beore dead reckoning is declared (msec)
 
     struct {
         bool enabled:1;
