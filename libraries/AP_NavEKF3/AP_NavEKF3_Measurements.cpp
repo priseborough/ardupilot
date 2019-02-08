@@ -869,4 +869,10 @@ void NavEKF3_core::getTimingStatistics(struct ekf_timing &_timing)
     memset(&timing, 0, sizeof(timing));
 }
 
+// set value of default airspeed to be assumed when there is no airspeed measurement and we are doing wind estimation
+void NavEKF3_core::set_default_airspeed(float spd)
+{
+    externalEasDefault = spd;
+}
+
 #endif // HAL_CPU_CLASS

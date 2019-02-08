@@ -137,7 +137,8 @@ public:
     void getEkfControlLimits(float &ekfGndSpdLimit, float &ekfNavVelGainScaler) const;
 
     // return the NED wind speed estimates in m/s (positive is air moving in the direction of the axis)
-    void getWind(Vector3f &wind) const;
+    // returns true if wind state estimation is active
+    bool getWind(Vector3f &wind) const;
 
     // return earth magnetic field estimates in measurement units / 1000
     void getMagNED(Vector3f &magNED) const;
@@ -349,6 +350,9 @@ public:
 
     // get timing statistics structure
     void getTimingStatistics(struct ekf_timing &timing);
+
+    // set value of default airspeed to be assumed when there is no airspeed measurement and we are doing wind estimation
+    void set_default_airspeed(float spd);
     
 private:
     // Reference to the global EKF frontend for parameters
@@ -935,6 +939,8 @@ private:
     bool optFlowFusionDelayed;      // true when the optical flow fusion has been delayed
     bool airSpdFusionDelayed;       // true when the air speed fusion has been delayed
     bool sideSlipFusionDelayed;     // true when the sideslip fusion has been delayed
+    bool airDataFusionWindOnly;     // true when  sideslip and airspeed fusion is only allowed to modify the wind states
+    float externalEasDefault;       // externally settable default value of EAS used for fusion when no direct measurement is available (m/s)
     Vector3f lastMagOffsets;        // Last magnetometer offsets from COMPASS_ parameters. Used to detect parameter changes.
     bool lastMagOffsetsValid;       // True when lastMagOffsets has been initialized
     Vector2f posResetNE;            // Change in North/East position due to last in-flight reset in metres. Returned by getLastPosNorthEastReset
