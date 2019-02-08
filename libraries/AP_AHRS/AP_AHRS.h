@@ -160,6 +160,10 @@ public:
         return _optflow;
     }
 
+    // set a default value of EAS in m/s to be assumed by the AHRS estimators
+    // used to improve wind and airspeed estimation where supported
+    virtual void set_default_airspeed(float spd) = 0;
+
     // allow for runtime change of orientation
     // this makes initial config easier
     void set_orientation();

@@ -255,6 +255,17 @@ public:
     // get the index of the current primary gyro sensor
     uint8_t get_primary_gyro_index(void) const override;
 
+    // sets the default value of EAS to be assumed when there is no direct measurement
+    // only supported by EKF2 & 3
+    void set_default_airspeed(float spd) {
+        if (active_EKF_type() == EKF_TYPE2) {
+            EKF2.set_default_airspeed(spd);
+        } else if (active_EKF_type() == EKF_TYPE3) {
+            EKF3.set_default_airspeed(spd);
+        }
+    }
+
+
 private:
     enum EKF_TYPE {EKF_TYPE_NONE=0,
                    EKF_TYPE3=3,

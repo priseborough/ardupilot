@@ -105,6 +105,10 @@ public:
     // time that the AHRS has been up
     uint32_t uptime_ms() const override;
 
+    // sets the default value of airspeed to be assumed if no measurement available
+    // not supported by this estimator
+    void set_default_airspeed(float spd) {}
+
 private:
     float _ki;
     float _ki_yaw;
