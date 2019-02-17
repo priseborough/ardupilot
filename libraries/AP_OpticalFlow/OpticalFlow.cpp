@@ -69,7 +69,7 @@ const AP_Param::GroupInfo OpticalFlow::var_info[] = {
     // @Range: 0 127
     // @User: Advanced
     AP_GROUPINFO("_ADDR", 5,  OpticalFlow, _address,   0),
-    
+
     AP_GROUPEND
 };
 
@@ -94,7 +94,8 @@ void OpticalFlow::init(uint32_t log_bit)
 #if AP_FEATURE_BOARD_DETECT
         if (AP_BoardConfig::get_board_type() == AP_BoardConfig::PX4_BOARD_PIXHAWK ||
             AP_BoardConfig::get_board_type() == AP_BoardConfig::PX4_BOARD_PIXHAWK2 ||
-            AP_BoardConfig::get_board_type() == AP_BoardConfig::PX4_BOARD_PCNC1) {
+            AP_BoardConfig::get_board_type() == AP_BoardConfig::PX4_BOARD_PCNC1 ||
+            AP_BoardConfig::get_board_type() == AP_BoardConfig::PX4_BOARD_PIXRACER) {
             // possibly have pixhart on external SPI
             backend = AP_OpticalFlow_Pixart::detect("pixartflow", *this);
         }
