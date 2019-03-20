@@ -227,5 +227,10 @@ void Copter::tuning()
          g2.winch.set_desired_rate(tuning_value);
          break;
 #endif
+
+     case TUNING_ARTIFICIAL_CLIPPING: {
+         ins.set_artificial_clipping(tuning_value);
+         break;
+         }
      }
 }
