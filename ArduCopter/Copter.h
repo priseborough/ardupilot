@@ -350,6 +350,13 @@ private:
     uint32_t ekfYawReset_ms;
     int8_t ekf_primary_core;
 
+    // vibration check
+    struct {
+        bool high_vibes;    // true while high vibration are detected
+        uint32_t start_ms;  // system time high vibration were last detected
+        uint32_t clear_ms;  // system time high vibrations stopped
+    } vibration_check;
+
     AP_SerialManager serial_manager;
 
     // GCS selection
@@ -713,6 +720,7 @@ private:
     void failsafe_ekf_event();
     void failsafe_ekf_off_event(void);
     void check_ekf_reset();
+    void check_vibration();
 
     // esc_calibration.cpp
     void esc_calibration_startup_check();

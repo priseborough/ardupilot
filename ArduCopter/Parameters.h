@@ -602,6 +602,9 @@ public:
     // object avoidance path planning
     AP_OAPathPlanner oa;
 #endif
+
+    // vibration failsafe enable/disable
+    AP_Int8 fs_vibe_enabled;
 };
 
 extern const AP_Param::Info        var_info[];
