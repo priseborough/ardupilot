@@ -241,6 +241,7 @@ void AC_PosControl::set_dt(float delta_sec)
 
     // update rate z-axis velocity error and accel error filters
     _vel_error_filter.set_cutoff_frequency(POSCONTROL_VEL_ERROR_CUTOFF_FREQ);
+    _vel_dem_deriv_filter.set_cutoff_frequency(POSCONTROL_VEL_ERROR_CUTOFF_FREQ);
 }
 
 /// set_max_speed_z - set the maximum climb and descent rates
@@ -554,15 +555,17 @@ void AC_PosControl::run_z_controller()
     }
 
     // feed forward desired acceleration calculation
+    // filter desired accel with cut off frequency of 2 Hz to remove noise from derivative
     if (_dt > 0.0f) {
     	if (!_flags.freeze_ff_z) {
-    	    _accel_desired.z = (_vel_target.z - _vel_last.z)/_dt;
+    	    _accel_desired.z = _vel_dem_deriv_filter.apply((_vel_target.z - _vel_last.z)/_dt, _dt);
         } else {
     		// stop the feed forward being calculated during a known discontinuity
     		_flags.freeze_ff_z = false;
     	}
     } else {
         _accel_desired.z = 0.0f;
+        _vel_dem_deriv_filter.reset(0);
     }
 
     // store this iteration's velocities for the next iteration
@@ -574,6 +577,8 @@ void AC_PosControl::run_z_controller()
         _vel_error.z = 0;
         _vel_error_filter.reset(0);
         _flags.reset_rate_to_accel_z = false;
+        _accel_desired.z = 0.0f;
+        _vel_dem_deriv_filter.reset(0);
     } else {
         // calculate rate error and filter with cut off frequency of 2 Hz
         _vel_error.z = _vel_error_filter.apply(_vel_target.z - curr_vel.z, _dt);
