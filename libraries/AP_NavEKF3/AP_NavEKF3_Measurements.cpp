@@ -544,15 +544,10 @@ void NavEKF3_core::readGpsData()
                 useGpsVertVel = false;
             }
 
-            // Monitor quality of the GPS velocity data before and after alignment using separate checks
-            if (PV_AidingMode != AID_ABSOLUTE) {
-                // Pre-alignment checks
-                gpsGoodToAlign = calcGpsGoodToAlign();
-            } else {
-                gpsGoodToAlign = false;
-            }
+            // Check if GPS data has sufficient quality for position and velocity alignment
+            gpsGoodToAlign = calcGpsGoodToAlign();
 
-            // Post-alignment checks
+            // This check is used during GPS usage to determine if its use should be discontinued
             calcGpsGoodForFlight();
 
             // Read the GPS location in WGS-84 lat,long,height coordinates

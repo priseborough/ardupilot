@@ -472,21 +472,23 @@ void NavEKF3_core::FuseVelPosNED()
                 lastPosPassTime_ms = imuSampleTime_ms;
                 // if timed out or outside the specified uncertainty radius, reset to the GPS
                 if (posTimeout || ((P[8][8] + P[7][7]) > sq(float(frontend->_gpsGlitchRadiusMax)))) {
-                    // reset the position to the current GPS position
-                    ResetPosition();
-                    // reset the velocity to the GPS velocity
-                    ResetVelocity();
-                    // don't fuse GPS data on this time step
-                    fusePosData = false;
-                    fuseVelData = false;
-                    // Reset the position variances and corresponding covariances to a value that will pass the checks
-                    zeroRows(P,7,8);
-                    zeroCols(P,7,8);
-                    P[7][7] = sq(float(0.5f*frontend->_gpsGlitchRadiusMax));
-                    P[8][8] = P[7][7];
-                    // Reset the normalised innovation to avoid failing the bad fusion tests
-                    posTestRatio = 0.0f;
-                    velTestRatio = 0.0f;
+                    if (gpsGoodToAlign) {
+                        // reset the position to the current GPS position
+                        ResetPosition();
+                        // reset the velocity to the GPS velocity
+                        ResetVelocity();
+                        // don't fuse GPS data on this time step
+                        fusePosData = false;
+                        fuseVelData = false;
+                        // Reset the position variances and corresponding covariances to a value that will pass the checks
+                        zeroRows(P,7,8);
+                        zeroCols(P,7,8);
+                        P[7][7] = sq(float(0.5f*frontend->_gpsGlitchRadiusMax));
+                        P[8][8] = P[7][7];
+                        // Reset the normalised innovation to avoid failing the bad fusion tests
+                        posTestRatio = 0.0f;
+                        velTestRatio = 0.0f;
+                    }
                 }
             } else {
                 posHealth = false;
