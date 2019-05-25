@@ -232,6 +232,7 @@ void NavEKF2_core::InitialiseVariables()
     velResetNE.zero();
     posResetD = 0.0f;
     hgtInnovFiltState = 0.0f;
+    velErrUnconstrained = false;
 
     imuDataDownSampledNew.delAng.zero();
     imuDataDownSampledNew.delVel.zero();

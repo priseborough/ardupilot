@@ -174,6 +174,7 @@ void NavEKF2_core::setAidingMode()
             PV_AidingMode = AID_RELATIVE;
         }
         }
+        velErrUnconstrained = false;
         break;
 
     case AID_RELATIVE: {
@@ -189,6 +190,7 @@ void NavEKF2_core::setAidingMode()
             PV_AidingMode = AID_NONE;
         }
         }
+        velErrUnconstrained = false;
         break;
 
     case AID_ABSOLUTE: {
@@ -238,6 +240,7 @@ void NavEKF2_core::setAidingMode()
             }
             posAidLossCritical = (imuSampleTime_ms - lastRngBcnPassTime_ms > maxLossTime_ms) &&
                    (imuSampleTime_ms - lastPosPassTime_ms > maxLossTime_ms);
+            velErrUnconstrained = posAidLossCritical;
         }
 
         if (attAidLossCritical) {
