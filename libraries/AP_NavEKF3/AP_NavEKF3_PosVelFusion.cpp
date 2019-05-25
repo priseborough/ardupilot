@@ -472,7 +472,7 @@ void NavEKF3_core::FuseVelPosNED()
                 lastPosPassTime_ms = imuSampleTime_ms;
                 // if timed out or outside the specified uncertainty radius, reset to the GPS
                 if (posTimeout || ((P[8][8] + P[7][7]) > sq(float(frontend->_gpsGlitchRadiusMax)))) {
-                    if (gpsGoodToAlign) {
+                    if (gpsGoodToAlign || velErrUnconstrained) {
                         // reset the position to the current GPS position
                         ResetPosition();
                         // reset the velocity to the GPS velocity
