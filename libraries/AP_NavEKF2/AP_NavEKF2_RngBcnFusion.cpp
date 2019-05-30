@@ -143,9 +143,15 @@ void NavEKF2_core::FuseRngBcn()
         Kfusion[13] = -t26*(P[13][6]*t4*t9+P[13][7]*t3*t9+P[13][8]*t2*t9);
         Kfusion[14] = -t26*(P[14][6]*t4*t9+P[14][7]*t3*t9+P[14][8]*t2*t9);
         if (!inhibitMagStates) {
-            Kfusion[16] = -t26*(P[16][6]*t4*t9+P[16][7]*t3*t9+P[16][8]*t2*t9);
-            Kfusion[17] = -t26*(P[17][6]*t4*t9+P[17][7]*t3*t9+P[17][8]*t2*t9);
-            Kfusion[18] = -t26*(P[18][6]*t4*t9+P[18][7]*t3*t9+P[18][8]*t2*t9);
+            if (freezeEarthMagStates) {
+                Kfusion[16] = 0.0f;
+                Kfusion[17] = 0.0f;
+                Kfusion[18] = 0.0f;
+            } else {
+                Kfusion[16] = -t26*(P[16][6]*t4*t9+P[16][7]*t3*t9+P[16][8]*t2*t9);
+                Kfusion[17] = -t26*(P[17][6]*t4*t9+P[17][7]*t3*t9+P[17][8]*t2*t9);
+                Kfusion[18] = -t26*(P[18][6]*t4*t9+P[18][7]*t3*t9+P[18][8]*t2*t9);
+            }
             Kfusion[19] = -t26*(P[19][6]*t4*t9+P[19][7]*t3*t9+P[19][8]*t2*t9);
             Kfusion[20] = -t26*(P[20][6]*t4*t9+P[20][7]*t3*t9+P[20][8]*t2*t9);
             Kfusion[21] = -t26*(P[21][6]*t4*t9+P[21][7]*t3*t9+P[21][8]*t2*t9);

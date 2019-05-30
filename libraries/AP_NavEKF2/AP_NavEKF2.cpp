@@ -464,8 +464,8 @@ const AP_Param::GroupInfo NavEKF2::var_info[] = {
 
     // @Param: MAGE_P_NSE
     // @DisplayName: Earth magnetic field process noise (gauss/s)
-    // @Description: This state process noise controls the growth of earth magnetic field state error estimates. Increasing it makes earth magnetic field estimation faster and noisier.
-    // @Range: 0.00001 0.01
+    // @Description: This state process noise controls the growth of earth magnetic field state error estimates. Increasing it makes earth magnetic field estimation faster and noisier. Set to zero to make the EKF use fixed values from geoscience lookup tables.
+    // @Range: 0.0 0.01
     // @User: Advanced
     // @Units: Gauss/s
     AP_GROUPINFO("MAGE_P_NSE", 40, NavEKF2, _magEarthProcessNoise, MAGE_P_NSE_DEFAULT),

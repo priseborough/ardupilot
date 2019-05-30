@@ -336,6 +336,7 @@ void NavEKF2_core::InitialiseVariablesMag()
     finalInflightMagInit = false;
 
     inhibitMagStates = true;
+    freezeEarthMagStates = false;
 
     if (_ahrs->get_compass()) {
         magSelectIndex = _ahrs->get_compass()->get_primary();
@@ -867,7 +868,6 @@ void NavEKF2_core::CovariancePrediction()
     dAngBiasSigma = sq(dt) * constrain_float(frontend->_gyroBiasProcessNoise, 0.0f, 1.0f);
     dVelBiasSigma = sq(dt) * constrain_float(frontend->_accelBiasProcessNoise, 0.0f, 1.0f);
     dAngScaleSigma = dt * constrain_float(frontend->_gyroScaleProcessNoise, 0.0f, 1.0f);
-    magEarthSigma = dt * constrain_float(frontend->_magEarthProcessNoise, 0.0f, 1.0f);
     magBodySigma  = dt * constrain_float(frontend->_magBodyProcessNoise, 0.0f, 1.0f);
     for (uint8_t i= 0; i<=8;  i++) processNoise[i] = 0.0f;
     for (uint8_t i=9; i<=11; i++) processNoise[i] = dAngBiasSigma;
@@ -877,7 +877,18 @@ void NavEKF2_core::CovariancePrediction()
     } else {
         processNoise[15] = dVelBiasSigma;
     }
-    for (uint8_t i=16; i<=18; i++) processNoise[i] = magEarthSigma;
+    if (frontend->_magEarthProcessNoise <= 0.0f) {
+        freezeEarthMagStates = true;
+        magEarthSigma = 0.0f;
+    } else {
+        freezeEarthMagStates = false;
+        magEarthSigma = dt * constrain_float(frontend->_magEarthProcessNoise, 0.0f, 1.0f);
+    }
+    if (freezeEarthMagStates) {
+        for (uint8_t i= 16; i<=18;  i++) processNoise[i] = 0.0f;
+    } else {
+        for (uint8_t i=16; i<=18; i++) processNoise[i] = magEarthSigma;
+    }
     for (uint8_t i=19; i<=21; i++) processNoise[i] = magBodySigma;
     for (uint8_t i=22; i<=23; i++) processNoise[i] = windVelSigma;
 
@@ -1119,60 +1130,80 @@ void NavEKF2_core::CovariancePrediction()
     nextP[15][15] = P[15][15];
 
     if (stateIndexLim > 15) {
-        nextP[0][16] = P[0][16]*SPP[5] - P[1][16]*SPP[4] + P[2][16]*SPP[8] + P[9][16]*SPP[22] + P[12][16]*SPP[18];
-        nextP[1][16] = P[1][16]*SPP[6] - P[0][16]*SPP[2] - P[2][16]*SPP[9] + P[10][16]*SPP[22] + P[13][16]*SPP[17];
-        nextP[2][16] = P[0][16]*SPP[14] - P[1][16]*SPP[3] + P[2][16]*SPP[13] + P[11][16]*SPP[22] + P[14][16]*SPP[16];
-        nextP[3][16] = P[3][16] + P[0][16]*SPP[1] + P[1][16]*SPP[19] + P[2][16]*SPP[15] - P[15][16]*SPP[21];
-        nextP[4][16] = P[4][16] + P[15][16]*SF[22] + P[0][16]*SPP[20] + P[1][16]*SPP[12] + P[2][16]*SPP[11];
-        nextP[5][16] = P[5][16] + P[15][16]*SF[20] - P[0][16]*SPP[7] + P[1][16]*SPP[10] + P[2][16]*SPP[0];
-        nextP[6][16] = P[6][16] + P[3][16]*dt;
-        nextP[7][16] = P[7][16] + P[4][16]*dt;
-        nextP[8][16] = P[8][16] + P[5][16]*dt;
-        nextP[9][16] = P[9][16];
-        nextP[10][16] = P[10][16];
-        nextP[11][16] = P[11][16];
-        nextP[12][16] = P[12][16];
-        nextP[13][16] = P[13][16];
-        nextP[14][16] = P[14][16];
-        nextP[15][16] = P[15][16];
-        nextP[16][16] = P[16][16];
-        nextP[0][17] = P[0][17]*SPP[5] - P[1][17]*SPP[4] + P[2][17]*SPP[8] + P[9][17]*SPP[22] + P[12][17]*SPP[18];
-        nextP[1][17] = P[1][17]*SPP[6] - P[0][17]*SPP[2] - P[2][17]*SPP[9] + P[10][17]*SPP[22] + P[13][17]*SPP[17];
-        nextP[2][17] = P[0][17]*SPP[14] - P[1][17]*SPP[3] + P[2][17]*SPP[13] + P[11][17]*SPP[22] + P[14][17]*SPP[16];
-        nextP[3][17] = P[3][17] + P[0][17]*SPP[1] + P[1][17]*SPP[19] + P[2][17]*SPP[15] - P[15][17]*SPP[21];
-        nextP[4][17] = P[4][17] + P[15][17]*SF[22] + P[0][17]*SPP[20] + P[1][17]*SPP[12] + P[2][17]*SPP[11];
-        nextP[5][17] = P[5][17] + P[15][17]*SF[20] - P[0][17]*SPP[7] + P[1][17]*SPP[10] + P[2][17]*SPP[0];
-        nextP[6][17] = P[6][17] + P[3][17]*dt;
-        nextP[7][17] = P[7][17] + P[4][17]*dt;
-        nextP[8][17] = P[8][17] + P[5][17]*dt;
-        nextP[9][17] = P[9][17];
-        nextP[10][17] = P[10][17];
-        nextP[11][17] = P[11][17];
-        nextP[12][17] = P[12][17];
-        nextP[13][17] = P[13][17];
-        nextP[14][17] = P[14][17];
-        nextP[15][17] = P[15][17];
-        nextP[16][17] = P[16][17];
-        nextP[17][17] = P[17][17];
-        nextP[0][18] = P[0][18]*SPP[5] - P[1][18]*SPP[4] + P[2][18]*SPP[8] + P[9][18]*SPP[22] + P[12][18]*SPP[18];
-        nextP[1][18] = P[1][18]*SPP[6] - P[0][18]*SPP[2] - P[2][18]*SPP[9] + P[10][18]*SPP[22] + P[13][18]*SPP[17];
-        nextP[2][18] = P[0][18]*SPP[14] - P[1][18]*SPP[3] + P[2][18]*SPP[13] + P[11][18]*SPP[22] + P[14][18]*SPP[16];
-        nextP[3][18] = P[3][18] + P[0][18]*SPP[1] + P[1][18]*SPP[19] + P[2][18]*SPP[15] - P[15][18]*SPP[21];
-        nextP[4][18] = P[4][18] + P[15][18]*SF[22] + P[0][18]*SPP[20] + P[1][18]*SPP[12] + P[2][18]*SPP[11];
-        nextP[5][18] = P[5][18] + P[15][18]*SF[20] - P[0][18]*SPP[7] + P[1][18]*SPP[10] + P[2][18]*SPP[0];
-        nextP[6][18] = P[6][18] + P[3][18]*dt;
-        nextP[7][18] = P[7][18] + P[4][18]*dt;
-        nextP[8][18] = P[8][18] + P[5][18]*dt;
-        nextP[9][18] = P[9][18];
-        nextP[10][18] = P[10][18];
-        nextP[11][18] = P[11][18];
-        nextP[12][18] = P[12][18];
-        nextP[13][18] = P[13][18];
-        nextP[14][18] = P[14][18];
-        nextP[15][18] = P[15][18];
-        nextP[16][18] = P[16][18];
-        nextP[17][18] = P[17][18];
-        nextP[18][18] = P[18][18];
+        if (freezeEarthMagStates) {
+            zeroCols(nextP,16,18);
+            zeroRows(nextP,16,18);
+
+        } else {
+            nextP[0][16] = P[0][16]*SPP[5] - P[1][16]*SPP[4] + P[2][16]*SPP[8] + P[9][16]*SPP[22] + P[12][16]*SPP[18];
+            nextP[1][16] = P[1][16]*SPP[6] - P[0][16]*SPP[2] - P[2][16]*SPP[9] + P[10][16]*SPP[22] + P[13][16]*SPP[17];
+            nextP[2][16] = P[0][16]*SPP[14] - P[1][16]*SPP[3] + P[2][16]*SPP[13] + P[11][16]*SPP[22] + P[14][16]*SPP[16];
+            nextP[3][16] = P[3][16] + P[0][16]*SPP[1] + P[1][16]*SPP[19] + P[2][16]*SPP[15] - P[15][16]*SPP[21];
+            nextP[4][16] = P[4][16] + P[15][16]*SF[22] + P[0][16]*SPP[20] + P[1][16]*SPP[12] + P[2][16]*SPP[11];
+            nextP[5][16] = P[5][16] + P[15][16]*SF[20] - P[0][16]*SPP[7] + P[1][16]*SPP[10] + P[2][16]*SPP[0];
+            nextP[6][16] = P[6][16] + P[3][16]*dt;
+            nextP[7][16] = P[7][16] + P[4][16]*dt;
+            nextP[8][16] = P[8][16] + P[5][16]*dt;
+            nextP[9][16] = P[9][16];
+            nextP[10][16] = P[10][16];
+            nextP[11][16] = P[11][16];
+            nextP[12][16] = P[12][16];
+            nextP[13][16] = P[13][16];
+            nextP[14][16] = P[14][16];
+            nextP[15][16] = P[15][16];
+            nextP[16][16] = P[16][16];
+            nextP[0][17] = P[0][17]*SPP[5] - P[1][17]*SPP[4] + P[2][17]*SPP[8] + P[9][17]*SPP[22] + P[12][17]*SPP[18];
+            nextP[1][17] = P[1][17]*SPP[6] - P[0][17]*SPP[2] - P[2][17]*SPP[9] + P[10][17]*SPP[22] + P[13][17]*SPP[17];
+            nextP[2][17] = P[0][17]*SPP[14] - P[1][17]*SPP[3] + P[2][17]*SPP[13] + P[11][17]*SPP[22] + P[14][17]*SPP[16];
+            nextP[3][17] = P[3][17] + P[0][17]*SPP[1] + P[1][17]*SPP[19] + P[2][17]*SPP[15] - P[15][17]*SPP[21];
+            nextP[4][17] = P[4][17] + P[15][17]*SF[22] + P[0][17]*SPP[20] + P[1][17]*SPP[12] + P[2][17]*SPP[11];
+            nextP[5][17] = P[5][17] + P[15][17]*SF[20] - P[0][17]*SPP[7] + P[1][17]*SPP[10] + P[2][17]*SPP[0];
+            nextP[6][17] = P[6][17] + P[3][17]*dt;
+            nextP[7][17] = P[7][17] + P[4][17]*dt;
+            nextP[8][17] = P[8][17] + P[5][17]*dt;
+            nextP[9][17] = P[9][17];
+            nextP[10][17] = P[10][17];
+            nextP[11][17] = P[11][17];
+            nextP[12][17] = P[12][17];
+            nextP[13][17] = P[13][17];
+            nextP[14][17] = P[14][17];
+            nextP[15][17] = P[15][17];
+            nextP[16][17] = P[16][17];
+            nextP[17][17] = P[17][17];
+            nextP[0][18] = P[0][18]*SPP[5] - P[1][18]*SPP[4] + P[2][18]*SPP[8] + P[9][18]*SPP[22] + P[12][18]*SPP[18];
+            nextP[1][18] = P[1][18]*SPP[6] - P[0][18]*SPP[2] - P[2][18]*SPP[9] + P[10][18]*SPP[22] + P[13][18]*SPP[17];
+            nextP[2][18] = P[0][18]*SPP[14] - P[1][18]*SPP[3] + P[2][18]*SPP[13] + P[11][18]*SPP[22] + P[14][18]*SPP[16];
+            nextP[3][18] = P[3][18] + P[0][18]*SPP[1] + P[1][18]*SPP[19] + P[2][18]*SPP[15] - P[15][18]*SPP[21];
+            nextP[4][18] = P[4][18] + P[15][18]*SF[22] + P[0][18]*SPP[20] + P[1][18]*SPP[12] + P[2][18]*SPP[11];
+            nextP[5][18] = P[5][18] + P[15][18]*SF[20] - P[0][18]*SPP[7] + P[1][18]*SPP[10] + P[2][18]*SPP[0];
+            nextP[6][18] = P[6][18] + P[3][18]*dt;
+            nextP[7][18] = P[7][18] + P[4][18]*dt;
+            nextP[8][18] = P[8][18] + P[5][18]*dt;
+            nextP[9][18] = P[9][18];
+            nextP[10][18] = P[10][18];
+            nextP[11][18] = P[11][18];
+            nextP[12][18] = P[12][18];
+            nextP[13][18] = P[13][18];
+            nextP[14][18] = P[14][18];
+            nextP[15][18] = P[15][18];
+            nextP[16][18] = P[16][18];
+            nextP[17][18] = P[17][18];
+            nextP[18][18] = P[18][18];
+
+            nextP[16][19] = P[16][19];
+            nextP[17][19] = P[17][19];
+            nextP[18][19] = P[18][19];
+
+            nextP[16][20] = P[16][20];
+            nextP[17][20] = P[17][20];
+            nextP[18][20] = P[18][20];
+
+            nextP[16][21] = P[16][21];
+            nextP[17][21] = P[17][21];
+            nextP[18][21] = P[18][21];
+
+        }
+
         nextP[0][19] = P[0][19]*SPP[5] - P[1][19]*SPP[4] + P[2][19]*SPP[8] + P[9][19]*SPP[22] + P[12][19]*SPP[18];
         nextP[1][19] = P[1][19]*SPP[6] - P[0][19]*SPP[2] - P[2][19]*SPP[9] + P[10][19]*SPP[22] + P[13][19]*SPP[17];
         nextP[2][19] = P[0][19]*SPP[14] - P[1][19]*SPP[3] + P[2][19]*SPP[13] + P[11][19]*SPP[22] + P[14][19]*SPP[16];
@@ -1189,9 +1220,6 @@ void NavEKF2_core::CovariancePrediction()
         nextP[13][19] = P[13][19];
         nextP[14][19] = P[14][19];
         nextP[15][19] = P[15][19];
-        nextP[16][19] = P[16][19];
-        nextP[17][19] = P[17][19];
-        nextP[18][19] = P[18][19];
         nextP[19][19] = P[19][19];
         nextP[0][20] = P[0][20]*SPP[5] - P[1][20]*SPP[4] + P[2][20]*SPP[8] + P[9][20]*SPP[22] + P[12][20]*SPP[18];
         nextP[1][20] = P[1][20]*SPP[6] - P[0][20]*SPP[2] - P[2][20]*SPP[9] + P[10][20]*SPP[22] + P[13][20]*SPP[17];
@@ -1209,9 +1237,6 @@ void NavEKF2_core::CovariancePrediction()
         nextP[13][20] = P[13][20];
         nextP[14][20] = P[14][20];
         nextP[15][20] = P[15][20];
-        nextP[16][20] = P[16][20];
-        nextP[17][20] = P[17][20];
-        nextP[18][20] = P[18][20];
         nextP[19][20] = P[19][20];
         nextP[20][20] = P[20][20];
         nextP[0][21] = P[0][21]*SPP[5] - P[1][21]*SPP[4] + P[2][21]*SPP[8] + P[9][21]*SPP[22] + P[12][21]*SPP[18];
@@ -1230,9 +1255,6 @@ void NavEKF2_core::CovariancePrediction()
         nextP[13][21] = P[13][21];
         nextP[14][21] = P[14][21];
         nextP[15][21] = P[15][21];
-        nextP[16][21] = P[16][21];
-        nextP[17][21] = P[17][21];
-        nextP[18][21] = P[18][21];
         nextP[19][21] = P[19][21];
         nextP[20][21] = P[20][21];
         nextP[21][21] = P[21][21];
@@ -1436,7 +1458,12 @@ void NavEKF2_core::ConstrainVariances()
         zeroCols(P,12,14);
     }
     P[15][15] = constrain_float(P[15][15],0.0f,sq(10.0f * dtEkfAvg)); // delta velocity bias
-    for (uint8_t i=16; i<=18; i++) P[i][i] = constrain_float(P[i][i],0.0f,0.01f); // earth magnetic field
+    if (freezeEarthMagStates) {
+        zeroRows(P,16,18);
+        zeroCols(P,16,18);
+    } else {
+        for (uint8_t i=16; i<=18; i++) P[i][i] = constrain_float(P[i][i],0.0f,0.01f); // earth magnetic field
+    }
     for (uint8_t i=19; i<=21; i++) P[i][i] = constrain_float(P[i][i],0.0f,0.01f); // body magnetic field
     for (uint8_t i=22; i<=23; i++) P[i][i] = constrain_float(P[i][i],0.0f,1.0e3f); // wind velocity
 }
