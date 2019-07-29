@@ -548,8 +548,15 @@ void Plane::set_servos_controlled(void)
         // if armed and not spooled down ask quadplane code for forward throttle
         if (quadplane.motors->armed() &&
             quadplane.motors->get_desired_spool_state() != AP_Motors::DesiredSpoolState::SHUT_DOWN) {
-
-            fwd_thr = constrain_int16(quadplane.forward_throttle_pct(), min_throttle, max_throttle);
+            if (plane.quadplane.fwd_throttle_use) {
+            // handle special case where we are using forward throttle instead of forward tilt in Q modes
+                fwd_thr = 100.0f * q_fwd_throttle;
+            } else {
+                // ask quadplane code for forward throttle using legacy method that only works in 
+                // position control modes
+                fwd_thr = quadplane.forward_throttle_pct();
+            }
+            fwd_thr = constrain_int16(fwd_thr, min_throttle, max_throttle);
         }
         SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, fwd_thr);
     }

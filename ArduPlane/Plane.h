@@ -1086,6 +1086,9 @@ private:
     bool have_reverse_thrust(void) const;
     int16_t get_throttle_input(bool no_deadzone=false) const;
 
+    // quadplane customisations
+    float q_fwd_throttle; // forward throttle used in q modes
+
     enum Failsafe_Action {
         Failsafe_Action_None      = 0,
         Failsafe_Action_RTL       = 1,
