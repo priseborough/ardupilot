@@ -33,7 +33,6 @@
 
 #define POSCONTROL_ACTIVE_TIMEOUT_US            200000  // position controller is considered active if it has been called within the past 0.2 seconds
 
-#define POSCONTROL_VEL_ERROR_CUTOFF_FREQ        4.0f    // low-pass filter on velocity error (unit: hz)
 #define POSCONTROL_THROTTLE_CUTOFF_FREQ         2.0f    // low-pass filter on accel error (unit: hz)
 #define POSCONTROL_ACCEL_FILTER_HZ              2.0f    // low-pass filter on acceleration (unit: hz)
 #define POSCONTROL_JERK_RATIO                   1.0f    // Defines the time it takes to reach the requested acceleration
@@ -273,7 +272,7 @@ public:
 
     /// get pid controllers
     AC_P& get_pos_z_p() { return _p_pos_z; }
-    AC_P& get_vel_z_p() { return _p_vel_z; }
+    AC_PID& get_vel_z_pid() { return _pid_vel_z; }
     AC_PID& get_accel_z_pid() { return _pid_accel_z; }
     AC_P& get_pos_xy_p() { return _p_pos_xy; }
     AC_PID_2D& get_vel_xy_pid() { return _pid_vel_xy; }
@@ -297,6 +296,9 @@ public:
     bool pre_arm_checks(const char *param_prefix,
                         char *failure_msg,
                         const uint8_t failure_msg_len);
+
+    // enable or disable high vibration compensation
+    void set_vibe_comp(bool on_off);
 
     static const struct AP_Param::GroupInfo var_info[];
 
@@ -376,7 +378,7 @@ protected:
     AP_Float    _accel_xy_filt_hz;      // XY acceleration filter cutoff frequency
     AP_Float    _lean_angle_max;        // Maximum autopilot commanded angle (in degrees). Set to zero for Angle Max
     AC_P        _p_pos_z;
-    AC_P        _p_vel_z;
+    AC_PID      _pid_vel_z;
     AC_PID      _pid_accel_z;
     AC_P        _p_pos_xy;
     AC_PID_2D   _pid_vel_xy;
@@ -410,11 +412,14 @@ protected:
     Vector3f    _accel_target;          // acceleration target in cm/s/s
     Vector3f    _accel_error;           // acceleration error in cm/s/s
     Vector2f    _vehicle_horiz_vel;     // velocity to use if _flags.vehicle_horiz_vel_override is set
-    LowPassFilterFloat _vel_error_filter;   // low-pass-filter on z-axis velocity error
 
     LowPassFilterVector2f _accel_target_filter; // acceleration target filter
 
     // ekf reset handling
     uint32_t    _ekf_xy_reset_ms;      // system time of last recorded ekf xy position reset
     uint32_t    _ekf_z_reset_ms;       // system time of last recorded ekf altitude reset
+
+    // high vibration handling
+    bool        _vibe_comp_enabled;     // true when high vibration compensation is on
+    float       _vibe_comp_pid_velz_i_backup;   // vertical velocity I term backup
 };

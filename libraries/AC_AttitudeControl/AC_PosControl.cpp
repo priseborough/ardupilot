@@ -9,6 +9,11 @@ extern const AP_HAL::HAL& hal;
  // default gains for Plane
  # define POSCONTROL_POS_Z_P                    1.0f    // vertical position controller P gain default
  # define POSCONTROL_VEL_Z_P                    5.0f    // vertical velocity controller P gain default
+ # define POSCONTROL_VEL_Z_I                    0.0f    // vertical velocity controller I gain default
+ # define POSCONTROL_VEL_Z_D                    0.0f    // vertical velocity controller D gain default
+ # define POSCONTROL_VEL_Z_IMAX                 5000.0f // vertical velocity controller IMAX default
+ # define POSCONTROL_VEL_Z_FILT_HZ              4.0f    // vertical velocity controller input filter default
+ # define POSCONTROL_VEL_Z_DT                   0.02f   // vertical velocity controller dt default
  # define POSCONTROL_ACC_Z_P                    0.3f    // vertical acceleration controller P gain default
  # define POSCONTROL_ACC_Z_I                    1.0f    // vertical acceleration controller I gain default
  # define POSCONTROL_ACC_Z_D                    0.0f    // vertical acceleration controller D gain default
@@ -26,6 +31,11 @@ extern const AP_HAL::HAL& hal;
  // default gains for Sub
  # define POSCONTROL_POS_Z_P                    3.0f    // vertical position controller P gain default
  # define POSCONTROL_VEL_Z_P                    8.0f    // vertical velocity controller P gain default
+ # define POSCONTROL_VEL_Z_I                    0.0f    // vertical velocity controller I gain default
+ # define POSCONTROL_VEL_Z_D                    0.0f    // vertical velocity controller D gain default
+ # define POSCONTROL_VEL_Z_IMAX                 5000.0f // vertical velocity controller IMAX default
+ # define POSCONTROL_VEL_Z_FILT_HZ              4.0f    // vertical velocity controller input filter default
+ # define POSCONTROL_VEL_Z_DT                   0.0025f // vertical velocity controller dt default
  # define POSCONTROL_ACC_Z_P                    0.5f    // vertical acceleration controller P gain default
  # define POSCONTROL_ACC_Z_I                    0.1f    // vertical acceleration controller I gain default
  # define POSCONTROL_ACC_Z_D                    0.0f    // vertical acceleration controller D gain default
@@ -43,6 +53,11 @@ extern const AP_HAL::HAL& hal;
  // default gains for Copter / TradHeli
  # define POSCONTROL_POS_Z_P                    1.0f    // vertical position controller P gain default
  # define POSCONTROL_VEL_Z_P                    5.0f    // vertical velocity controller P gain default
+ # define POSCONTROL_VEL_Z_I                    0.0f    // vertical velocity controller I gain default
+ # define POSCONTROL_VEL_Z_D                    0.0f    // vertical velocity controller D gain default
+ # define POSCONTROL_VEL_Z_IMAX                 5000.0f // vertical velocity controller IMAX default
+ # define POSCONTROL_VEL_Z_FILT_HZ              4.0f    // vertical velocity controller input filter default
+ # define POSCONTROL_VEL_Z_DT                   0.0025f // vertical velocity controller dt default
  # define POSCONTROL_ACC_Z_P                    0.5f    // vertical acceleration controller P gain default
  # define POSCONTROL_ACC_Z_I                    1.0f    // vertical acceleration controller I gain default
  # define POSCONTROL_ACC_Z_D                    0.0f    // vertical acceleration controller D gain default
@@ -77,12 +92,14 @@ const AP_Param::GroupInfo AC_PosControl::var_info[] = {
     // @User: Standard
     AP_SUBGROUPINFO(_p_pos_z, "_POSZ_", 2, AC_PosControl, AC_P),
 
-    // @Param: _VELZ_P
-    // @DisplayName: Velocity (vertical) controller P gain
-    // @Description: Velocity (vertical) controller P gain.  Converts the difference between desired vertical speed and actual speed into a desired acceleration that is passed to the throttle acceleration controller
-    // @Range: 1.000 8.000
+    // 3 was _VELZ_P
+
+    // @Param: _ACCZ_FF
+    // @DisplayName: Acceleration (vertical) controller FF gain (Not Used)
+    // @Description: Acceleration (vertical) controller FF gain (Not Used)
+    // @Range: 0.0 3.0
+    // @Increment: 0.05
     // @User: Standard
-    AP_SUBGROUPINFO(_p_vel_z, "_VELZ_", 3, AC_PosControl, AC_P),
 
     // @Param: _ACCZ_P
     // @DisplayName: Acceleration (vertical) controller P gain
@@ -178,6 +195,60 @@ const AP_Param::GroupInfo AC_PosControl::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("_ANGLE_MAX", 7, AC_PosControl, _lean_angle_max, 0.0f),
 
+    // @Param: _VELZ_FF
+    // @DisplayName: Velocity (vertical) controller FF gain
+    // @Description: Velocity (vertical) controller FF gain.  Converts the desired velocity into a desired acceleration
+    // @Range: 1.000 8.000
+    // @User: Standard
+
+    // @Param: _VELZ_P
+    // @DisplayName: Velocity (vertical) controller P gain
+    // @Description: Velocity (vertical) controller P gain.  Converts the difference between desired vertical speed and actual speed into a desired acceleration that is passed to the vertical acceleration controller
+    // @Range: 1.000 8.000
+    // @User: Standard
+
+    // @Param: _VELZ_I
+    // @DisplayName: Velocity (vertical) controller I gain
+    // @Description: Velocity (vertical) controller I gain.  Converts the difference between desired vertical speed and actual speed into a desired acceleration that is passed to the vertical acceleration controller
+    // @Range: 1.000 8.000
+    // @User: Standard
+
+    // @Param: _VELZ_D
+    // @DisplayName: Velocity (vertical) controller D gain
+    // @Description: Velocity (vertical) controller D gain.  Converts the difference between desired vertical speed and actual speed into a desired acceleration that is passed to the vertical acceleration controller
+    // @Range: 0.0 1.0
+    // @User: Standard
+
+    // @Param: _VELZ_IMAX
+    // @DisplayName: Velocity (vertical) controller integrator maximum
+    // @Description: Velocity (vertical) controller integrator maximum.  Constrains the target acceleration that the I gain will output
+    // @Range: 0 10000
+    // @Increment: 10
+    // @Units: cm/s/s
+    // @User: Advanced
+
+    // @Param: _VELZ_FLTT
+    // @DisplayName: Velocity (vertical) controller target filter frequency
+    // @Description: Velocity (vertical) controller target filter frequency.  This filter is applied to the target
+    // @Range: 0 100
+    // @Units: Hz
+    // @User: Advanced
+
+    // @Param: _VELZ_FLTE
+    // @DisplayName: Velocity (vertical) controller input filter
+    // @Description: Velocity (vertical) controller input filter.  This filter is applied to the error
+    // @Range: 0 100
+    // @Units: Hz
+    // @User: Advanced
+
+    // @Param: _VELZ_FLTD
+    // @DisplayName: Velocity (vertical) controller D term input filter
+    // @Description: Velocity (vertcial) controller D term input filter.  This filter is applied to the input for the D term
+    // @Range: 0 100
+    // @Units: Hz
+    // @User: Advanced
+    AP_SUBGROUPINFO(_pid_vel_z, "_VELZ_", 8, AC_PosControl, AC_PID),
+
     AP_GROUPEND
 };
 
@@ -192,7 +263,7 @@ AC_PosControl::AC_PosControl(const AP_AHRS_View& ahrs, const AP_InertialNav& ina
     _motors(motors),
     _attitude_control(attitude_control),
     _p_pos_z(POSCONTROL_POS_Z_P),
-    _p_vel_z(POSCONTROL_VEL_Z_P),
+    _pid_vel_z(POSCONTROL_VEL_Z_P, POSCONTROL_VEL_Z_I, POSCONTROL_VEL_Z_D, 0.0f, POSCONTROL_VEL_Z_IMAX, 0.0f, POSCONTROL_VEL_Z_FILT_HZ, 0.0f, POSCONTROL_VEL_Z_DT),
     _pid_accel_z(POSCONTROL_ACC_Z_P, POSCONTROL_ACC_Z_I, POSCONTROL_ACC_Z_D, 0.0f, POSCONTROL_ACC_Z_IMAX, 0.0f, POSCONTROL_ACC_Z_FILT_HZ, 0.0f, POSCONTROL_ACC_Z_DT),
     _p_pos_xy(POSCONTROL_POS_XY_P),
     _pid_vel_xy(POSCONTROL_VEL_XY_P, POSCONTROL_VEL_XY_I, POSCONTROL_VEL_XY_D, POSCONTROL_VEL_XY_IMAX, POSCONTROL_VEL_XY_FILT_HZ, POSCONTROL_VEL_XY_FILT_D_HZ, POSCONTROL_DT_50HZ),
@@ -235,10 +306,8 @@ void AC_PosControl::set_dt(float delta_sec)
 
     // update PID controller dt
     _pid_accel_z.set_dt(_dt);
+    _pid_vel_z.set_dt(_dt);
     _pid_vel_xy.set_dt(_dt);
-
-    // update rate z-axis velocity error and accel error filters
-    _vel_error_filter.set_cutoff_frequency(POSCONTROL_VEL_ERROR_CUTOFF_FREQ);
 }
 
 /// set_max_speed_z - set the maximum climb and descent rates
@@ -409,7 +478,7 @@ void AC_PosControl::get_stopping_point_z(Vector3f& stopping_point) const
 
     // if position controller is active add current velocity error to avoid sudden jump in acceleration
     if (is_active_z()) {
-        curr_vel_z += _vel_error.z;
+        curr_vel_z += _pid_vel_z.get_latest_error();
         if (_flags.use_desvel_ff_z) {
             curr_vel_z -= _vel_desired.z;
         }
@@ -570,19 +639,21 @@ void AC_PosControl::run_z_controller()
 
     // reset velocity error and filter if this controller has just been engaged
     if (_flags.reset_rate_to_accel_z) {
-        // Reset Filter
-        _vel_error.z = 0;
-        _vel_error_filter.reset(0);
+        // reset filter
+        _pid_vel_z.reset_filter();
         _flags.reset_rate_to_accel_z = false;
-    } else {
-        // calculate rate error and filter with cut off frequency of 2 Hz
-        _vel_error.z = _vel_error_filter.apply(_vel_target.z - curr_vel.z, _dt);
     }
 
-    _accel_target.z = _p_vel_z.get_p(_vel_error.z);
+    // set input to velocity PID
+    const float vpid = _pid_vel_z.update_all(_vel_target.z, curr_vel.z, _motors.limit.throttle_lower || _motors.limit.throttle_upper);
+    const float vff = _pid_vel_z.get_ff();
 
+    // store filtered error in _vel_error.z
+    _vel_error.z = _pid_vel_z.get_latest_error();
+
+    // get PID results
+    _accel_target.z =  vpid + vff;
     _accel_target.z += _accel_desired.z;
-
 
     // the following section calculates a desired throttle needed to achieve the acceleration target
     float z_accel_meas;         // actual acceleration
@@ -595,7 +666,15 @@ void AC_PosControl::run_z_controller()
         _pid_accel_z.imax(_motors.get_throttle_hover() * 1000.0f);
     }
 
-    float thr_out = _pid_accel_z.update_all(_accel_target.z, z_accel_meas, (_motors.limit.throttle_lower || _motors.limit.throttle_upper)) * 0.001f +_motors.get_throttle_hover();
+    float thr_out;
+    if (_vibe_comp_enabled) {
+        // during vibration compensation use feed forward with manually calculated gain
+        // ToDo: clear pid_info P, I and D terms for logging
+        thr_out = (_motors.get_throttle_hover() / GRAVITY_MSS) * _accel_target.z * 0.001f;
+    } else {
+        thr_out = _pid_accel_z.update_all(_accel_target.z, z_accel_meas, (_motors.limit.throttle_lower || _motors.limit.throttle_upper)) * 0.001f;
+    }
+    thr_out += _motors.get_throttle_hover();
 
     // send throttle to attitude controller with angle boost
     _attitude_control.set_throttle_out(thr_out, true, POSCONTROL_THROTTLE_CUTOFF_FREQ);
@@ -1200,7 +1279,6 @@ bool AC_PosControl::pre_arm_checks(const char *param_prefix,
     } ps[] = {
         { "POSXY", get_pos_xy_p() },
         { "POSZ", get_pos_z_p() },
-        { "VELZ", get_vel_z_p() },
     };
     for (uint8_t i=0; i<ARRAY_SIZE(ps); i++) {
         // all AC_P's must have a positive P value:
@@ -1210,6 +1288,11 @@ bool AC_PosControl::pre_arm_checks(const char *param_prefix,
         }
     }
 
+    // z-axis velocity P must always be positive
+    if (!is_positive(get_vel_z_pid().kP())) {
+        hal.util->snprintf(failure_msg, failure_msg_len, "%s_VELZ_P must be > 0", param_prefix);
+        return false;
+    }
     // z-axis acceleration control PID doesn't use FF, so P and I must be positive
     if (!is_positive(get_accel_z_pid().kP())) {
         hal.util->snprintf(failure_msg, failure_msg_len, "%s_ACCZ_P must be > 0", param_prefix);
@@ -1221,4 +1304,28 @@ bool AC_PosControl::pre_arm_checks(const char *param_prefix,
     }
 
     return true;
+}
+
+// enable or disable high vibration compensation
+void AC_PosControl::set_vibe_comp(bool on_off)
+{
+    // return immediately if no change
+    if (on_off == _vibe_comp_enabled) {
+        return;
+    }
+
+    _vibe_comp_enabled = on_off;
+
+    if (_vibe_comp_enabled) {
+        // backup existing velocity i gain
+        _vibe_comp_pid_velz_i_backup = _pid_vel_z.kI();
+
+        // ensure I term is at least 1/2 of P
+        if (is_positive(_pid_vel_z.kP()) && (_pid_vel_z.kI() < _pid_vel_z.kP() * 0.5f)) {
+            _pid_vel_z.kI(_pid_vel_z.kP() * 0.5f);
+        }
+    } else {
+        // restore velz's i term gain
+        _pid_vel_z.kI(_vibe_comp_pid_velz_i_backup);
+    }
 }
