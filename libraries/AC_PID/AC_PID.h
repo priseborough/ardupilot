@@ -53,6 +53,9 @@ public:
     // todo: remove function when it is no longer used.
     float get_ff(float target);
 
+    // get latest error
+    float get_latest_error() const { return _error; }
+
     // reset_I - reset the integrator
     void reset_I();
 
