@@ -146,7 +146,9 @@ void NavEKF2_core::ResetHeight(void)
     // write to the state vector
     stateStruct.position.z = -hgtMea;
     outputDataNew.position.z = stateStruct.position.z;
+    outputDataVertNew.vel_d_integ = stateStruct.position.z;
     outputDataDelayed.position.z = stateStruct.position.z;
+    outputDataVertDelayed.vel_d_integ = stateStruct.position.z;
 
     // reset the terrain state height
     if (onGround) {
@@ -158,6 +160,7 @@ void NavEKF2_core::ResetHeight(void)
     }
     for (uint8_t i=0; i<imu_buffer_length; i++) {
         storedOutput[i].position.z = stateStruct.position.z;
+        storedOutputVert[i].vel_d_integ = stateStruct.position.z;
     }
 
     // Calculate the position jump due to the reset
@@ -186,9 +189,12 @@ void NavEKF2_core::ResetHeight(void)
     }
     for (uint8_t i=0; i<imu_buffer_length; i++) {
         storedOutput[i].velocity.z = stateStruct.velocity.z;
+        storedOutputVert[i].vel_d = stateStruct.velocity.z;
     }
     outputDataNew.velocity.z = stateStruct.velocity.z;
+    outputDataVertNew.vel_d = stateStruct.velocity.z;
     outputDataDelayed.velocity.z = stateStruct.velocity.z;
+    outputDataVertDelayed.vel_d = stateStruct.velocity.z;
 
     // reset the corresponding covariances
     zeroRows(P,5,5);
@@ -386,8 +392,11 @@ void NavEKF2_core::SelectVelPosFusion()
             // Add the offset to the output observer states
             outputDataNew.position.z += posResetD;
             outputDataDelayed.position.z += posResetD;
+            outputDataVertNew.vel_d_integ += posResetD;
+            outputDataVertDelayed.vel_d_integ += posResetD;
             for (uint8_t i=0; i<imu_buffer_length; i++) {
                 storedOutput[i].position.z += posResetD;
+                storedOutputVert[i].vel_d_integ += posResetD;
             }
 
             // store the time of the reset

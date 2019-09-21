@@ -415,6 +415,12 @@ private:
         Vector3f    position;       // 7..9
     };
 
+    struct output_elements_vert {
+        float	    vel_d;		    // 0
+        float	    vel_d_integ;	// 1
+        float	    dt;			    // 2
+    };
+
     struct imu_elements {
         Vector3f    delAng;         // 0..2
         Vector3f    delVel;         // 3..5
@@ -810,6 +816,7 @@ private:
     obs_ring_buffer_t<tas_elements> storedTAS;      // TAS data buffer
     obs_ring_buffer_t<range_elements> storedRange;  // Range finder data buffer
     imu_ring_buffer_t<output_elements> storedOutput;// output state buffer
+    imu_ring_buffer_t<output_elements_vert> storedOutputVert;// output vertical state buffer
     Matrix3f prevTnb;               // previous nav to body transformation used for INS earth rotation compensation
     ftype accNavMag;                // magnitude of navigation accel - used to adjust GPS obs variance (m/s^2)
     ftype accNavMagHoriz;           // magnitude of navigation accel in horizontal plane (m/s^2)
@@ -914,6 +921,8 @@ private:
     uint8_t gpsStoreIndex;          // GPS data storage index
     output_elements outputDataNew;  // output state data at the current time step
     output_elements outputDataDelayed; // output state data at the current time step
+    output_elements_vert outputDataVertNew;  // output vertical state data at the current time step
+    output_elements_vert outputDataVertDelayed; // output vertical state data at the current time step
     Vector3f delAngCorrection;      // correction applied to delta angles used by output observer to track the EKF
     Vector3f velErrintegral;        // integral of output predictor NED velocity tracking error (m)
     Vector3f posErrintegral;        // integral of output predictor NED position tracking error (m.sec)
@@ -960,10 +969,6 @@ private:
     Vector3f outputTrackError;      // attitude (rad), velocity (m/s) and position (m) tracking error magnitudes from the output observer
     Vector3f velOffsetNED;          // This adds to the earth frame velocity estimate at the IMU to give the velocity at the body origin (m/s)
     Vector3f posOffsetNED;          // This adds to the earth frame position estimate at the IMU to give the position at the body origin (m)
-
-    // variables used to calculate a vertical velocity that is kinematically consistent with the verical position
-    float posDownDerivative;        // Rate of chage of vertical position (dPosD/dt) in m/s. This is the first time derivative of PosD.
-    float posDown;                  // Down position state used in calculation of posDownRate
 
     // variables used by the pre-initialisation GPS checks
     struct Location gpsloc_prev;    // LLH location of previous GPS measurement

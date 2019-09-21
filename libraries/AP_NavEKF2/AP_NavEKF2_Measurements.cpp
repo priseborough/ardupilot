@@ -569,7 +569,7 @@ void NavEKF2_core::readGpsData()
                 alignMagStateDeclination();
 
                 // Set the height of the NED origin
-                ekfGpsRefHgt = (double)0.01 * (double)gpsloc.alt + (double)outputDataNew.position.z;
+                ekfGpsRefHgt = (double)0.01 * (double)gpsloc.alt + (double)stateStruct.position.z;
 
                 // Set the uncertainty of the GPS origin height
                 ekfOriginHgtVar = sq(gpsHgtAccuracy);

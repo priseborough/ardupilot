@@ -96,6 +96,9 @@ bool NavEKF2_core::setup_core(NavEKF2 *_frontend, uint8_t _imu_index, uint8_t _c
     if(!storedOutput.init(imu_buffer_length)) {
         return false;
     }
+    if(!storedOutputVert.init(imu_buffer_length)) {
+        return false;
+    }
 
     return true;
 }
@@ -226,8 +229,6 @@ void NavEKF2_core::InitialiseVariables()
     gpsVertVelFilt = 0.0f;
     gpsHorizVelFilt = 0.0f;
     memset(&statesArray, 0, sizeof(statesArray));
-    posDownDerivative = 0.0f;
-    posDown = 0.0f;
     posVelFusionDelayed = false;
     optFlowFusionDelayed = false;
     airSpdFusionDelayed = false;
@@ -315,6 +316,7 @@ void NavEKF2_core::InitialiseVariables()
     storedTAS.reset();
     storedRange.reset();
     storedOutput.reset();
+    storedOutputVert.reset();
     storedRangeBeacon.reset();
     storedExtNav.reset();
 
@@ -720,12 +722,20 @@ void NavEKF2_core::calcOutputStates()
 
     // save velocity for use in trapezoidal integration for position calcuation
     Vector3f lastVelocity = outputDataNew.velocity;
+    float lastVertVel = outputDataVertNew.vel_d;
 
     // sum delta velocities to get velocity
+    // do the same for the vertical position derivative complementary filter
     outputDataNew.velocity += delVelNav;
+    outputDataVertNew.vel_d += delVelNav.z;
 
     // apply a trapezoidal integration to velocities to calculate position
+    // do the same for the vertical position derivative complementary filter
     outputDataNew.position += (outputDataNew.velocity + lastVelocity) * (imuDataNew.delVelDT*0.5f);
+    outputDataVertNew.vel_d_integ += (outputDataVertNew.vel_d + lastVertVel) * (imuDataNew.delVelDT*0.5f);
+
+	// accumulate the time for each update for use in complementary filter integration
+	outputDataVertNew.dt += imuDataNew.delVelDT;
 
     // If the IMU accelerometer is offset from the body frame origin, then calculate corrections
     // that can be added to the EKF velocity and position outputs so that they represent the velocity
@@ -752,9 +762,11 @@ void NavEKF2_core::calcOutputStates()
     if (runUpdates) {
         // store the states at the output time horizon
         storedOutput[storedIMU.get_youngest_index()] = outputDataNew;
+        storedOutputVert[storedIMU.get_youngest_index()] = outputDataVertNew;
 
         // recall the states from the fusion time horizon
         outputDataDelayed = storedOutput[storedIMU.get_oldest_index()];
+        outputDataVertDelayed = storedOutputVert[storedIMU.get_oldest_index()];
 
         // compare quaternion data with EKF quaternion at the fusion time horizon and calculate correction
 
@@ -785,8 +797,13 @@ void NavEKF2_core::calcOutputStates()
         delAngCorrection = deltaAngErr * errorGain * dtIMUavg;
 
         // calculate velocity and position tracking errors
-        Vector3f velErr = (stateStruct.velocity - outputDataDelayed.velocity);
-        Vector3f posErr = (stateStruct.position - outputDataDelayed.position);
+        Vector3f velErr = stateStruct.velocity - outputDataDelayed.velocity;
+        Vector3f posErr = stateStruct.position - outputDataDelayed.position;
+
+        // calculate vertical velocity and position tracking errors for complementary filter
+        // used to estimate vertical position derivative
+        float velErrD = stateStruct.velocity.z - outputDataVertDelayed.vel_d;
+        float posErrD = stateStruct.position.z - outputDataVertDelayed.vel_d_integ;
 
         // collect magnitude tracking error for diagnostics
         outputTrackError.x = deltaAngErr.length();
@@ -799,6 +816,45 @@ void NavEKF2_core::calcOutputStates()
         // calculate a gain to track the EKF position states with the specified time constant
         float velPosGain = dtEkfAvg / constrain_float(tauPosVel, dtEkfAvg, 10.0f);
 
+        /*
+        * Calculate a correction to be applied to vel_d that casues vel_d_integ to track the EKF
+        * down position state at the fusion time horizon using an alternative algorithm to what
+        * is used for the vel and pos state tracking. The algorithm applies a correction to the vel_d
+        * state history and propagates vel_d_integ forward in time using the corrected vel_d history.
+        * This provides an alternative vertical velocity output that is closer to the first derivative
+        * of the position but does degrade tracking relative to the EKF state.
+        */
+
+        // calculate a velocity correction that will be applied to the output state history
+        // using a PD feedback tuned to a 5% overshoot
+        const float vel_d_correction = posErrD * velPosGain + velErrD * velPosGain * 1.1f;
+
+        uint8_t index = storedIMU.get_youngest_index();
+        for (uint8_t counter = 0; counter < imu_buffer_length-1; counter++) {
+            const uint8_t index_next = (index + 1) % imu_buffer_length;
+            output_elements_vert &current_state = storedOutputVert[index];
+            output_elements_vert &next_state = storedOutputVert[index_next];
+
+            // correct the velocity
+            if (counter == 0) {
+                current_state.vel_d += vel_d_correction;
+            }
+
+            next_state.vel_d += vel_d_correction;
+
+            // position is propagated forward using the corrected velocity and a trapezoidal integrator
+            next_state.vel_d_integ = current_state.vel_d_integ + (current_state.vel_d + next_state.vel_d) * 0.5f * next_state.dt;
+
+            // advance the index
+            index = (index + 1) % imu_buffer_length;
+        }
+
+        // update output state to corrected values
+        outputDataVertNew = storedOutputVert[storedIMU.get_youngest_index()];
+
+        // reset time delta to zero for the next accumulation of full rate IMU data
+        outputDataVertNew.dt = 0.0f;
+
         // use a PI feedback to calculate a correction that will be applied to the output state history
         posErrintegral += posErr;
         velErrintegral += velErr;
@@ -810,7 +866,7 @@ void NavEKF2_core::calcOutputStates()
         // but does not introduce a time delay in the 'correction loop' and allows smaller tracking time constants
         // to be used
         output_elements outputStates;
-        for (unsigned index=0; index < imu_buffer_length; index++) {
+        for (index=0; index < imu_buffer_length; index++) {
             outputStates = storedOutput[index];
 
             // a constant  velocity correction is applied
@@ -1368,14 +1424,17 @@ void NavEKF2_core::StoreOutputReset()
     outputDataNew.quat = stateStruct.quat;
     outputDataNew.velocity = stateStruct.velocity;
     outputDataNew.position = stateStruct.position;
+    outputDataVertNew.vel_d = stateStruct.velocity.z;
+    outputDataVertNew.vel_d_integ = stateStruct.position.z;
+
     // write current measurement to entire table
     for (uint8_t i=0; i<imu_buffer_length; i++) {
         storedOutput[i] = outputDataNew;
+        storedOutputVert[i] = outputDataVertNew;
     }
     outputDataDelayed = outputDataNew;
-    // reset the states for the complementary filter used to provide a vertical position dervative output
-    posDown = stateStruct.position.z;
-    posDownDerivative = stateStruct.velocity.z;
+    outputDataVertDelayed = outputDataVertNew;
+
 }
 
 // Reset the stored output quaternion history to current EKF state
