@@ -30,6 +30,7 @@
 #include <AP_NavEKF/AP_NavEKF_core_common.h>
 #include <AP_NavEKF3/AP_NavEKF3_Buffer.h>
 #include <AP_InertialSensor/AP_InertialSensor.h>
+#include "AP_NavEKF/EKFGSF_yaw.h"
 
 // GPS pre-flight check bit locations
 #define MASK_GPS_NSATS      (1<<0)
@@ -367,7 +368,20 @@ public:
     // get timing statistics structure
     void getTimingStatistics(struct ekf_timing &timing);
 
+    // get solution data for the EKF-GSF emergency yaw estimator
+    // return false if data not available
+	bool getDataEKFGSF(float *yaw_composite, float *yaw_composite_variance, float yaw[N_MODELS_EKFGSF], float innov_VN[N_MODELS_EKFGSF], float innov_VE[N_MODELS_EKFGSF], float weight[N_MODELS_EKFGSF]);
+
+    // attempt to reset the yaw to the EKF-GSF value
+    // returns false if unsuccessful
+    bool EKFGSF_resetMainFilterYaw();
+
+    // Writes the default equivalent airspeed in m/s to be used in forward flight if a measured airspeed is required and not available.
+    void writeDefaultAirSpeed(float airspeed);
+
 private:
+    EKFGSF_yaw *yawEstimator;
+
     // Reference to the global EKF frontend for parameters
     NavEKF3 *frontend;
     uint8_t imu_index; // preferred IMU index
@@ -695,8 +709,8 @@ private:
     // align the yaw angle for the quaternion states using the external yaw sensor
     void alignYawAngle();
 
-    // and return attitude quaternion
-    Quaternion calcQuatAndFieldStates(float roll, float pitch);
+    // update quaternion, mag field states and associated variances using magnetomer and declination data
+    void calcQuatAndFieldStates();
 
     // zero stored variables
     void InitialiseVariables();
@@ -847,6 +861,14 @@ private:
     // correct GPS data for antenna position
     void CorrectGPSForAntennaOffset(gps_elements &gps_data);
 
+    // reset the quaternion states using the supplied yaw angle, maintaining the previous roll and pitch
+    // also reset the body to nav frame rotation matrix
+    // reset the quaternion state covariances using the supplied yaw variance
+    // yaw          : new yaw angle (rad)
+    // yaw_variance : variance of new yaw angle (rad^2)
+    // isDeltaYaw   : true when the yaw should be added to the existing yaw angle
+    void resetQuatStateYawOnly(float yaw, float yawVariance, bool isDeltaYaw);
+
     // Variables
     bool statesInitialised;         // boolean true when filter states have been initialised
     bool velHealth;                 // boolean true if velocity measurements have passed innovation consistency check
@@ -894,6 +916,7 @@ private:
     Vector3f varInnovMag;           // innovation variance output from fusion of X,Y,Z compass measurements
     ftype innovVtas;                // innovation output from fusion of airspeed measurements
     ftype varInnovVtas;             // innovation variance output from fusion of airspeed measurements
+    float defaultAirSpeed;          // default equivalent airspeed in m/s to be used if the measurement is unavailable. Do not use if not positive.
     bool magFusePerformed;          // boolean set to true when magnetometer fusion has been perfomred in that time step
     bool magFuseRequired;           // boolean set to true when magnetometer fusion will be perfomred in the next time step
     uint32_t prevTasStep_ms;        // time stamp of last TAS fusion step
@@ -1306,4 +1329,9 @@ private:
 
     // vehicle specific initial gyro bias uncertainty
     float InitialGyroBiasUncertainty(void) const;
+
+    // The following declarations are used to control when the main navigation filter resets it's yaw to the estimate provided by the GSF
+	uint64_t EKFGSF_yaw_reset_time_ms;	// timestamp of last emergency yaw reset (uSec)
+    uint8_t EKFGSF_yaw_reset_count;     // number of emergency yaw resets performed
+    bool EKFGSF_run_filterbank;         // true when the filter bank is active
 };

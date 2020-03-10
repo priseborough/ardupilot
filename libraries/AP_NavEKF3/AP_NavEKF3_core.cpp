@@ -152,6 +152,22 @@ bool NavEKF3_core::setup_core(uint8_t _imu_index, uint8_t _core_index)
                     (unsigned)obs_buffer_length,
                     (unsigned)flow_buffer_length,
                     (double)dtEkfAvg);
+
+    if ((yawEstimator == nullptr) && (frontend->_gsfRunMask & (1U<<core_index))) {
+        // check if there is enough memory to create the EKF-GSF object
+        if (hal.util->available_memory() < sizeof(EKFGSF_yaw) + 1024) {
+            gcs().send_text(MAV_SEVERITY_CRITICAL, "EKF3 IMU%u GSF: not enough memory",(unsigned)imu_index);
+            return false;
+        }
+
+        // try to instantiate
+        yawEstimator = new EKFGSF_yaw();
+        if (yawEstimator == nullptr) {
+            gcs().send_text(MAV_SEVERITY_CRITICAL, "EKF3 IMU%uGSF: allocation failed",(unsigned)imu_index);
+            return false;
+        }
+    }
+
     return true;
 }
     
@@ -389,6 +405,11 @@ void NavEKF3_core::InitialiseVariables()
     hal.util->snprintf(prearm_fail_string, sizeof(prearm_fail_string), "EKF3 still initialising");
 
     InitialiseVariablesMag();
+
+    // emergency reset of yaw to EKFGSF estimate
+    EKFGSF_yaw_reset_time_ms = 0;
+    EKFGSF_yaw_reset_count = 0;
+    EKFGSF_run_filterbank = false;
 }
 
 
@@ -625,6 +646,26 @@ void NavEKF3_core::UpdateFilter(bool predict)
 
         // Update the filter status
         updateFilterStatus();
+
+        // Generate an alternative yaw estimate used for inflight recovery from bad compass data
+        if (yawEstimator != nullptr) {
+            float trueAirspeed;
+            if (is_positive(defaultAirSpeed) && assume_zero_sideslip()) {
+                if (imuDataDelayed.time_ms < (tasDataDelayed.time_ms + 5000)) {
+                    trueAirspeed = tasDataDelayed.tas;
+                } else {
+                    trueAirspeed = defaultAirSpeed * AP::ahrs().get_EAS2TAS();
+                }
+            } else {
+                trueAirspeed = 0.0f;
+            }
+            yawEstimator->update(imuDataDelayed.delAng, imuDataDelayed.delVel, imuDataDelayed.delAngDT, imuDataDelayed.delVelDT, EKFGSF_run_filterbank, trueAirspeed);
+            if (gpsDataToFuse) {
+                Vector2f gpsVelNE = Vector2f(gpsDataDelayed.vel.x, gpsDataDelayed.vel.y);
+                float gpsVelAcc = fmaxf(gpsSpdAccuracy, frontend->_gpsHorizVelNoise);
+                yawEstimator->pushVelData(gpsVelNE, gpsVelAcc);
+            }
+        }
     }
 
     // Wind output forward from the fusion to output time horizon
@@ -1599,89 +1640,60 @@ void NavEKF3_core::calcEarthRateNED(Vector3f &omega, int32_t latitude) const
     omega.z  = -earthRate*sinf(lat_rad);
 }
 
-// initialise the earth magnetic field states using declination, supplied roll/pitch
-// and magnetometer measurements and return initial attitude quaternion
-Quaternion NavEKF3_core::calcQuatAndFieldStates(float roll, float pitch)
+// update quaternion, mag field states and associated variances using magnetomer and declination data
+void NavEKF3_core::calcQuatAndFieldStates()
 {
-    // declare local variables required to calculate initial orientation and magnetic field
-    float yaw;
-    Matrix3f Tbn;
-    Vector3f initMagNED;
-    Quaternion initQuat;
-
-    if (use_compass()) {
-        // calculate rotation matrix from body to NED frame
-        Tbn.from_euler(roll, pitch, 0.0f);
-
-        // read the magnetometer data
-        readMagData();
-
-        // rotate the magnetic field into NED axes
-        initMagNED = Tbn * magDataDelayed.mag;
-
-        // calculate heading of mag field rel to body heading
-        float magHeading = atan2f(initMagNED.y, initMagNED.x);
-
-        // get the magnetic declination
-        float magDecAng = MagDeclination();
-
-        // calculate yaw angle rel to true north
-        yaw = magDecAng - magHeading;
-
-        // calculate initial filter quaternion states using yaw from magnetometer
-        // store the yaw change so that it can be retrieved externally for use by the control loops to prevent yaw disturbances following a reset
-        Vector3f tempEuler;
-        stateStruct.quat.to_euler(tempEuler.x, tempEuler.y, tempEuler.z);
-        // this check ensures we accumulate the resets that occur within a single iteration of the EKF
-        if (imuSampleTime_ms != lastYawReset_ms) {
-            yawResetAngle = 0.0f;
-        }
-        yawResetAngle += wrap_PI(yaw - tempEuler.z);
-        lastYawReset_ms = imuSampleTime_ms;
-        // calculate an initial quaternion using the new yaw value
-        initQuat.from_euler(roll, pitch, yaw);
-        // zero the attitude covariances because the correlations will now be invalid
-        zeroAttCovOnly();
-
-        // calculate initial Tbn matrix and rotate Mag measurements into NED
-        // to set initial NED magnetic field states
-        // don't do this if the earth field has already been learned
-        if (!magFieldLearned) {
-            initQuat.rotation_matrix(Tbn);
-            if (have_table_earth_field && frontend->_mag_ef_limit > 0) {
-                stateStruct.earth_magfield = table_earth_field_ga;
-            } else {
-                stateStruct.earth_magfield = Tbn * magDataDelayed.mag;
-            }
-
-            // set the NE earth magnetic field states using the published declination
-            // and set the corresponding variances and covariances
-            alignMagStateDeclination();
-
-            // set the remaining variances and covariances
-            zeroRows(P,18,21);
-            zeroCols(P,18,21);
-            P[18][18] = sq(frontend->_magNoise);
-            P[19][19] = P[18][18];
-            P[20][20] = P[18][18];
-            P[21][21] = P[18][18];
-
-        }
-
-        // record the fact we have initialised the magnetic field states
-        recordMagReset();
-
-        // clear mag state reset request
-        magStateResetRequest = false;
-
-    } else {
-        // this function should not be called if there is no compass data but if it is, return the
-        // current attitude
-        initQuat = stateStruct.quat;
+    if (!use_compass()) {
+        return;
     }
 
-    // return attitude quaternion
-    return initQuat;
+    // update rotation matrix from body to NED frame
+    stateStruct.quat.inverse().rotation_matrix(prevTnb);
+
+    // read the magnetometer data
+    readMagData();
+
+    // rotate the magnetic field into NED axes
+    Vector3f initMagNED = prevTnb * magDataDelayed.mag;
+
+    // calculate heading of mag field rel to body heading
+    float magHeading = atan2f(initMagNED.y, initMagNED.x);
+
+    // get the magnetic declination
+    float magDecAng = MagDeclination();
+
+    // calculate yaw angle delta
+    float yaw_delta = magDecAng - magHeading;
+
+    // update quaternion states and covariances
+    resetQuatStateYawOnly(yaw_delta, sq(MAX(frontend->_yawNoise, 1.0e-2f)), true);
+
+    // Rotate Mag measurements into NED to set initial NED magnetic field states
+    // Don't do this if the earth field has already been learned
+    if (!magFieldLearned) {
+        if (have_table_earth_field && frontend->_mag_ef_limit > 0) {
+            stateStruct.earth_magfield = table_earth_field_ga;
+        } else {
+            stateStruct.earth_magfield = prevTnb.transposed() * magDataDelayed.mag;
+        }
+
+        // set the NE earth magnetic field states using the published declination
+        // and set the corresponding variances and covariances
+        alignMagStateDeclination();
+
+        // set the remaining variances and covariances
+        zeroRows(P,18,21);
+        zeroCols(P,18,21);
+        P[18][18] = sq(frontend->_magNoise);
+        P[19][19] = P[18][18];
+        P[20][20] = P[18][18];
+        P[21][21] = P[18][18];
+
+    }
+
+    // record the fact we have initialised the magnetic field states
+    recordMagReset();
+
 }
 
 // zero the attitude covariances, but preserve the variances
