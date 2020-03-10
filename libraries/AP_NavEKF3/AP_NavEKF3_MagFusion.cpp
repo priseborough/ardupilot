@@ -48,6 +48,11 @@ void NavEKF3_core::controlMagYawReset()
 
     }
 
+    // reset the limit on the number of magnetic anomaly resets for each takeoff
+    if (onGround) {
+        magYawAnomallyCount = 0;
+    }
+
     // Check if conditions for a interim or final yaw/mag reset are met
     bool finalResetRequest = false;
     bool interimResetRequest = false;
@@ -70,7 +75,12 @@ void NavEKF3_core::controlMagYawReset()
 
         // if yaw innovations and height have increased and we haven't rotated much
         // then we are climbing away from a ground based magnetic anomaly and need to reset
-        interimResetRequest = hgtIncreasing && yawInnovIncreasing && !largeAngleChange;
+        interimResetRequest = !finalInflightYawInit
+                                && !finalResetRequest
+                                && (magYawAnomallyCount < MAG_ANOMALY_RESET_MAX)
+                                && hgtIncreasing
+                                && yawInnovIncreasing
+                                && !largeAngleChange;
     }
 
     // an initial reset is required if we have not yet aligned the yaw angle
@@ -114,6 +124,7 @@ void NavEKF3_core::controlMagYawReset()
         if (finalResetRequest) {
             gcs().send_text(MAV_SEVERITY_INFO, "EKF3 IMU%u in-flight yaw alignment complete",(unsigned)imu_index);
         } else if (interimResetRequest) {
+            magYawAnomallyCount++;
             gcs().send_text(MAV_SEVERITY_WARNING, "EKF3 IMU%u ground mag anomaly, yaw re-aligned",(unsigned)imu_index);
         }
 

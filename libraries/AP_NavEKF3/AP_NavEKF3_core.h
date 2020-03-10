@@ -63,6 +63,9 @@
 // mag fusion final reset altitude (using NED frame so altitude is negative)
 #define EKF3_MAG_FINAL_RESET_ALT 2.5f
 
+// maximum number of yaw resets due to detected magnetic anomaly allowed per flight
+#define MAG_ANOMALY_RESET_MAX 2
+
 class AP_AHRS;
 
 class NavEKF3_core : public NavEKF_core_common
@@ -1234,6 +1237,7 @@ private:
 
     // control of post takeoff magentic field and heading resets
     bool finalInflightYawInit;      // true when the final post takeoff initialisation of yaw angle has been performed
+    uint8_t magYawAnomallyCount;    // Number of times the yaw has been reset due to a magnetic anomaly during initial ascent
     bool finalInflightMagInit;      // true when the final post takeoff initialisation of magnetic field states been performed
     bool magStateResetRequest;      // true if magnetic field states need to be reset using the magnetomter measurements
     bool magYawResetRequest;        // true if the vehicle yaw and magnetic field states need to be reset using the magnetometer measurements
