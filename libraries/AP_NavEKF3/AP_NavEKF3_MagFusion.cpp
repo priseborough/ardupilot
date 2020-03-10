@@ -286,6 +286,40 @@ void NavEKF3_core::SelectMagFusion()
         return;
     }
 
+    // Handle case where we are not useing a yaw sensor of any type and will reset
+    // the yaw in flight using the output from the GSF yaw estimator.
+    if ((frontend->_magCal == 6)) {
+        if ((yawEstimator == nullptr) || yawAlignComplete) {
+            return;
+        }
+        float yawEKFGSF, yawVarianceEKFGSF;
+        if (tiltAlignComplete &&
+            yawEstimator->getYawData(&yawEKFGSF, &yawVarianceEKFGSF) &&
+            yawVarianceEKFGSF < sq(radians(15.0f)))
+        {
+            // keep roll and pitch and reset yaw
+            resetQuatStateYawOnly(yawEKFGSF, yawVarianceEKFGSF, false);
+
+            // record the emergency reset event
+            EKFGSF_yaw_reset_time_ms = imuSampleTime_ms;
+            EKFGSF_yaw_reset_count++;
+
+            gcs().send_text(MAV_SEVERITY_WARNING, "EKF3 IMU%u yaw aligned using GPS",(unsigned)imu_index);
+
+            // Fail the magnetomer so it doesn't get used and pull the yaw away from the correct value
+            allMagSensorsFailed = true;
+
+            // reset velocity and position states to GPS - if yaw is fixed then the filter should start to operate correctly
+            ResetVelocity();
+            ResetPosition();
+
+            // reset test ratios that are reported to prevent a race condition with the external state machine requesting the reset
+            velTestRatio = 0.0f;
+            posTestRatio = 0.0f;
+        }
+        return;
+    }
+
     // check for and read new magnetometer measurements
     readMagData();
 

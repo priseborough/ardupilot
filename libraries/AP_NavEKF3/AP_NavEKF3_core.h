@@ -864,6 +864,10 @@ private:
     // correct GPS data for antenna position
     void CorrectGPSForAntennaOffset(gps_elements &gps_data);
 
+    // Run an independent yaw estimator algorithm that uses IMU, GPs horizontal velocity
+    // and optionally true airspeed data.
+    void runYawEstimator(void);
+
     // reset the quaternion states using the supplied yaw angle, maintaining the previous roll and pitch
     // also reset the body to nav frame rotation matrix
     // reset the quaternion state covariances using the supplied yaw variance

@@ -574,3 +574,24 @@ void  NavEKF3_core::updateFilterStatus(void)
     filterStatus.flags.initalized = filterStatus.flags.initalized || healthy();
 }
 
+void NavEKF3_core::runYawEstimator()
+{
+    if (yawEstimator != nullptr && frontend->_fusionModeGPS <= 1) {
+        float trueAirspeed;
+        if (is_positive(defaultAirSpeed) && assume_zero_sideslip()) {
+            if (imuDataDelayed.time_ms < (tasDataDelayed.time_ms + 5000)) {
+                trueAirspeed = tasDataDelayed.tas;
+            } else {
+                trueAirspeed = defaultAirSpeed * AP::ahrs().get_EAS2TAS();
+            }
+        } else {
+            trueAirspeed = 0.0f;
+        }
+        yawEstimator->update(imuDataDelayed.delAng, imuDataDelayed.delVel, imuDataDelayed.delAngDT, imuDataDelayed.delVelDT, EKFGSF_run_filterbank, trueAirspeed);
+        if (gpsDataToFuse) {
+            Vector2f gpsVelNE = Vector2f(gpsDataDelayed.vel.x, gpsDataDelayed.vel.y);
+            float gpsVelAcc = fmaxf(gpsSpdAccuracy, frontend->_gpsHorizVelNoise);
+            yawEstimator->pushVelData(gpsVelNE, gpsVelAcc);
+        }
+    }
+}

@@ -440,8 +440,13 @@ void NavEKF3_core::InitialiseVariablesMag()
     storedYawAng.reset();
 }
 
-// Initialise the states from accelerometer and magnetometer data (if present)
-// This method can only be used when the vehicle is static
+/*
+Initialise the states from accelerometer data. This assumes measured acceleration 
+is dominated by gravity. If this assumption is not true then the EKF will require
+timee to reduce the resulting tilt error. Yaw alignment is not performed by this
+function, but is perfomred later and initiated the SelectMagFusion() function
+after the tilt has stabilised.
+*/
 bool NavEKF3_core::InitialiseFilterBootstrap(void)
 {
     // If we are a plane and don't have GPS lock then don't initialise
@@ -648,24 +653,8 @@ void NavEKF3_core::UpdateFilter(bool predict)
         updateFilterStatus();
 
         // Generate an alternative yaw estimate used for inflight recovery from bad compass data
-        if (yawEstimator != nullptr) {
-            float trueAirspeed;
-            if (is_positive(defaultAirSpeed) && assume_zero_sideslip()) {
-                if (imuDataDelayed.time_ms < (tasDataDelayed.time_ms + 5000)) {
-                    trueAirspeed = tasDataDelayed.tas;
-                } else {
-                    trueAirspeed = defaultAirSpeed * AP::ahrs().get_EAS2TAS();
-                }
-            } else {
-                trueAirspeed = 0.0f;
-            }
-            yawEstimator->update(imuDataDelayed.delAng, imuDataDelayed.delVel, imuDataDelayed.delAngDT, imuDataDelayed.delVelDT, EKFGSF_run_filterbank, trueAirspeed);
-            if (gpsDataToFuse) {
-                Vector2f gpsVelNE = Vector2f(gpsDataDelayed.vel.x, gpsDataDelayed.vel.y);
-                float gpsVelAcc = fmaxf(gpsSpdAccuracy, frontend->_gpsHorizVelNoise);
-                yawEstimator->pushVelData(gpsVelNE, gpsVelAcc);
-            }
-        }
+        // requires horizontal GPS velocity
+        runYawEstimator();
     }
 
     // Wind output forward from the fusion to output time horizon
