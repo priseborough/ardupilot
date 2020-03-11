@@ -381,6 +381,12 @@ public:
      */
     void checkLaneSwitch(void);
 
+    /*
+      Request a reset of the EKF yaw. This is called when the vehicle code is about to
+      trigger an EKF failsafe, and it would like to avoid that.
+     */
+    void requestYawReset(void);
+
     // write EKF information to on-board logs
     void Log_Write();
 

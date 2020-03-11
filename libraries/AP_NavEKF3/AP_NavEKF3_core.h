@@ -66,6 +66,9 @@
 // maximum number of yaw resets due to detected magnetic anomaly allowed per flight
 #define MAG_ANOMALY_RESET_MAX 2
 
+// number of seconds a request to reset the yaw to the GSF estimate is active before it times out
+#define YAW_RESET_TO_GSF_TIMEOUT_MS 5000
+
 class AP_AHRS;
 
 class NavEKF3_core : public NavEKF_core_common
@@ -375,12 +378,11 @@ public:
     // return false if data not available
 	bool getDataEKFGSF(float *yaw_composite, float *yaw_composite_variance, float yaw[N_MODELS_EKFGSF], float innov_VN[N_MODELS_EKFGSF], float innov_VE[N_MODELS_EKFGSF], float weight[N_MODELS_EKFGSF]);
 
-    // attempt to reset the yaw to the EKF-GSF value
-    // returns false if unsuccessful
-    bool EKFGSF_resetMainFilterYaw();
-
     // Writes the default equivalent airspeed in m/s to be used in forward flight if a measured airspeed is required and not available.
     void writeDefaultAirSpeed(float airspeed);
+
+    // request a reset the yaw to the EKF-GSF value
+    void EKFGSF_requestYawReset();
 
 private:
     EKFGSF_yaw *yawEstimator;
@@ -876,6 +878,10 @@ private:
     // isDeltaYaw   : true when the yaw should be added to the existing yaw angle
     void resetQuatStateYawOnly(float yaw, float yawVariance, bool isDeltaYaw);
 
+    // attempt to reset the yaw to the EKF-GSF value
+    // returns false if unsuccessful
+    bool EKFGSF_resetMainFilterYaw();
+
     // Variables
     bool statesInitialised;         // boolean true when filter states have been initialised
     bool velHealth;                 // boolean true if velocity measurements have passed innovation consistency check
@@ -1339,7 +1345,8 @@ private:
     float InitialGyroBiasUncertainty(void) const;
 
     // The following declarations are used to control when the main navigation filter resets it's yaw to the estimate provided by the GSF
-	uint64_t EKFGSF_yaw_reset_time_ms;	// timestamp of last emergency yaw reset (uSec)
-    uint8_t EKFGSF_yaw_reset_count;     // number of emergency yaw resets performed
-    bool EKFGSF_run_filterbank;         // true when the filter bank is active
+	uint64_t EKFGSF_yaw_reset_ms;	        // timestamp of last emergency yaw reset (uSec)
+	uint64_t EKFGSF_yaw_reset_request_ms;   // timestamp of last emergency yaw reset request (uSec)
+    uint8_t EKFGSF_yaw_reset_count;         // number of emergency yaw resets performed
+    bool EKFGSF_run_filterbank;             // true when the filter bank is active
 };

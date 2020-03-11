@@ -407,7 +407,8 @@ void NavEKF3_core::InitialiseVariables()
     InitialiseVariablesMag();
 
     // emergency reset of yaw to EKFGSF estimate
-    EKFGSF_yaw_reset_time_ms = 0;
+    EKFGSF_yaw_reset_ms = 0;
+    EKFGSF_yaw_reset_request_ms = 0;
     EKFGSF_yaw_reset_count = 0;
     EKFGSF_run_filterbank = false;
 }

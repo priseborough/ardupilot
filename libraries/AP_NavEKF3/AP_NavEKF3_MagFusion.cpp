@@ -301,7 +301,7 @@ void NavEKF3_core::SelectMagFusion()
             resetQuatStateYawOnly(yawEKFGSF, yawVarianceEKFGSF, false);
 
             // record the emergency reset event
-            EKFGSF_yaw_reset_time_ms = imuSampleTime_ms;
+            EKFGSF_yaw_reset_ms = imuSampleTime_ms;
             EKFGSF_yaw_reset_count++;
 
             gcs().send_text(MAV_SEVERITY_WARNING, "EKF3 IMU%u yaw aligned using GPS",(unsigned)imu_index);
@@ -1341,21 +1341,23 @@ void NavEKF3_core::recordMagReset()
 bool NavEKF3_core::EKFGSF_resetMainFilterYaw()
 {
     // Don't do a reset unless permitted by the EK3_GSF_USE and EKF3_GSF_RUN parameter masks
-    if ((yawEstimator == nullptr) || !(frontend->_gsfUseMask & (1U<<core_index))) {
+    if ((yawEstimator == nullptr)
+        || !(frontend->_gsfUseMask & (1U<<core_index))
+        || EKFGSF_yaw_reset_count >= frontend->_gsfResetMaxCount
+        || imuSampleTime_ms < (EKFGSF_yaw_reset_ms + YAW_RESET_TO_GSF_TIMEOUT_MS)) {
         return false;
     };
 
     float yawEKFGSF, yawVarianceEKFGSF;
-    if (EKFGSF_yaw_reset_count < frontend->_gsfResetMaxCount &&
-        yawEstimator->getYawData(&yawEKFGSF, &yawVarianceEKFGSF) &&
-        yawVarianceEKFGSF < sq(radians(15.0f)) &&
-        (imuSampleTime_ms - EKFGSF_yaw_reset_time_ms) > 5000) {
+    yawEstimator->getYawData(&yawEKFGSF, &yawVarianceEKFGSF);
+    if (yawVarianceEKFGSF < sq(radians(15.0f))) {
 
         // keep roll and pitch and reset yaw
         resetQuatStateYawOnly(yawEKFGSF, yawVarianceEKFGSF, false);
 
         // record the emergency reset event
-        EKFGSF_yaw_reset_time_ms = imuSampleTime_ms;
+        EKFGSF_yaw_reset_request_ms = 0;
+        EKFGSF_yaw_reset_ms = imuSampleTime_ms;
         EKFGSF_yaw_reset_count++;
 
         gcs().send_text(MAV_SEVERITY_WARNING, "EKF3 IMU%u emergency yaw reset - mag sensor stopped",(unsigned)imu_index);

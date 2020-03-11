@@ -301,8 +301,7 @@ void NavEKF3_core::setAidingMode()
 
             } else if (posAidLossPending) {
                 // attempt to reset the yaw to the estimate from the EKF-GSF algorithm
-                EKFGSF_resetMainFilterYaw();
-
+                EKFGSF_yaw_reset_request_ms = imuSampleTime_ms;
             }
             break;
         }
@@ -587,11 +586,26 @@ void NavEKF3_core::runYawEstimator()
         } else {
             trueAirspeed = 0.0f;
         }
+
         yawEstimator->update(imuDataDelayed.delAng, imuDataDelayed.delVel, imuDataDelayed.delAngDT, imuDataDelayed.delVelDT, EKFGSF_run_filterbank, trueAirspeed);
+
         if (gpsDataToFuse) {
             Vector2f gpsVelNE = Vector2f(gpsDataDelayed.vel.x, gpsDataDelayed.vel.y);
             float gpsVelAcc = fmaxf(gpsSpdAccuracy, frontend->_gpsHorizVelNoise);
             yawEstimator->pushVelData(gpsVelNE, gpsVelAcc);
         }
+
+        // action an external reset request
+        if (EKFGSF_yaw_reset_request_ms > 0 && imuSampleTime_ms < (EKFGSF_yaw_reset_request_ms + YAW_RESET_TO_GSF_TIMEOUT_MS)) {
+            EKFGSF_resetMainFilterYaw();
+        }
     }
+
+}
+
+// request a reset the yaw to the GSF estimate
+// request times out after YAW_RESET_TO_GSF_TIMEOUT_MS if it cannot be actioned
+void NavEKF3_core::EKFGSF_requestYawReset()
+{
+    EKFGSF_yaw_reset_request_ms = imuSampleTime_ms;
 }

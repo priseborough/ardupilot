@@ -873,33 +873,35 @@ void NavEKF3::checkLaneSwitch(void)
         return;
     }
 
-    // attempt to fix via a yaw reset first
-    if (!core[primary].EKFGSF_resetMainFilterYaw()) {
-        float primaryErrorScore = core[primary].errorScore();
-        float lowestErrorScore = primaryErrorScore;
-        uint8_t newPrimaryIndex = primary;
-        for (uint8_t coreIndex=0; coreIndex<num_cores; coreIndex++) {
-            if (coreIndex != primary) {
-                // an alternative core is available for selection only if healthy and if states have been updated on this time step
-                bool altCoreAvailable = core[coreIndex].healthy();
-                float altErrorScore = core[coreIndex].errorScore();
-                if (altCoreAvailable && altErrorScore < lowestErrorScore && altErrorScore < 0.9) {
-                    newPrimaryIndex = coreIndex;
-                    lowestErrorScore = altErrorScore;
-                }
+    float primaryErrorScore = core[primary].errorScore();
+    float lowestErrorScore = primaryErrorScore;
+    uint8_t newPrimaryIndex = primary;
+    for (uint8_t coreIndex=0; coreIndex<num_cores; coreIndex++) {
+        if (coreIndex != primary) {
+            // an alternative core is available for selection only if healthy and if states have been updated on this time step
+            bool altCoreAvailable = core[coreIndex].healthy();
+            float altErrorScore = core[coreIndex].errorScore();
+            if (altCoreAvailable && altErrorScore < lowestErrorScore && altErrorScore < 0.9) {
+                newPrimaryIndex = coreIndex;
+                lowestErrorScore = altErrorScore;
             }
         }
-
-        // update the yaw and position reset data to capture changes due to the lane switch
-        if (newPrimaryIndex != primary) {
-            updateLaneSwitchYawResetData(newPrimaryIndex, primary);
-            updateLaneSwitchPosResetData(newPrimaryIndex, primary);
-            updateLaneSwitchPosDownResetData(newPrimaryIndex, primary);
-            primary = newPrimaryIndex;
-            lastLaneSwitch_ms = now;
-            gcs().send_text(MAV_SEVERITY_CRITICAL, "NavEKF3: lane switch %u", primary);
-        }
     }
+
+    // update the yaw and position reset data to capture changes due to the lane switch
+    if (newPrimaryIndex != primary) {
+        updateLaneSwitchYawResetData(newPrimaryIndex, primary);
+        updateLaneSwitchPosResetData(newPrimaryIndex, primary);
+        updateLaneSwitchPosDownResetData(newPrimaryIndex, primary);
+        primary = newPrimaryIndex;
+        lastLaneSwitch_ms = now;
+        gcs().send_text(MAV_SEVERITY_CRITICAL, "NavEKF3: lane switch %u", primary);
+    }
+}
+
+void NavEKF3::requestYawReset(void)
+{
+    core[primary].EKFGSF_requestYawReset();
 }
 
 // Check basic filter health metrics and return a consolidated health status
