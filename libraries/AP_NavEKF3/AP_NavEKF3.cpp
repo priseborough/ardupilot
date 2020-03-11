@@ -243,7 +243,7 @@ const AP_Param::GroupInfo NavEKF3::var_info[] = {
 
     // @Param: MAG_CAL
     // @DisplayName: Magnetometer default fusion mode
-    // @Description: This determines when the filter will use the 3-axis magnetometer fusion model that estimates both earth and body fixed magnetic field states, when it will use a simpler magnetic heading fusion model that does not use magnetic field states and when it will use an alternative method of yaw determination to the magnetometer. The 3-axis magnetometer fusion is only suitable for use when the external magnetic field environment is stable. EK3_MAG_CAL = 0 uses heading fusion on ground, 3-axis fusion in-flight, and is the default setting for Plane users. EK3_MAG_CAL = 1 uses 3-axis fusion only when manoeuvring. EK3_MAG_CAL = 2 uses heading fusion at all times, is recommended if the external magnetic field is varying and is the default for rovers. EK3_MAG_CAL = 3 uses heading fusion on the ground and 3-axis fusion after the first in-air field and yaw reset has completed, and is the default for copters. EK3_MAG_CAL = 4 uses 3-axis fusion at all times. EK3_MAG_CAL = 5 uses an external yaw sensor with simple heading fusion. EK3_MAG_CAL = 6 aligns the yaw angle using IMU and GPS velocity data. NOTE: The fusion mode can be forced to 2 for specific EKF cores using the EK3_MAG_MASK parameter.
+    // @Description: This determines when the filter will use the 3-axis magnetometer fusion model that estimates both earth and body fixed magnetic field states, when it will use a simpler magnetic heading fusion model that does not use magnetic field states and when it will use an alternative method of yaw determination to the magnetometer. The 3-axis magnetometer fusion is only suitable for use when the external magnetic field environment is stable. EK3_MAG_CAL = 0 uses heading fusion on ground, 3-axis fusion in-flight, and is the default setting for Plane users. EK3_MAG_CAL = 1 uses 3-axis fusion only when manoeuvring. EK3_MAG_CAL = 2 uses heading fusion at all times, is recommended if the external magnetic field is varying and is the default for rovers. EK3_MAG_CAL = 3 uses heading fusion on the ground and 3-axis fusion after the first in-air field and yaw reset has completed, and is the default for copters. EK3_MAG_CAL = 4 uses 3-axis fusion at all times. EK3_MAG_CAL = 5 uses an external yaw sensor with simple heading fusion. EK3_MAG_CAL = 6 aligns the yaw angle using IMU and GPS velocity data. NOTE: The fusion mode can be forced to 2 for specific EKF cores using the EK3_MAG_MASK parameter. NOTE: When using EKF3_MAG_CAL = 6, the EK3_GSF_RUN and EK3_GSF_USE masks must be set to the same as EK3_IMU_MASK.
     // @Values: 0:When flying,1:When manoeuvring,2:Never,3:After first climb yaw reset,4:Always,5:Use external yaw sensor,6:Use IMU and GPS velocity
     // @User: Advanced
     // @RebootRequired: True
@@ -610,7 +610,7 @@ const AP_Param::GroupInfo NavEKF3::var_info[] = {
     // @Bitmask: 0:FirstEKF,1:SecondEKF,2:ThirdEKF,3:FourthEKF,4:FifthEKF,5:SixthEKF
     // @User: Advanced
     // @RebootRequired: True
-    AP_GROUPINFO("GSF_RUN", 57, NavEKF3, _gsfRunMask, 1),
+    AP_GROUPINFO("GSF_RUN", 57, NavEKF3, _gsfRunMask, 3),
 
     // @Param: GSF_USE
     // @DisplayName: Bitmask of which EKF-GSF yaw estimators are used
@@ -618,7 +618,7 @@ const AP_Param::GroupInfo NavEKF3::var_info[] = {
     // @Bitmask: 0:FirstEKF,1:SecondEKF,2:ThirdEKF,3:FourthEKF,4:FifthEKF,5:SixthEKF
     // @User: Advanced
     // @RebootRequired: True
-    AP_GROUPINFO("GSF_USE", 58, NavEKF3, _gsfUseMask, 1),
+    AP_GROUPINFO("GSF_USE", 58, NavEKF3, _gsfUseMask, 3),
 
     // @Param: GSF_DELAY
     // @DisplayName: Delay from loss of navigation to yaw reset
@@ -901,7 +901,9 @@ void NavEKF3::checkLaneSwitch(void)
 
 void NavEKF3::requestYawReset(void)
 {
-    core[primary].EKFGSF_requestYawReset();
+    for (uint8_t i = 0; i < num_cores; i++) {
+        core[primary].EKFGSF_requestYawReset();
+    }
 }
 
 // Check basic filter health metrics and return a consolidated health status
