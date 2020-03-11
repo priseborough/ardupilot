@@ -49,10 +49,17 @@ void Copter::ekf_check()
         if (!ekf_check_state.bad_variance) {
             // increase counter
             ekf_check_state.fail_count++;
-#if EKF_CHECK_ITERATIONS_MAX > 2
-            if (ekf_check_state.fail_count == EKF_CHECK_ITERATIONS_MAX/2) {
+#if EKF_CHECK_ITERATIONS_MAX > 3
+            if (ekf_check_state.fail_count == MIN((EKF_CHECK_ITERATIONS_MAX-2), 5)) {
                 // we are just about to declare a EKF failsafe, ask the EKF if we can reset
-                // the yaw or change lanes to resolve the issue
+                // yaw to resolve the issue
+                ahrs.request_yaw_reset();
+            }
+#endif
+#if EKF_CHECK_ITERATIONS_MAX > 2
+            if (ekf_check_state.fail_count == EKF_CHECK_ITERATIONS_MAX-1) {
+                // we are just about to declare a EKF failsafe, ask the EKF if we can
+                // change lanes to resolve the issue
                 ahrs.check_lane_switch();
             }
 #endif
