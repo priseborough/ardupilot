@@ -925,8 +925,13 @@ void RC_Channel::do_aux_function(const aux_func_t ch_option, const aux_switch_po
     }
 
     case AUX_FUNC::EKF_LANE_SWITCH:
-        // used to test emergeny yaw reset
+        // used to test emergency lane switch
         AP::ahrs().check_lane_switch();
+        break;
+
+    case AUX_FUNC::EKF_YAW_RESET:
+        // used to test emergency yaw reset
+        AP::ahrs().request_yaw_reset();
         break;
 
     default:
