@@ -112,11 +112,12 @@ bool Copter::ekf_over_threshold()
     Vector2f offset;
     ahrs.get_variances(vel_variance, position_variance, height_variance, mag_variance, tas_variance, offset);
 
-    // return true if two of compass, velocity and position variances are over the threshold OR velocity variance is twice the threshold
+    // return true if position variances and either compass or velocity veriance are over the threshold
     uint8_t over_thresh_count = 0;
     if (mag_variance.length() >= g.fs_ekf_thresh) {
         over_thresh_count++;
     }
+
     bool optflow_healthy = false;
 #if OPTFLOW == ENABLED
     optflow_healthy = optflow.healthy();
@@ -126,11 +127,8 @@ bool Copter::ekf_over_threshold()
     } else if (vel_variance >= g.fs_ekf_thresh) {
         over_thresh_count++;
     }
-    if (position_variance >= g.fs_ekf_thresh) {
-        over_thresh_count++;
-    }
 
-    if (over_thresh_count >= 2) {
+    if (position_variance >= g.fs_ekf_thresh && over_thresh_count >= 1) {
         return true;
     }
 
