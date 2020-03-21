@@ -629,6 +629,14 @@ void NavEKF3_core::UpdateFilter(bool predict)
         // Predict the covariance growth
         CovariancePrediction();
 
+        // Read GPS data from the sensor
+        // This is required by multiple processes so needs to be done before other fusion steps
+        readGpsData();
+
+        // Generate an alternative yaw estimate used for inflight recovery from bad compass data
+        // requires horizontal GPS velocity
+        runYawEstimator();
+
         // Update states using  magnetometer or external yaw sensor data
         SelectMagFusion();
 
@@ -652,10 +660,6 @@ void NavEKF3_core::UpdateFilter(bool predict)
 
         // Update the filter status
         updateFilterStatus();
-
-        // Generate an alternative yaw estimate used for inflight recovery from bad compass data
-        // requires horizontal GPS velocity
-        runYawEstimator();
     }
 
     // Wind output forward from the fusion to output time horizon

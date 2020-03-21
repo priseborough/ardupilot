@@ -286,10 +286,20 @@ void NavEKF3_core::SelectMagFusion()
         return;
     }
 
-    // Handle case where we are not using a yaw sensor of any type and will reset
-    // the yaw in flight using the output from the GSF yaw estimator.
-    if (frontend->_magCal == 6) {
+    // Handle case where we are not using a yaw sensor of any type and and attempt to reset the yaw in
+    // flight using the output from the GSF yaw estimator.
+    if (frontend->_magCal == 6 || !use_compass()) {
         if (yawAlignComplete) {
+            // Fuse a synthetic heading measurement at 7Hz to prevent the filter covariances from
+            // becoming badly conditioned when static for long periods. For planes we only do this on-ground
+            // because they can align the yaw from GPS when airborne. For other platform types we do this
+            // all the time.
+            if ((onGround || !assume_zero_sideslip()) && (imuSampleTime_ms - lastSynthYawTime_ms > 140)) {
+                fuseEulerYaw(true, false);
+                magTestRatio.zero();
+                yawTestRatio = 0.0f;
+                lastSynthYawTime_ms = imuSampleTime_ms;
+            }
             return;
         }
         yawAlignComplete = EKFGSF_resetMainFilterYaw();
@@ -347,18 +357,6 @@ void NavEKF3_core::SelectMagFusion()
             hal.util->perf_end(_perf_test[0]);
             // zero the test ratio output from the inactive simple magnetometer yaw fusion
             yawTestRatio = 0.0f;
-        }
-    }
-
-    // If we have no magnetometer, fuse in a synthetic heading measurement at 7Hz to prevent the filter covariances
-    // from becoming badly conditioned. For planes we only do this on-ground because they can align the yaw from GPS when
-    // airborne. For other platform types we do this all the time.
-    if (!use_compass()) {
-        if ((onGround || !assume_zero_sideslip()) && (imuSampleTime_ms - lastSynthYawTime_ms > 140)) {
-            fuseEulerYaw(true, false);
-            magTestRatio.zero();
-            yawTestRatio = 0.0f;
-            lastSynthYawTime_ms = imuSampleTime_ms;
         }
     }
 
@@ -839,7 +837,8 @@ void NavEKF3_core::FuseMagnetometer()
  * The following booleans are passed to the function to control the fusion process:
  *
  * usePredictedYaw -  Set this to true if no valid yaw measurement will be available for an extended periods.
- *                    This uses an innovation set to zero which prevents uncontrolled quaternion covaraince growth.
+ *                    This uses an innovation set to zero which prevents uncontrolled quaternion covariance
+ *                    growth or if available, a yaw estimate from the Gaussian Sum Filter.
  * UseExternalYawSensor - Set this to true if yaw data from an external yaw sensor is being used instead of the magnetometer.
 */
 void NavEKF3_core::fuseEulerYaw(bool usePredictedYaw, bool useExternalYawSensor)
@@ -849,9 +848,21 @@ void NavEKF3_core::fuseEulerYaw(bool usePredictedYaw, bool useExternalYawSensor)
     float q2 = stateStruct.quat[2];
     float q3 = stateStruct.quat[3];
 
+    // external yaw available check
+    bool canUseGsfYaw = false;
+    float gsfYaw = 0.0f;
+    float gsfYawVariance = 0.0f;
+    if (usePredictedYaw && yawEstimator != nullptr) {
+        canUseGsfYaw = yawEstimator->getYawData(&gsfYaw, &gsfYawVariance)
+                        && is_positive(gsfYawVariance)
+                        && gsfYawVariance < sq(radians(15.0f));
+    }
+
     // yaw measurement error variance (rad^2)
     float R_YAW;
-    if (!useExternalYawSensor) {
+    if (canUseGsfYaw) {
+        R_YAW = gsfYawVariance;
+    } else if (!useExternalYawSensor) {
         R_YAW = sq(frontend->_yawNoise);
     } else {
         R_YAW = sq(yawAngDataDelayed.yawAngErr);
@@ -970,9 +981,13 @@ void NavEKF3_core::fuseEulerYaw(bool usePredictedYaw, bool useExternalYawSensor)
             // use the external yaw sensor data
             innovation = wrap_PI(yawAngPredicted - yawAngDataDelayed.yawAng);
         }
+    } else if (canUseGsfYaw) {
+        // The GSF yaw esitimator can provide a better estimate than the main nav filter can when no yaw
+        // sensor is available
+        innovation = wrap_PI(yawAngPredicted - gsfYaw);
     } else {
-        // setting the innovation to zero enables quaternion covariance growth to be constrained when there is no
-        // method of observing yaw
+        // setting the innovation to zero enables quaternion covariance growth to be constrained when there
+        // is no method of observing yaw
         innovation = 0.0f;
     }
 
