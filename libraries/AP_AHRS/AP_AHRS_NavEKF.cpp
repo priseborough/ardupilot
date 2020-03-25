@@ -2149,6 +2149,7 @@ void AP_AHRS_NavEKF::request_yaw_reset(void)
 
 #if HAL_NAVEKF2_AVAILABLE
     case EKFType::TWO:
+        EKF2.requestYawReset();
         break;
 #endif
 
