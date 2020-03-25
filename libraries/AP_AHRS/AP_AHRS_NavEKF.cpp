@@ -1408,6 +1408,9 @@ void AP_AHRS_NavEKF::writeExtNavData(const Vector3f &sensOffset, const Vector3f 
 // Writes the default equivalent airspeed in m/s to be used in forward flight if a measured airspeed is required and not available.
 void AP_AHRS_NavEKF::writeDefaultAirSpeed(float airspeed)
 {
+#if HAL_NAVEKF2_AVAILABLE
+    EKF2.writeDefaultAirSpeed(airspeed);
+#endif
 #if HAL_NAVEKF3_AVAILABLE
     EKF3.writeDefaultAirSpeed(airspeed);
 #endif
