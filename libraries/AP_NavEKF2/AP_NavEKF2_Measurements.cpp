@@ -1014,3 +1014,8 @@ void NavEKF2_core::learnInactiveBiases(void)
     }
 }
 
+// Writes the default equivalent airspeed in m/s to be used in forward flight if a measured airspeed is required and not available.
+void NavEKF2_core::writeDefaultAirSpeed(float airspeed)
+{
+    defaultAirSpeed = airspeed;
+}

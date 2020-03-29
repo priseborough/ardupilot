@@ -1700,3 +1700,13 @@ bool NavEKF2::getDataEKFGSF(int8_t instance, float *yaw_composite, float *yaw_co
     }
     return false;
 }
+
+// Writes the default equivalent airspeed in m/s to be used in forward flight if a measured airspeed is required and not available.
+void NavEKF2::writeDefaultAirSpeed(float airspeed)
+{
+    if (core) {
+        for (uint8_t i=0; i<num_cores; i++) {
+            core[i].writeDefaultAirSpeed(airspeed);
+        }
+    }
+}
