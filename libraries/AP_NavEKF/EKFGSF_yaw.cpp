@@ -208,27 +208,9 @@ void EKFGSF_yaw::predictAHRS(const uint8_t mdl_idx)
         Vector3f accel = ahrs_accel;
 
         if (is_positive(true_airspeed)) {
-            // Turn rate is component of gyro rate about vertical (down) axis
-            const float turn_rate = AHRS[mdl_idx].R[2][0] * ang_rate_delayed_raw[0]
-                                    + AHRS[mdl_idx].R[2][1] * ang_rate_delayed_raw[1]
-                                    + AHRS[mdl_idx].R[2][2] * ang_rate_delayed_raw[2];
-
-            // Use measured airspeed to calculate centripetal acceleration
-            float centripetal_accel = true_airspeed * turn_rate;
-
-            // Project Y body axis onto horizontal and multiply by centripetal acceleration to give estimated
-            // centripetal acceleration vector in earth frame due to coordinated turn
-            Vector3f centripetal_accel_vec_ef = {AHRS[mdl_idx].R[0][1], AHRS[mdl_idx].R[1][1], 0.0f};
-            if (AHRS[mdl_idx].R[2][2] > 0.0f) {
-                // Vehicle is upright
-                centripetal_accel_vec_ef *= centripetal_accel;
-            } else {
-                // Vehicle is inverted
-                centripetal_accel_vec_ef *= - centripetal_accel;
-            }
-
-            // Rotate into body frame
-            Vector3f centripetal_accel_vec_bf = AHRS[mdl_idx].R.transposed() * centripetal_accel_vec_ef;
+            // Calculate centripetal acceleration in body frame from cross product of body rate and body frame airspeed vector
+            // NOTE: this assumes X axis is aligned with airspeed vector
+            Vector3f centripetal_accel_vec_bf = Vector3f(0.0f, ang_rate_delayed_raw[2] * true_airspeed, - ang_rate_delayed_raw[1] * true_airspeed);
 
             // Correct measured accel for centripetal acceleration
             accel -= centripetal_accel_vec_bf;
