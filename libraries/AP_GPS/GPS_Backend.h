@@ -102,7 +102,14 @@ protected:
     void set_uart_timestamp(uint16_t nbytes);
 
     void check_new_itow(uint32_t itow, uint32_t msg_length);
-    
+
+    /*
+      access to ublox option bits
+     */
+    uint16_t ublox_options(void) const {
+        return uint16_t(gps._ublox_options.get());
+    }
+
 private:
     // itow from previous message
     uint32_t _last_itow;

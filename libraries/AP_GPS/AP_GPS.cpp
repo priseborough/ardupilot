@@ -290,6 +290,13 @@ const AP_Param::GroupInfo AP_GPS::var_info[] = {
     AP_GROUPINFO("BLEND_TC", 21, AP_GPS, _blend_tc, 10.0f),
 #endif
 
+    // @Param: UBX_OPTIONS
+    // @DisplayName: Ublox options
+    // @Description: Additional options for UBlox backend
+    // @Bitmask: 0:Use UART2 for moving baseline
+    // @User: Advanced
+    AP_GROUPINFO("UBX_OPTIONS", 22, AP_GPS, _ublox_options, 0),
+    
     AP_GROUPEND
 };
 
