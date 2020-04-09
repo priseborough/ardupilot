@@ -272,9 +272,30 @@ void NavEKF3_core::SelectMagFusion()
     // used for load levelling
     magFusePerformed = false;
 
+    effectiveMagCal = effective_magCal();
+
+    // Handle case where we are not using a yaw sensor of any type and and attempt to reset the yaw in
+    // flight using the output from the GSF yaw estimator.
+    if (effectiveMagCal == MagCal::GPS_YAW || !use_compass()) {
+        if (yawAlignComplete) {
+            // Fuse a synthetic heading measurement at 7Hz to prevent the filter covariances from
+            // becoming badly conditioned when static for long periods. For planes we only do this on-ground
+            // because they can align the yaw from GPS when airborne. For other platform types we do this
+            // all the time.
+            if ((onGround || !assume_zero_sideslip()) && (imuSampleTime_ms - lastSynthYawTime_ms > 140)) {
+                fuseEulerYaw(true, false);
+                magTestRatio.zero();
+                yawTestRatio = 0.0f;
+                lastSynthYawTime_ms = imuSampleTime_ms;
+            }
+            return;
+        }
+        yawAlignComplete = EKFGSF_resetMainFilterYaw();
+        return;
+    }
+
     // Handle case where we are using an external yaw sensor instead of a magnetomer
-    MagCal magcal = effective_magCal();
-    if (magcal == MagCal::EXTERNAL_YAW || magcal == MagCal::EXTERNAL_YAW_FALLBACK) {
+    if (effectiveMagCal == MagCal::EXTERNAL_YAW || effectiveMagCal == MagCal::EXTERNAL_YAW_FALLBACK) {
         bool have_fused_gps_yaw = false;
         uint32_t now = AP_HAL::millis();
         if (storedYawAng.recall(yawAngDataDelayed,imuDataDelayed.time_ms)) {
@@ -310,7 +331,7 @@ void NavEKF3_core::SelectMagFusion()
             }
             lastSynthYawTime_ms = imuSampleTime_ms;
         }
-        if (magcal == MagCal::EXTERNAL_YAW) {
+        if (effectiveMagCal == MagCal::EXTERNAL_YAW) {
             // no fallback
             return;
         }
@@ -350,36 +371,13 @@ void NavEKF3_core::SelectMagFusion()
         // fall through to magnetometer fusion
     }
 
-    if (magcal != MagCal::EXTERNAL_YAW_FALLBACK) {
+    if (effectiveMagCal != MagCal::EXTERNAL_YAW_FALLBACK) {
         // check for and read new magnetometer measurements. We don't
         // real for EXTERNAL_YAW_FALLBACK as it has already been read
         // above
         readMagData();
     }
     
-    // Handle case where we are not using a yaw sensor of any type and and attempt to reset the yaw in
-    // flight using the output from the GSF yaw estimator.
-    if (frontend->_magCal == 7 || !use_compass()) {
-        if (yawAlignComplete) {
-            // Fuse a synthetic heading measurement at 7Hz to prevent the filter covariances from
-            // becoming badly conditioned when static for long periods. For planes we only do this on-ground
-            // because they can align the yaw from GPS when airborne. For other platform types we do this
-            // all the time.
-            if ((onGround || !assume_zero_sideslip()) && (imuSampleTime_ms - lastSynthYawTime_ms > 140)) {
-                fuseEulerYaw(true, false);
-                magTestRatio.zero();
-                yawTestRatio = 0.0f;
-                lastSynthYawTime_ms = imuSampleTime_ms;
-            }
-            return;
-        }
-        yawAlignComplete = EKFGSF_resetMainFilterYaw();
-        return;
-    }
-
-    // check for and read new magnetometer measurements
-    readMagData();
-
     // If we are using the compass and the magnetometer has been unhealthy for too long we declare a timeout
     if (magHealth) {
         magTimeout = false;
@@ -1486,7 +1484,7 @@ bool NavEKF3_core::EKFGSF_resetMainFilterYaw()
         EKFGSF_yaw_reset_ms = imuSampleTime_ms;
         EKFGSF_yaw_reset_count++;
 
-        if (frontend->_magCal == 6) {
+        if (effectiveMagCal == MagCal::GPS_YAW) {
             gcs().send_text(MAV_SEVERITY_INFO, "EKF3 IMU%u yaw aligned using GPS",(unsigned)imu_index);
         } else {
             gcs().send_text(MAV_SEVERITY_WARNING, "EKF3 IMU%u emergency yaw reset - mag sensor stopped",(unsigned)imu_index);
