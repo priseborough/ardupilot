@@ -184,6 +184,9 @@ public:
     // see if EKF lane switching is possible to avoid EKF failsafe
     virtual void check_lane_switch(void) {}
     
+    // request EKF yaw reset to try and avoid the need for an EKF lane switch or failsafe
+    virtual void request_yaw_reset(void) {}
+
     // Euler angles (radians)
     float roll;
     float pitch;

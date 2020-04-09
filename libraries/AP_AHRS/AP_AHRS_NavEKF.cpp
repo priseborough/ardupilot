@@ -1405,6 +1405,16 @@ void AP_AHRS_NavEKF::writeExtNavData(const Vector3f &sensOffset, const Vector3f 
 #endif
 }
 
+// Writes the default equivalent airspeed in m/s to be used in forward flight if a measured airspeed is required and not available.
+void AP_AHRS_NavEKF::writeDefaultAirSpeed(float airspeed)
+{
+#if HAL_NAVEKF2_AVAILABLE
+    EKF2.writeDefaultAirSpeed(airspeed);
+#endif
+#if HAL_NAVEKF3_AVAILABLE
+    EKF3.writeDefaultAirSpeed(airspeed);
+#endif
+}
 
 // inhibit GPS usage
 uint8_t AP_AHRS_NavEKF::setInhibitGPS(void)
@@ -2127,6 +2137,32 @@ void AP_AHRS_NavEKF::check_lane_switch(void)
 #if HAL_NAVEKF3_AVAILABLE
     case EKFType::THREE:
         EKF3.checkLaneSwitch();
+        break;
+#endif
+    }
+}
+
+// request EKF yaw reset to try and avoid the need for an EKF lane switch or failsafe
+void AP_AHRS_NavEKF::request_yaw_reset(void)
+{
+    switch (active_EKF_type()) {
+    case EKFType::NONE:
+        break;
+
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+    case EKFType::SITL:
+        break;
+#endif
+
+#if HAL_NAVEKF2_AVAILABLE
+    case EKFType::TWO:
+        EKF2.requestYawReset();
+        break;
+#endif
+
+#if HAL_NAVEKF3_AVAILABLE
+    case EKFType::THREE:
+        EKF3.requestYawReset();
         break;
 #endif
     }
