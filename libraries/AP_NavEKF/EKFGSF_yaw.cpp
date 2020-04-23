@@ -32,8 +32,10 @@ void EKFGSF_yaw::update(const Vector3f &delAng,
                         const Vector3f &delVel,
                         const float delAngDT,
                         const float delVelDT,
-                        bool runEKF,
-                        float TAS)
+                        const bool runEKF,
+                        const float TAS,
+                        const uint8_t log_id,
+                        const uint64_t log_timestamp_us)
 {
 
     // copy to class variables
@@ -177,8 +179,12 @@ void EKFGSF_yaw::update(const Vector3f &delAng,
         GSF.yaw_variance +=  GSF.weights[mdl_idx] * (EKF[mdl_idx].P[2][2] + sq(yawDelta));
     }
 
-    // prevent the same velocity data being used again
-    vel_data_updated = false;
+    // log data after each velocity fusion step
+    if (vel_data_updated) {
+        logData(log_id, log_timestamp_us);
+        // prevent the same velocity data being used again
+        vel_data_updated = false;
+    }
 }
 
 void EKFGSF_yaw::pushVelData(Vector2f vel, float velAcc)
@@ -592,22 +598,6 @@ float EKFGSF_yaw::gaussianDensity(const uint8_t mdl_idx) const
     return normDist;
 }
 
-bool EKFGSF_yaw::getLogData(float &yaw_composite, float &yaw_composite_variance, float yaw[N_MODELS_EKFGSF], float innov_VN[N_MODELS_EKFGSF], float innov_VE[N_MODELS_EKFGSF], float weight[N_MODELS_EKFGSF])
-{
-    if (vel_fuse_running) {
-        yaw_composite = GSF.yaw;
-        yaw_composite_variance = GSF.yaw_variance;
-        for (uint8_t mdl_idx = 0; mdl_idx < N_MODELS_EKFGSF; mdl_idx++) {
-            yaw[mdl_idx] = EKF[mdl_idx].X[2];
-            innov_VN[mdl_idx] = EKF[mdl_idx].innov[0];
-            innov_VE[mdl_idx] = EKF[mdl_idx].innov[1];
-            weight[mdl_idx] = GSF.weights[mdl_idx];
-        }
-        return true;
-    }
-    return false;
-}
-
 void EKFGSF_yaw::forceSymmetry(const uint8_t mdl_idx)
 {
     float P01 = 0.5f * (EKF[mdl_idx].P[0][1] + EKF[mdl_idx].P[1][0]);
@@ -655,4 +645,45 @@ bool EKFGSF_yaw::getYawData(float &yaw, float &yawVariance)
     yaw = GSF.yaw;
     yawVariance = GSF.yaw_variance;
     return true;
+}
+
+void EKFGSF_yaw::logData(const uint8_t instance_id, const uint64_t time_stamp_us)
+{
+    AP::logger().Write("GSF0",
+                    "TimeUS,C,YC,YCS,Y0,Y1,Y2,Y3,Y4,W0,W1,W2,W3,W4",
+                    "s#rrrrrrr-----",
+                    "F-000000000000",
+                    "QBffffffffffff",
+                    time_stamp_us,
+                    instance_id,
+                    GSF.yaw,
+                    sqrtf(MAX(GSF.yaw_variance, 0.0f)),
+                    EKF[0].X[2],
+                    EKF[1].X[2],
+                    EKF[2].X[2],
+                    EKF[3].X[2],
+                    EKF[4].X[2],
+                    GSF.weights[0],
+                    GSF.weights[1],
+                    GSF.weights[2],
+                    GSF.weights[3],
+                    GSF.weights[4]);
+
+    AP::logger().Write("GSF1",
+                    "TimeUS,C,IVN0,IVN1,IVN2,IVN3,IVN4,IVE0,IVE1,IVE2,IVE3,IVE4",
+                    "s#nnnnnnnnnn",
+                    "F-0000000000",
+                    "QBffffffffff",
+                    time_stamp_us,
+                    instance_id,
+                    EKF[0].innov[0],
+                    EKF[1].innov[0],
+                    EKF[2].innov[0],
+                    EKF[3].innov[0],
+                    EKF[4].innov[0],
+                    EKF[0].innov[1],
+                    EKF[1].innov[1],
+                    EKF[2].innov[1],
+                    EKF[3].innov[1],
+                    EKF[4]);
 }

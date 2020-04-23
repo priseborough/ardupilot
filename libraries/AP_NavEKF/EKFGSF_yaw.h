@@ -15,19 +15,17 @@ public:
     EKFGSF_yaw();
 
     // Update Filter States - this should be called whenever new IMU data is available
-    void update(const Vector3f &delAng,// IMU delta angle rotation vector meassured in body frame (rad)
-                const Vector3f &delVel,// IMU delta velocity vector meassured in body frame (m/s)
-                const float delAngDT, // time interval that delAng was integrated over (sec) - must be no less than IMU_DT_MIN_SEC
-                const float delVelDT, // time interval that delVel was integrated over (sec) - must be no less than IMU_DT_MIN_SEC
-                bool runEKF,          // set to true when flying or movement suitable for yaw estimation
-                float TAS);           // true airspeed used for centripetal accel compensation - set to 0 when not required.
+    void update(const Vector3f &delAng, // IMU delta angle rotation vector meassured in body frame (rad)
+                const Vector3f &delVel, // IMU delta velocity vector meassured in body frame (m/s)
+                const float delAngDT,   // time interval that delAng was integrated over (sec) - must be no less than IMU_DT_MIN_SEC
+                const float delVelDT,   // time interval that delVel was integrated over (sec) - must be no less than IMU_DT_MIN_SEC
+                const bool runEKF,      // set to true when flying or movement suitable for yaw estimation
+                const float TAS,        // true airspeed used for centripetal accel compensation - set to 0 when not required.
+                const uint8_t log_id,   // unique identifier for logging
+                const uint64_t log_timestamp_us); // timestamp for logging (uSec)
 
     void pushVelData(Vector2f vel,    // NE velocity measurement (m/s)
                      float velAcc);   // 1-sigma accuracy of velocity measurement (m/s)
-
-    // get solution data for logging
-    // return false if yaw estimation is inactive
-    bool getLogData(float &yaw_composite, float &yaw_composite_variance, float yaw[N_MODELS_EKFGSF], float innov_VN[N_MODELS_EKFGSF], float innov_VE[N_MODELS_EKFGSF], float weight[N_MODELS_EKFGSF]);
 
     // get yaw estimated and corresponding variance
     // return false if yaw estimation is inactive
@@ -131,4 +129,8 @@ private:
     // Returns the probability for a selected model assuming a Gaussian error distribution
     // Used by the Guassian Sum Filter to calculate the weightings when combining the outputs from the bank of EKF's
     float gaussianDensity(const uint8_t mdl_idx) const;
+
+    // writes log data using the specified _id and time stamp
+    void logData(const uint8_t instance_id, const uint64_t time_stamp_us);
+
 };
