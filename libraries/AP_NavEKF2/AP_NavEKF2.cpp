@@ -1691,19 +1691,6 @@ void NavEKF2::requestYawReset(void)
     }
 }
 
-// return data for debugging EKF-GSF yaw estimator
-// return false if data not available
-bool NavEKF2::getDataEKFGSF(int8_t instance, float &yaw_composite, float &yaw_composite_variance, float yaw[N_MODELS_EKFGSF], float innov_VN[N_MODELS_EKFGSF], float innov_VE[N_MODELS_EKFGSF], float weight[N_MODELS_EKFGSF]) const
-{
-    if (instance < 0 || instance >= num_cores) instance = primary;
-    if (core) {
-        if (core[instance].getDataEKFGSF(yaw_composite, yaw_composite_variance, yaw, innov_VN, innov_VE, weight)) {
-            return true;
-        }
-    }
-    return false;
-}
-
 // Writes the default equivalent airspeed in m/s to be used in forward flight if a measured airspeed is required and not available.
 void NavEKF2::writeDefaultAirSpeed(float airspeed)
 {
