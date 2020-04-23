@@ -611,7 +611,7 @@ void NavEKF3_core::runYawEstimatorPrediction()
             trueAirspeed = 0.0f;
         }
 
-        yawEstimator->update(imuDataDelayed.delAng, imuDataDelayed.delVel, imuDataDelayed.delAngDT, imuDataDelayed.delVelDT, EKFGSF_run_filterbank, trueAirspeed);
+        yawEstimator->update(imuDataDelayed.delAng, imuDataDelayed.delVel, imuDataDelayed.delAngDT, imuDataDelayed.delVelDT, EKFGSF_run_filterbank, trueAirspeed, core_index + 8, frontend->imuSampleTime_us);
     }
 }
 
