@@ -16,9 +16,8 @@ extern const AP_HAL::HAL& hal;
 ********************************************************/
 
 /*
- * Fuse true airspeed measurements using explicit algebraic equations generated with Matlab symbolic toolbox.
- * The script file used to generate these and other equations in this filter can be found here:
- * https://github.com/PX4/ecl/blob/master/matlab/scripts/Inertial%20Nav%20EKF/GenerateNavFilterEquations.m
+ * Fuse true airspeed measurements using explicit algebraic equations auto-generated from
+ * libraries/AP_NavEKF3/python/main.py with output recorded in libraries/AP_NavEKF3/python/tas_generated.cpp
 */
 void NavEKF3_core::FuseAirspeed()
 {
@@ -26,46 +25,70 @@ void NavEKF3_core::FuseAirspeed()
     hal.util->perf_begin(_perf_FuseAirspeed);
 
     // declarations
-    float vn;
-    float ve;
-    float vd;
-    float vwn;
-    float vwe;
+    float &vn = stateStruct.velocity.x;
+    float &ve = stateStruct.velocity.y;
+    float &vd = stateStruct.velocity.z;
+    float &vwn = stateStruct.wind_vel.x;
+    float &vwe = stateStruct.wind_vel.y;
     float EAS2TAS = _ahrs->get_EAS2TAS();
     const float R_TAS = sq(constrain_float(frontend->_easNoise, 0.5f, 5.0f) * constrain_float(EAS2TAS, 0.9f, 10.0f));
-    float SH_TAS[3];
-    float SK_TAS[2];
-    Vector24 H_TAS = {};
+    Vector24 H_TAS;
     float VtasPred;
+    const bool airDataFusionWindOnly = false; // place holder for future functionality
 
     // health is set bad until test passed
     tasHealth = false;
-
-    // copy required states to local variable names
-    vn = stateStruct.velocity.x;
-    ve = stateStruct.velocity.y;
-    vd = stateStruct.velocity.z;
-    vwn = stateStruct.wind_vel.x;
-    vwe = stateStruct.wind_vel.y;
 
     // calculate the predicted airspeed
     VtasPred = norm((ve - vwe) , (vn - vwn) , vd);
     // perform fusion of True Airspeed measurement
     if (VtasPred > 1.0f)
     {
-        // calculate observation jacobians
-        SH_TAS[0] = 1.0f/VtasPred;
-        SH_TAS[1] = (SH_TAS[0]*(2.0f*ve - 2.0f*vwe))*0.5f;
-        SH_TAS[2] = (SH_TAS[0]*(2.0f*vn - 2.0f*vwn))*0.5f;
-        H_TAS[4] = SH_TAS[2];
-        H_TAS[5] = SH_TAS[1];
-        H_TAS[6] = vd*SH_TAS[0];
-        H_TAS[22] = -SH_TAS[2];
-        H_TAS[23] = -SH_TAS[1];
+        // TAS observatoin Jacobian, innovation variance and kalman gain
+        float HK0 = vn - vwn;
+        float HK1 = ve - vwe;
+        float HK2 = 1.0f / VtasPred;
+        float HK3 = HK0*HK2;
+        float HK4 = HK1*HK2;
+        float HK5 = HK2*vd;
+        float HK6 = HK2*(-vn + vwn);
+        float HK7 = HK2*(-ve + vwe);
+        float HK8 = HK3*P[4][6] + HK4*P[5][6] + HK5*P[6][6] + HK6*P[6][22] + HK7*P[6][23];
+        float HK9 = HK3*P[4][23] + HK4*P[5][23] + HK5*P[6][23] + HK6*P[22][23] + HK7*P[23][23];
+        float HK10 = HK3*P[4][5] + HK4*P[5][5] + HK5*P[5][6] + HK6*P[5][22] + HK7*P[5][23];
+        float HK11 = HK3*P[4][22] + HK4*P[5][22] + HK5*P[6][22] + HK6*P[22][22] + HK7*P[22][23];
+        float HK12 = HK3*P[4][4] + HK4*P[4][5] + HK5*P[4][6] + HK6*P[4][22] + HK7*P[4][23];
+        float HK13;
+
+        H_TAS[0] = 0;
+        H_TAS[1] = 0;
+        H_TAS[2] = 0;
+        H_TAS[3] = 0;
+        H_TAS[4] = HK3;
+        H_TAS[5] = HK4;
+        H_TAS[6] = HK5;
+        H_TAS[7] = 0;
+        H_TAS[8] = 0;
+        H_TAS[9] = 0;
+        H_TAS[10] = 0;
+        H_TAS[11] = 0;
+        H_TAS[12] = 0;
+        H_TAS[13] = 0;
+        H_TAS[14] = 0;
+        H_TAS[15] = 0;
+        H_TAS[16] = 0;
+        H_TAS[17] = 0;
+        H_TAS[18] = 0;
+        H_TAS[19] = 0;
+        H_TAS[20] = 0;
+        H_TAS[21] = 0;
+        H_TAS[22] = HK6;
+        H_TAS[23] = HK7;
+
         // calculate Kalman gains
-        float temp = (R_TAS + SH_TAS[2]*(P[4][4]*SH_TAS[2] + P[5][4]*SH_TAS[1] - P[22][4]*SH_TAS[2] - P[23][4]*SH_TAS[1] + P[6][4]*vd*SH_TAS[0]) + SH_TAS[1]*(P[4][5]*SH_TAS[2] + P[5][5]*SH_TAS[1] - P[22][5]*SH_TAS[2] - P[23][5]*SH_TAS[1] + P[6][5]*vd*SH_TAS[0]) - SH_TAS[2]*(P[4][22]*SH_TAS[2] + P[5][22]*SH_TAS[1] - P[22][22]*SH_TAS[2] - P[23][22]*SH_TAS[1] + P[6][22]*vd*SH_TAS[0]) - SH_TAS[1]*(P[4][23]*SH_TAS[2] + P[5][23]*SH_TAS[1] - P[22][23]*SH_TAS[2] - P[23][23]*SH_TAS[1] + P[6][23]*vd*SH_TAS[0]) + vd*SH_TAS[0]*(P[4][6]*SH_TAS[2] + P[5][6]*SH_TAS[1] - P[22][6]*SH_TAS[2] - P[23][6]*SH_TAS[1] + P[6][6]*vd*SH_TAS[0]));
-        if (temp >= R_TAS) {
-            SK_TAS[0] = 1.0f / temp;
+        varInnovVtas = (HK10*HK4 + HK11*HK6 + HK12*HK3 + HK5*HK8 + HK7*HK9 + R_TAS);
+        if (varInnovVtas >= R_TAS) {
+            HK13 = 1.0f / varInnovVtas;
             faultStatus.bad_airspeed = false;
         } else {
             // the calculation is badly conditioned, so we cannot perform fusion on this step
@@ -74,59 +97,61 @@ void NavEKF3_core::FuseAirspeed()
             faultStatus.bad_airspeed = true;
             return;
         }
-        SK_TAS[1] = SH_TAS[1];
-        Kfusion[0] = SK_TAS[0]*(P[0][4]*SH_TAS[2] - P[0][22]*SH_TAS[2] + P[0][5]*SK_TAS[1] - P[0][23]*SK_TAS[1] + P[0][6]*vd*SH_TAS[0]);
-        Kfusion[1] = SK_TAS[0]*(P[1][4]*SH_TAS[2] - P[1][22]*SH_TAS[2] + P[1][5]*SK_TAS[1] - P[1][23]*SK_TAS[1] + P[1][6]*vd*SH_TAS[0]);
-        Kfusion[2] = SK_TAS[0]*(P[2][4]*SH_TAS[2] - P[2][22]*SH_TAS[2] + P[2][5]*SK_TAS[1] - P[2][23]*SK_TAS[1] + P[2][6]*vd*SH_TAS[0]);
-        Kfusion[3] = SK_TAS[0]*(P[3][4]*SH_TAS[2] - P[3][22]*SH_TAS[2] + P[3][5]*SK_TAS[1] - P[3][23]*SK_TAS[1] + P[3][6]*vd*SH_TAS[0]);
-        Kfusion[4] = SK_TAS[0]*(P[4][4]*SH_TAS[2] - P[4][22]*SH_TAS[2] + P[4][5]*SK_TAS[1] - P[4][23]*SK_TAS[1] + P[4][6]*vd*SH_TAS[0]);
-        Kfusion[5] = SK_TAS[0]*(P[5][4]*SH_TAS[2] - P[5][22]*SH_TAS[2] + P[5][5]*SK_TAS[1] - P[5][23]*SK_TAS[1] + P[5][6]*vd*SH_TAS[0]);
-        Kfusion[6] = SK_TAS[0]*(P[6][4]*SH_TAS[2] - P[6][22]*SH_TAS[2] + P[6][5]*SK_TAS[1] - P[6][23]*SK_TAS[1] + P[6][6]*vd*SH_TAS[0]);
-        Kfusion[7] = SK_TAS[0]*(P[7][4]*SH_TAS[2] - P[7][22]*SH_TAS[2] + P[7][5]*SK_TAS[1] - P[7][23]*SK_TAS[1] + P[7][6]*vd*SH_TAS[0]);
-        Kfusion[8] = SK_TAS[0]*(P[8][4]*SH_TAS[2] - P[8][22]*SH_TAS[2] + P[8][5]*SK_TAS[1] - P[8][23]*SK_TAS[1] + P[8][6]*vd*SH_TAS[0]);
-        Kfusion[9] = SK_TAS[0]*(P[9][4]*SH_TAS[2] - P[9][22]*SH_TAS[2] + P[9][5]*SK_TAS[1] - P[9][23]*SK_TAS[1] + P[9][6]*vd*SH_TAS[0]);
 
-        if (!inhibitDelAngBiasStates) {
-            Kfusion[10] = SK_TAS[0]*(P[10][4]*SH_TAS[2] - P[10][22]*SH_TAS[2] + P[10][5]*SK_TAS[1] - P[10][23]*SK_TAS[1] + P[10][6]*vd*SH_TAS[0]);
-            Kfusion[11] = SK_TAS[0]*(P[11][4]*SH_TAS[2] - P[11][22]*SH_TAS[2] + P[11][5]*SK_TAS[1] - P[11][23]*SK_TAS[1] + P[11][6]*vd*SH_TAS[0]);
-            Kfusion[12] = SK_TAS[0]*(P[12][4]*SH_TAS[2] - P[12][22]*SH_TAS[2] + P[12][5]*SK_TAS[1] - P[12][23]*SK_TAS[1] + P[12][6]*vd*SH_TAS[0]);
+        if (!airDataFusionWindOnly) {
+            Kfusion[0] = HK13*(HK3*P[0][4] + HK4*P[0][5] + HK5*P[0][6] + HK6*P[0][22] + HK7*P[0][23]);
+            Kfusion[1] = HK13*(HK3*P[1][4] + HK4*P[1][5] + HK5*P[1][6] + HK6*P[1][22] + HK7*P[1][23]);
+            Kfusion[2] = HK13*(HK3*P[2][4] + HK4*P[2][5] + HK5*P[2][6] + HK6*P[2][22] + HK7*P[2][23]);
+            Kfusion[3] = HK13*(HK3*P[3][4] + HK4*P[3][5] + HK5*P[3][6] + HK6*P[3][22] + HK7*P[3][23]);
+            Kfusion[4] = HK12*HK13;
+            Kfusion[5] = HK10*HK13;
+            Kfusion[6] = HK13*HK8;
+            Kfusion[7] = HK13*(HK3*P[4][7] + HK4*P[5][7] + HK5*P[6][7] + HK6*P[7][22] + HK7*P[7][23]);
+            Kfusion[8] = HK13*(HK3*P[4][8] + HK4*P[5][8] + HK5*P[6][8] + HK6*P[8][22] + HK7*P[8][23]);
+            Kfusion[9] = HK13*(HK3*P[4][9] + HK4*P[5][9] + HK5*P[6][9] + HK6*P[9][22] + HK7*P[9][23]);
+        } else {
+            // zero indexes 0 to 9 = 10*4 bytes
+            memset(&Kfusion[0], 0, 40);
+        }
+
+        if (!inhibitDelAngBiasStates && !airDataFusionWindOnly) {
+            Kfusion[10] = HK13*(HK3*P[4][10] + HK4*P[5][10] + HK5*P[6][10] + HK6*P[10][22] + HK7*P[10][23]);
+            Kfusion[11] = HK13*(HK3*P[4][11] + HK4*P[5][11] + HK5*P[6][11] + HK6*P[11][22] + HK7*P[11][23]);
+            Kfusion[12] = HK13*(HK3*P[4][12] + HK4*P[5][12] + HK5*P[6][12] + HK6*P[12][22] + HK7*P[12][23]);
         } else {
             // zero indexes 10 to 12 = 3*4 bytes
             memset(&Kfusion[10], 0, 12);
         }
 
-        if (!inhibitDelVelBiasStates) {
-            Kfusion[13] = SK_TAS[0]*(P[13][4]*SH_TAS[2] - P[13][22]*SH_TAS[2] + P[13][5]*SK_TAS[1] - P[13][23]*SK_TAS[1] + P[13][6]*vd*SH_TAS[0]);
-            Kfusion[14] = SK_TAS[0]*(P[14][4]*SH_TAS[2] - P[14][22]*SH_TAS[2] + P[14][5]*SK_TAS[1] - P[14][23]*SK_TAS[1] + P[14][6]*vd*SH_TAS[0]);
-            Kfusion[15] = SK_TAS[0]*(P[15][4]*SH_TAS[2] - P[15][22]*SH_TAS[2] + P[15][5]*SK_TAS[1] - P[15][23]*SK_TAS[1] + P[15][6]*vd*SH_TAS[0]);
+        if (!inhibitDelVelBiasStates && !airDataFusionWindOnly) {
+            Kfusion[13] = HK13*(HK3*P[4][13] + HK4*P[5][13] + HK5*P[6][13] + HK6*P[13][22] + HK7*P[13][23]);
+            Kfusion[14] = HK13*(HK3*P[4][14] + HK4*P[5][14] + HK5*P[6][14] + HK6*P[14][22] + HK7*P[14][23]);
+            Kfusion[15] = HK13*(HK3*P[4][15] + HK4*P[5][15] + HK5*P[6][15] + HK6*P[15][22] + HK7*P[15][23]);
         } else {
             // zero indexes 13 to 15 = 3*4 bytes
             memset(&Kfusion[13], 0, 12);
         }
 
         // zero Kalman gains to inhibit magnetic field state estimation
-        if (!inhibitMagStates) {
-            Kfusion[16] = SK_TAS[0]*(P[16][4]*SH_TAS[2] - P[16][22]*SH_TAS[2] + P[16][5]*SK_TAS[1] - P[16][23]*SK_TAS[1] + P[16][6]*vd*SH_TAS[0]);
-            Kfusion[17] = SK_TAS[0]*(P[17][4]*SH_TAS[2] - P[17][22]*SH_TAS[2] + P[17][5]*SK_TAS[1] - P[17][23]*SK_TAS[1] + P[17][6]*vd*SH_TAS[0]);
-            Kfusion[18] = SK_TAS[0]*(P[18][4]*SH_TAS[2] - P[18][22]*SH_TAS[2] + P[18][5]*SK_TAS[1] - P[18][23]*SK_TAS[1] + P[18][6]*vd*SH_TAS[0]);
-            Kfusion[19] = SK_TAS[0]*(P[19][4]*SH_TAS[2] - P[19][22]*SH_TAS[2] + P[19][5]*SK_TAS[1] - P[19][23]*SK_TAS[1] + P[19][6]*vd*SH_TAS[0]);
-            Kfusion[20] = SK_TAS[0]*(P[20][4]*SH_TAS[2] - P[20][22]*SH_TAS[2] + P[20][5]*SK_TAS[1] - P[20][23]*SK_TAS[1] + P[20][6]*vd*SH_TAS[0]);
-            Kfusion[21] = SK_TAS[0]*(P[21][4]*SH_TAS[2] - P[21][22]*SH_TAS[2] + P[21][5]*SK_TAS[1] - P[21][23]*SK_TAS[1] + P[21][6]*vd*SH_TAS[0]);
+        if (!inhibitMagStates && !airDataFusionWindOnly) {
+            Kfusion[16] = HK13*(HK3*P[4][16] + HK4*P[5][16] + HK5*P[6][16] + HK6*P[16][22] + HK7*P[16][23]);
+            Kfusion[17] = HK13*(HK3*P[4][17] + HK4*P[5][17] + HK5*P[6][17] + HK6*P[17][22] + HK7*P[17][23]);
+            Kfusion[18] = HK13*(HK3*P[4][18] + HK4*P[5][18] + HK5*P[6][18] + HK6*P[18][22] + HK7*P[18][23]);
+            Kfusion[19] = HK13*(HK3*P[4][19] + HK4*P[5][19] + HK5*P[6][19] + HK6*P[19][22] + HK7*P[19][23]);
+            Kfusion[20] = HK13*(HK3*P[4][20] + HK4*P[5][20] + HK5*P[6][20] + HK6*P[20][22] + HK7*P[20][23]);
+            Kfusion[21] = HK13*(HK3*P[4][21] + HK4*P[5][21] + HK5*P[6][21] + HK6*P[21][22] + HK7*P[21][23]);
         } else {
             // zero indexes 16 to 21 = 6*4 bytes
             memset(&Kfusion[16], 0, 24);
         }
 
         if (!inhibitWindStates) {
-            Kfusion[22] = SK_TAS[0]*(P[22][4]*SH_TAS[2] - P[22][22]*SH_TAS[2] + P[22][5]*SK_TAS[1] - P[22][23]*SK_TAS[1] + P[22][6]*vd*SH_TAS[0]);
-            Kfusion[23] = SK_TAS[0]*(P[23][4]*SH_TAS[2] - P[23][22]*SH_TAS[2] + P[23][5]*SK_TAS[1] - P[23][23]*SK_TAS[1] + P[23][6]*vd*SH_TAS[0]);
+            Kfusion[22] = HK11*HK13;
+            Kfusion[23] = HK13*HK9;
         } else {
             // zero indexes 22 to 23 = 2*4 bytes
             memset(&Kfusion[22], 0, 8);
         }
-
-        // calculate measurement innovation variance
-        varInnovVtas = 1.0f/SK_TAS[0];
 
         // calculate measurement innovation
         innovVtas = VtasPred - tasDataDelayed.tas;
@@ -262,32 +287,22 @@ void NavEKF3_core::FuseSideslip()
     hal.util->perf_begin(_perf_FuseSideslip);
 
     // declarations
-    float q0;
-    float q1;
-    float q2;
-    float q3;
-    float vn;
-    float ve;
-    float vd;
-    float vwn;
-    float vwe;
-    const float R_BETA = 0.03f; // assume a sideslip angle RMS of ~10 deg
-    Vector13 SH_BETA;
-    Vector8 SK_BETA;
+    const float R_BETA = sq(radians(10.0f));
     Vector3f vel_rel_wind;
     Vector24 H_BETA;
     float innovBeta;
+    const bool airDataFusionWindOnly = false; // place holder for future functionality
 
-    // copy required states to local variable names
-    q0 = stateStruct.quat[0];
-    q1 = stateStruct.quat[1];
-    q2 = stateStruct.quat[2];
-    q3 = stateStruct.quat[3];
-    vn = stateStruct.velocity.x;
-    ve = stateStruct.velocity.y;
-    vd = stateStruct.velocity.z;
-    vwn = stateStruct.wind_vel.x;
-    vwe = stateStruct.wind_vel.y;
+    // local variable names required for state access
+    const float &q0 = stateStruct.quat[0];
+    const float &q1 = stateStruct.quat[1];
+    const float &q2 = stateStruct.quat[2];
+    const float &q3 = stateStruct.quat[3];
+    const float &vn = stateStruct.velocity.x;
+    const float &ve = stateStruct.velocity.y;
+    const float &vd = stateStruct.velocity.z;
+    const float &vwn = stateStruct.wind_vel.x;
+    const float &vwe = stateStruct.wind_vel.y;
 
     // calculate predicted wind relative velocity in NED
     vel_rel_wind.x = vn - vwn;
@@ -300,105 +315,193 @@ void NavEKF3_core::FuseSideslip()
     // perform fusion of assumed sideslip  = 0
     if (vel_rel_wind.x > 5.0f)
     {
-        // Calculate observation jacobians
-        SH_BETA[0] = (vn - vwn)*(sq(q0) + sq(q1) - sq(q2) - sq(q3)) - vd*(2*q0*q2 - 2*q1*q3) + (ve - vwe)*(2*q0*q3 + 2*q1*q2);
-        if (fabsf(SH_BETA[0]) <= 1e-9f) {
+        // calculate sub-expressions
+        const float S0 = 2*q0;
+        const float S1 = 2*q3;
+        const float S2 = S0*q1 + S1*q2;
+        const float S3 = S0*q2;
+        const float S4 = 2*q1;
+        const float S5 = S4*q3;
+        const float S6 = ve - vwe;
+        const float S7 = S0*q3;
+        const float S8 = S4*q2;
+        const float S9 = S7 + S8;
+        const float S10 = vn - vwn;
+        const float S11 = sq(q0);
+        const float S12 = sq(q3);
+        const float S13 = S11 - S12;
+        const float S14 = sq(q1);
+        const float S15 = sq(q2);
+        const float S16 = S14 - S15;
+        const float S17 = S13 + S16;
+        const float S18 = S10*S17 + S6*S9 + vd*(-S3 + S5);
+        if (!is_positive(sq(S18))) {
             faultStatus.bad_sideslip = true;
             return;
-        } else {
-            faultStatus.bad_sideslip = false;
         }
-        SH_BETA[1] = (ve - vwe)*(sq(q0) - sq(q1) + sq(q2) - sq(q3)) + vd*(2*q0*q1 + 2*q2*q3) - (vn - vwn)*(2*q0*q3 - 2*q1*q2);
-        SH_BETA[2] = vn - vwn;
-        SH_BETA[3] = ve - vwe;
-        SH_BETA[4] = 1/sq(SH_BETA[0]);
-        SH_BETA[5] = 1/SH_BETA[0];
-        SH_BETA[6] = SH_BETA[5]*(sq(q0) - sq(q1) + sq(q2) - sq(q3));
-        SH_BETA[7] = sq(q0) + sq(q1) - sq(q2) - sq(q3);
-        SH_BETA[8] = 2*q0*SH_BETA[3] - 2*q3*SH_BETA[2] + 2*q1*vd;
-        SH_BETA[9] = 2*q0*SH_BETA[2] + 2*q3*SH_BETA[3] - 2*q2*vd;
-        SH_BETA[10] = 2*q2*SH_BETA[2] - 2*q1*SH_BETA[3] + 2*q0*vd;
-        SH_BETA[11] = 2*q1*SH_BETA[2] + 2*q2*SH_BETA[3] + 2*q3*vd;
-        SH_BETA[12] = 2*q0*q3;
+        faultStatus.bad_sideslip = false;
+        const float S19 = 1.0F/S18;
+        const float S20 = -S7;
+        const float S21 = S20 + S8;
+        const float S22 = -S14 + S15;
+        const float S23 = S13 + S22;
+        const float S24 = (S10*S21 + S2*vd + S23*S6)/sq(S18);
+        const float S25 = S19*S2 + S24*(S3 - S5);
+        const float S26 = -S11 + S12;
+        const float S27 = S19*S21 + S24*(S22 + S26);
+        const float S28 = -S8;
+        const float S29 = S19*S23 + S24*(S20 + S28);
+        const float S30 = S17*S24 + S19*(S28 + S7);
+        const float S31 = S19*(S16 + S26) + S24*S9;
+        const float S32 = S4*vd;
+        const float S33 = S0*S6;
+        const float S34 = S1*S10;
+        const float S35 = 2*q2;
+        const float S36 = -S0*S10 - S1*S6 + S35*vd;
+        const float S37 = S19*(S32 + S33 - S34) + S24*S36;
+        const float S38 = S0*vd + S10*S35 - S4*S6;
+        const float S39 = S1*vd;
+        const float S40 = S10*S4;
+        const float S41 = S35*S6;
+        const float S42 = S19*S38 + S24*(-S39 - S40 - S41);
+        const float S43 = S19*(S39 + S40 + S41) + S24*S38;
+        const float S44 = S19*S36 + S24*(-S32 - S33 + S34);
 
-        H_BETA[0] = SH_BETA[5]*SH_BETA[8] - SH_BETA[1]*SH_BETA[4]*SH_BETA[9];
-        H_BETA[1] = SH_BETA[5]*SH_BETA[10] - SH_BETA[1]*SH_BETA[4]*SH_BETA[11];
-        H_BETA[2] = SH_BETA[5]*SH_BETA[11] + SH_BETA[1]*SH_BETA[4]*SH_BETA[10];
-        H_BETA[3] = - SH_BETA[5]*SH_BETA[9] - SH_BETA[1]*SH_BETA[4]*SH_BETA[8];
-        H_BETA[4] = - SH_BETA[5]*(SH_BETA[12] - 2*q1*q2) - SH_BETA[1]*SH_BETA[4]*SH_BETA[7];
-        H_BETA[5] = SH_BETA[6] - SH_BETA[1]*SH_BETA[4]*(SH_BETA[12] + 2*q1*q2);
-        H_BETA[6] = SH_BETA[5]*(2*q0*q1 + 2*q2*q3) + SH_BETA[1]*SH_BETA[4]*(2*q0*q2 - 2*q1*q3);
-        for (uint8_t i=7; i<=21; i++) {
-            H_BETA[i] = 0.0f;
-        }
-        H_BETA[22] = SH_BETA[5]*(SH_BETA[12] - 2*q1*q2) + SH_BETA[1]*SH_BETA[4]*SH_BETA[7];
-        H_BETA[23] = SH_BETA[1]*SH_BETA[4]*(SH_BETA[12] + 2*q1*q2) - SH_BETA[6];
-
-        // Calculate Kalman gains
-        float temp = (R_BETA - (SH_BETA[5]*(SH_BETA[12] - 2*q1*q2) + SH_BETA[1]*SH_BETA[4]*SH_BETA[7])*(P[22][4]*(SH_BETA[5]*(SH_BETA[12] - 2*q1*q2) + SH_BETA[1]*SH_BETA[4]*SH_BETA[7]) - P[4][4]*(SH_BETA[5]*(SH_BETA[12] - 2*q1*q2) + SH_BETA[1]*SH_BETA[4]*SH_BETA[7]) + P[5][4]*(SH_BETA[6] - SH_BETA[1]*SH_BETA[4]*(SH_BETA[12] + 2*q1*q2)) - P[23][4]*(SH_BETA[6] - SH_BETA[1]*SH_BETA[4]*(SH_BETA[12] + 2*q1*q2)) + P[0][4]*(SH_BETA[5]*SH_BETA[8] - SH_BETA[1]*SH_BETA[4]*SH_BETA[9]) + P[1][4]*(SH_BETA[5]*SH_BETA[10] - SH_BETA[1]*SH_BETA[4]*SH_BETA[11]) + P[2][4]*(SH_BETA[5]*SH_BETA[11] + SH_BETA[1]*SH_BETA[4]*SH_BETA[10]) - P[3][4]*(SH_BETA[5]*SH_BETA[9] + SH_BETA[1]*SH_BETA[4]*SH_BETA[8]) + P[6][4]*(SH_BETA[5]*(2*q0*q1 + 2*q2*q3) + SH_BETA[1]*SH_BETA[4]*(2*q0*q2 - 2*q1*q3))) + (SH_BETA[5]*(SH_BETA[12] - 2*q1*q2) + SH_BETA[1]*SH_BETA[4]*SH_BETA[7])*(P[22][22]*(SH_BETA[5]*(SH_BETA[12] - 2*q1*q2) + SH_BETA[1]*SH_BETA[4]*SH_BETA[7]) - P[4][22]*(SH_BETA[5]*(SH_BETA[12] - 2*q1*q2) + SH_BETA[1]*SH_BETA[4]*SH_BETA[7]) + P[5][22]*(SH_BETA[6] - SH_BETA[1]*SH_BETA[4]*(SH_BETA[12] + 2*q1*q2)) - P[23][22]*(SH_BETA[6] - SH_BETA[1]*SH_BETA[4]*(SH_BETA[12] + 2*q1*q2)) + P[0][22]*(SH_BETA[5]*SH_BETA[8] - SH_BETA[1]*SH_BETA[4]*SH_BETA[9]) + P[1][22]*(SH_BETA[5]*SH_BETA[10] - SH_BETA[1]*SH_BETA[4]*SH_BETA[11]) + P[2][22]*(SH_BETA[5]*SH_BETA[11] + SH_BETA[1]*SH_BETA[4]*SH_BETA[10]) - P[3][22]*(SH_BETA[5]*SH_BETA[9] + SH_BETA[1]*SH_BETA[4]*SH_BETA[8]) + P[6][22]*(SH_BETA[5]*(2*q0*q1 + 2*q2*q3) + SH_BETA[1]*SH_BETA[4]*(2*q0*q2 - 2*q1*q3))) + (SH_BETA[6] - SH_BETA[1]*SH_BETA[4]*(SH_BETA[12] + 2*q1*q2))*(P[22][5]*(SH_BETA[5]*(SH_BETA[12] - 2*q1*q2) + SH_BETA[1]*SH_BETA[4]*SH_BETA[7]) - P[4][5]*(SH_BETA[5]*(SH_BETA[12] - 2*q1*q2) + SH_BETA[1]*SH_BETA[4]*SH_BETA[7]) + P[5][5]*(SH_BETA[6] - SH_BETA[1]*SH_BETA[4]*(SH_BETA[12] + 2*q1*q2)) - P[23][5]*(SH_BETA[6] - SH_BETA[1]*SH_BETA[4]*(SH_BETA[12] + 2*q1*q2)) + P[0][5]*(SH_BETA[5]*SH_BETA[8] - SH_BETA[1]*SH_BETA[4]*SH_BETA[9]) + P[1][5]*(SH_BETA[5]*SH_BETA[10] - SH_BETA[1]*SH_BETA[4]*SH_BETA[11]) + P[2][5]*(SH_BETA[5]*SH_BETA[11] + SH_BETA[1]*SH_BETA[4]*SH_BETA[10]) - P[3][5]*(SH_BETA[5]*SH_BETA[9] + SH_BETA[1]*SH_BETA[4]*SH_BETA[8]) + P[6][5]*(SH_BETA[5]*(2*q0*q1 + 2*q2*q3) + SH_BETA[1]*SH_BETA[4]*(2*q0*q2 - 2*q1*q3))) - (SH_BETA[6] - SH_BETA[1]*SH_BETA[4]*(SH_BETA[12] + 2*q1*q2))*(P[22][23]*(SH_BETA[5]*(SH_BETA[12] - 2*q1*q2) + SH_BETA[1]*SH_BETA[4]*SH_BETA[7]) - P[4][23]*(SH_BETA[5]*(SH_BETA[12] - 2*q1*q2) + SH_BETA[1]*SH_BETA[4]*SH_BETA[7]) + P[5][23]*(SH_BETA[6] - SH_BETA[1]*SH_BETA[4]*(SH_BETA[12] + 2*q1*q2)) - P[23][23]*(SH_BETA[6] - SH_BETA[1]*SH_BETA[4]*(SH_BETA[12] + 2*q1*q2)) + P[0][23]*(SH_BETA[5]*SH_BETA[8] - SH_BETA[1]*SH_BETA[4]*SH_BETA[9]) + P[1][23]*(SH_BETA[5]*SH_BETA[10] - SH_BETA[1]*SH_BETA[4]*SH_BETA[11]) + P[2][23]*(SH_BETA[5]*SH_BETA[11] + SH_BETA[1]*SH_BETA[4]*SH_BETA[10]) - P[3][23]*(SH_BETA[5]*SH_BETA[9] + SH_BETA[1]*SH_BETA[4]*SH_BETA[8]) + P[6][23]*(SH_BETA[5]*(2*q0*q1 + 2*q2*q3) + SH_BETA[1]*SH_BETA[4]*(2*q0*q2 - 2*q1*q3))) + (SH_BETA[5]*SH_BETA[8] - SH_BETA[1]*SH_BETA[4]*SH_BETA[9])*(P[22][0]*(SH_BETA[5]*(SH_BETA[12] - 2*q1*q2) + SH_BETA[1]*SH_BETA[4]*SH_BETA[7]) - P[4][0]*(SH_BETA[5]*(SH_BETA[12] - 2*q1*q2) + SH_BETA[1]*SH_BETA[4]*SH_BETA[7]) + P[5][0]*(SH_BETA[6] - SH_BETA[1]*SH_BETA[4]*(SH_BETA[12] + 2*q1*q2)) - P[23][0]*(SH_BETA[6] - SH_BETA[1]*SH_BETA[4]*(SH_BETA[12] + 2*q1*q2)) + P[0][0]*(SH_BETA[5]*SH_BETA[8] - SH_BETA[1]*SH_BETA[4]*SH_BETA[9]) + P[1][0]*(SH_BETA[5]*SH_BETA[10] - SH_BETA[1]*SH_BETA[4]*SH_BETA[11]) + P[2][0]*(SH_BETA[5]*SH_BETA[11] + SH_BETA[1]*SH_BETA[4]*SH_BETA[10]) - P[3][0]*(SH_BETA[5]*SH_BETA[9] + SH_BETA[1]*SH_BETA[4]*SH_BETA[8]) + P[6][0]*(SH_BETA[5]*(2*q0*q1 + 2*q2*q3) + SH_BETA[1]*SH_BETA[4]*(2*q0*q2 - 2*q1*q3))) + (SH_BETA[5]*SH_BETA[10] - SH_BETA[1]*SH_BETA[4]*SH_BETA[11])*(P[22][1]*(SH_BETA[5]*(SH_BETA[12] - 2*q1*q2) + SH_BETA[1]*SH_BETA[4]*SH_BETA[7]) - P[4][1]*(SH_BETA[5]*(SH_BETA[12] - 2*q1*q2) + SH_BETA[1]*SH_BETA[4]*SH_BETA[7]) + P[5][1]*(SH_BETA[6] - SH_BETA[1]*SH_BETA[4]*(SH_BETA[12] + 2*q1*q2)) - P[23][1]*(SH_BETA[6] - SH_BETA[1]*SH_BETA[4]*(SH_BETA[12] + 2*q1*q2)) + P[0][1]*(SH_BETA[5]*SH_BETA[8] - SH_BETA[1]*SH_BETA[4]*SH_BETA[9]) + P[1][1]*(SH_BETA[5]*SH_BETA[10] - SH_BETA[1]*SH_BETA[4]*SH_BETA[11]) + P[2][1]*(SH_BETA[5]*SH_BETA[11] + SH_BETA[1]*SH_BETA[4]*SH_BETA[10]) - P[3][1]*(SH_BETA[5]*SH_BETA[9] + SH_BETA[1]*SH_BETA[4]*SH_BETA[8]) + P[6][1]*(SH_BETA[5]*(2*q0*q1 + 2*q2*q3) + SH_BETA[1]*SH_BETA[4]*(2*q0*q2 - 2*q1*q3))) + (SH_BETA[5]*SH_BETA[11] + SH_BETA[1]*SH_BETA[4]*SH_BETA[10])*(P[22][2]*(SH_BETA[5]*(SH_BETA[12] - 2*q1*q2) + SH_BETA[1]*SH_BETA[4]*SH_BETA[7]) - P[4][2]*(SH_BETA[5]*(SH_BETA[12] - 2*q1*q2) + SH_BETA[1]*SH_BETA[4]*SH_BETA[7]) + P[5][2]*(SH_BETA[6] - SH_BETA[1]*SH_BETA[4]*(SH_BETA[12] + 2*q1*q2)) - P[23][2]*(SH_BETA[6] - SH_BETA[1]*SH_BETA[4]*(SH_BETA[12] + 2*q1*q2)) + P[0][2]*(SH_BETA[5]*SH_BETA[8] - SH_BETA[1]*SH_BETA[4]*SH_BETA[9]) + P[1][2]*(SH_BETA[5]*SH_BETA[10] - SH_BETA[1]*SH_BETA[4]*SH_BETA[11]) + P[2][2]*(SH_BETA[5]*SH_BETA[11] + SH_BETA[1]*SH_BETA[4]*SH_BETA[10]) - P[3][2]*(SH_BETA[5]*SH_BETA[9] + SH_BETA[1]*SH_BETA[4]*SH_BETA[8]) + P[6][2]*(SH_BETA[5]*(2*q0*q1 + 2*q2*q3) + SH_BETA[1]*SH_BETA[4]*(2*q0*q2 - 2*q1*q3))) - (SH_BETA[5]*SH_BETA[9] + SH_BETA[1]*SH_BETA[4]*SH_BETA[8])*(P[22][3]*(SH_BETA[5]*(SH_BETA[12] - 2*q1*q2) + SH_BETA[1]*SH_BETA[4]*SH_BETA[7]) - P[4][3]*(SH_BETA[5]*(SH_BETA[12] - 2*q1*q2) + SH_BETA[1]*SH_BETA[4]*SH_BETA[7]) + P[5][3]*(SH_BETA[6] - SH_BETA[1]*SH_BETA[4]*(SH_BETA[12] + 2*q1*q2)) - P[23][3]*(SH_BETA[6] - SH_BETA[1]*SH_BETA[4]*(SH_BETA[12] + 2*q1*q2)) + P[0][3]*(SH_BETA[5]*SH_BETA[8] - SH_BETA[1]*SH_BETA[4]*SH_BETA[9]) + P[1][3]*(SH_BETA[5]*SH_BETA[10] - SH_BETA[1]*SH_BETA[4]*SH_BETA[11]) + P[2][3]*(SH_BETA[5]*SH_BETA[11] + SH_BETA[1]*SH_BETA[4]*SH_BETA[10]) - P[3][3]*(SH_BETA[5]*SH_BETA[9] + SH_BETA[1]*SH_BETA[4]*SH_BETA[8]) + P[6][3]*(SH_BETA[5]*(2*q0*q1 + 2*q2*q3) + SH_BETA[1]*SH_BETA[4]*(2*q0*q2 - 2*q1*q3))) + (SH_BETA[5]*(2*q0*q1 + 2*q2*q3) + SH_BETA[1]*SH_BETA[4]*(2*q0*q2 - 2*q1*q3))*(P[22][6]*(SH_BETA[5]*(SH_BETA[12] - 2*q1*q2) + SH_BETA[1]*SH_BETA[4]*SH_BETA[7]) - P[4][6]*(SH_BETA[5]*(SH_BETA[12] - 2*q1*q2) + SH_BETA[1]*SH_BETA[4]*SH_BETA[7]) + P[5][6]*(SH_BETA[6] - SH_BETA[1]*SH_BETA[4]*(SH_BETA[12] + 2*q1*q2)) - P[23][6]*(SH_BETA[6] - SH_BETA[1]*SH_BETA[4]*(SH_BETA[12] + 2*q1*q2)) + P[0][6]*(SH_BETA[5]*SH_BETA[8] - SH_BETA[1]*SH_BETA[4]*SH_BETA[9]) + P[1][6]*(SH_BETA[5]*SH_BETA[10] - SH_BETA[1]*SH_BETA[4]*SH_BETA[11]) + P[2][6]*(SH_BETA[5]*SH_BETA[11] + SH_BETA[1]*SH_BETA[4]*SH_BETA[10]) - P[3][6]*(SH_BETA[5]*SH_BETA[9] + SH_BETA[1]*SH_BETA[4]*SH_BETA[8]) + P[6][6]*(SH_BETA[5]*(2*q0*q1 + 2*q2*q3) + SH_BETA[1]*SH_BETA[4]*(2*q0*q2 - 2*q1*q3))));
-        if (temp >= R_BETA) {
-            SK_BETA[0] = 1.0f / temp;
-            faultStatus.bad_sideslip = false;
-        } else {
+        // calculate innovation variance and check numnerical conditioning
+        const float innov_var = R_BETA + S25*(P[0][6]*S37 + P[1][6]*S42 + P[2][6]*S43 + P[3][6]*S44 + P[4][6]*S27 + P[5][6]*S29 + P[6][22]*S30 + P[6][23]*S31 + P[6][6]*S25) + S27*(P[0][4]*S37 + P[1][4]*S42 + P[2][4]*S43 + P[3][4]*S44 + P[4][22]*S30 + P[4][23]*S31 + P[4][4]*S27 + P[4][5]*S29 + P[4][6]*S25) + S29*(P[0][5]*S37 + P[1][5]*S42 + P[2][5]*S43 + P[3][5]*S44 + P[4][5]*S27 + P[5][22]*S30 + P[5][23]*S31 + P[5][5]*S29 + P[5][6]*S25) + S30*(P[0][22]*S37 + P[1][22]*S42 + P[22][22]*S30 + P[22][23]*S31 + P[2][22]*S43 + P[3][22]*S44 + P[4][22]*S27 + P[5][22]*S29 + P[6][22]*S25) + S31*(P[0][23]*S37 + P[1][23]*S42 + P[22][23]*S30 + P[23][23]*S31 + P[2][23]*S43 + P[3][23]*S44 + P[4][23]*S27 + P[5][23]*S29 + P[6][23]*S25) + S37*(P[0][0]*S37 + P[0][1]*S42 + P[0][22]*S30 + P[0][23]*S31 + P[0][2]*S43 + P[0][3]*S44 + P[0][4]*S27 + P[0][5]*S29 + P[0][6]*S25) + S42*(P[0][1]*S37 + P[1][1]*S42 + P[1][22]*S30 + P[1][23]*S31 + P[1][2]*S43 + P[1][3]*S44 + P[1][4]*S27 + P[1][5]*S29 + P[1][6]*S25) + S43*(P[0][2]*S37 + P[1][2]*S42 + P[2][22]*S30 + P[2][23]*S31 + P[2][2]*S43 + P[2][3]*S44 + P[2][4]*S27 + P[2][5]*S29 + P[2][6]*S25) + S44*(P[0][3]*S37 + P[1][3]*S42 + P[2][3]*S43 + P[3][22]*S30 + P[3][23]*S31 + P[3][3]*S44 + P[3][4]*S27 + P[3][5]*S29 + P[3][6]*S25);
+        if (innov_var < R_BETA) {
             // the calculation is badly conditioned, so we cannot perform fusion on this step
             // we reset the covariance matrix and try again next measurement
             CovarianceInit();
             faultStatus.bad_sideslip = true;
             return;
         }
-        SK_BETA[1] = SH_BETA[5]*(SH_BETA[12] - 2*q1*q2) + SH_BETA[1]*SH_BETA[4]*SH_BETA[7];
-        SK_BETA[2] = SH_BETA[6] - SH_BETA[1]*SH_BETA[4]*(SH_BETA[12] + 2*q1*q2);
-        SK_BETA[3] = SH_BETA[5]*(2*q0*q1 + 2*q2*q3) + SH_BETA[1]*SH_BETA[4]*(2*q0*q2 - 2*q1*q3);
-        SK_BETA[4] = SH_BETA[5]*SH_BETA[10] - SH_BETA[1]*SH_BETA[4]*SH_BETA[11];
-        SK_BETA[5] = SH_BETA[5]*SH_BETA[8] - SH_BETA[1]*SH_BETA[4]*SH_BETA[9];
-        SK_BETA[6] = SH_BETA[5]*SH_BETA[11] + SH_BETA[1]*SH_BETA[4]*SH_BETA[10];
-        SK_BETA[7] = SH_BETA[5]*SH_BETA[9] + SH_BETA[1]*SH_BETA[4]*SH_BETA[8];
 
-        Kfusion[0] = SK_BETA[0]*(P[0][0]*SK_BETA[5] + P[0][1]*SK_BETA[4] - P[0][4]*SK_BETA[1] + P[0][5]*SK_BETA[2] + P[0][2]*SK_BETA[6] + P[0][6]*SK_BETA[3] - P[0][3]*SK_BETA[7] + P[0][22]*SK_BETA[1] - P[0][23]*SK_BETA[2]);
-        Kfusion[1] = SK_BETA[0]*(P[1][0]*SK_BETA[5] + P[1][1]*SK_BETA[4] - P[1][4]*SK_BETA[1] + P[1][5]*SK_BETA[2] + P[1][2]*SK_BETA[6] + P[1][6]*SK_BETA[3] - P[1][3]*SK_BETA[7] + P[1][22]*SK_BETA[1] - P[1][23]*SK_BETA[2]);
-        Kfusion[2] = SK_BETA[0]*(P[2][0]*SK_BETA[5] + P[2][1]*SK_BETA[4] - P[2][4]*SK_BETA[1] + P[2][5]*SK_BETA[2] + P[2][2]*SK_BETA[6] + P[2][6]*SK_BETA[3] - P[2][3]*SK_BETA[7] + P[2][22]*SK_BETA[1] - P[2][23]*SK_BETA[2]);
-        Kfusion[3] = SK_BETA[0]*(P[3][0]*SK_BETA[5] + P[3][1]*SK_BETA[4] - P[3][4]*SK_BETA[1] + P[3][5]*SK_BETA[2] + P[3][2]*SK_BETA[6] + P[3][6]*SK_BETA[3] - P[3][3]*SK_BETA[7] + P[3][22]*SK_BETA[1] - P[3][23]*SK_BETA[2]);
-        Kfusion[4] = SK_BETA[0]*(P[4][0]*SK_BETA[5] + P[4][1]*SK_BETA[4] - P[4][4]*SK_BETA[1] + P[4][5]*SK_BETA[2] + P[4][2]*SK_BETA[6] + P[4][6]*SK_BETA[3] - P[4][3]*SK_BETA[7] + P[4][22]*SK_BETA[1] - P[4][23]*SK_BETA[2]);
-        Kfusion[5] = SK_BETA[0]*(P[5][0]*SK_BETA[5] + P[5][1]*SK_BETA[4] - P[5][4]*SK_BETA[1] + P[5][5]*SK_BETA[2] + P[5][2]*SK_BETA[6] + P[5][6]*SK_BETA[3] - P[5][3]*SK_BETA[7] + P[5][22]*SK_BETA[1] - P[5][23]*SK_BETA[2]);
-        Kfusion[6] = SK_BETA[0]*(P[6][0]*SK_BETA[5] + P[6][1]*SK_BETA[4] - P[6][4]*SK_BETA[1] + P[6][5]*SK_BETA[2] + P[6][2]*SK_BETA[6] + P[6][6]*SK_BETA[3] - P[6][3]*SK_BETA[7] + P[6][22]*SK_BETA[1] - P[6][23]*SK_BETA[2]);
-        Kfusion[7] = SK_BETA[0]*(P[7][0]*SK_BETA[5] + P[7][1]*SK_BETA[4] - P[7][4]*SK_BETA[1] + P[7][5]*SK_BETA[2] + P[7][2]*SK_BETA[6] + P[7][6]*SK_BETA[3] - P[7][3]*SK_BETA[7] + P[7][22]*SK_BETA[1] - P[7][23]*SK_BETA[2]);
-        Kfusion[8] = SK_BETA[0]*(P[8][0]*SK_BETA[5] + P[8][1]*SK_BETA[4] - P[8][4]*SK_BETA[1] + P[8][5]*SK_BETA[2] + P[8][2]*SK_BETA[6] + P[8][6]*SK_BETA[3] - P[8][3]*SK_BETA[7] + P[8][22]*SK_BETA[1] - P[8][23]*SK_BETA[2]);
-        Kfusion[9] = SK_BETA[0]*(P[9][0]*SK_BETA[5] + P[9][1]*SK_BETA[4] - P[9][4]*SK_BETA[1] + P[9][5]*SK_BETA[2] + P[9][2]*SK_BETA[6] + P[9][6]*SK_BETA[3] - P[9][3]*SK_BETA[7] + P[9][22]*SK_BETA[1] - P[9][23]*SK_BETA[2]);
+        // sideslip observation matrix and kalman gain
+        const float HK0 = 2*q1;
+        const float HK1 = HK0*vd;
+        const float HK2 = ve - vwe;
+        const float HK3 = 2*q0;
+        const float HK4 = HK2*HK3;
+        const float HK5 = vn - vwn;
+        const float HK6 = 2*q3;
+        const float HK7 = HK5*HK6;
+        const float HK8 = HK3*q2;
+        const float HK9 = HK0*q3;
+        const float HK10 = HK3*q3;
+        const float HK11 = HK0*q2;
+        const float HK12 = HK10 + HK11;
+        const float HK13 = sq(q0);
+        const float HK14 = sq(q3);
+        const float HK15 = HK13 - HK14;
+        const float HK16 = sq(q1);
+        const float HK17 = sq(q2);
+        const float HK18 = HK16 - HK17;
+        const float HK19 = HK15 + HK18;
+        const float HK20 = HK12*HK2 + HK19*HK5 + vd*(-HK8 + HK9);
+        const float HK21 = 1.0F/HK20;
+        const float HK22 = 2*q2;
+        const float HK23 = -HK2*HK6 + HK22*vd - HK3*HK5;
+        const float HK24 = HK3*q1 + HK6*q2;
+        const float HK25 = -HK10;
+        const float HK26 = HK11 + HK25;
+        const float HK27 = -HK16 + HK17;
+        const float HK28 = HK15 + HK27;
+        const float HK29 = (HK2*HK28 + HK24*vd + HK26*HK5)/sq(HK20);
+        const float HK30 = HK21*(HK1 + HK4 - HK7) + HK23*HK29;
+        const float HK31 = -HK0*HK2 + HK22*HK5 + HK3*vd;
+        const float HK32 = HK6*vd;
+        const float HK33 = HK0*HK5;
+        const float HK34 = HK2*HK22;
+        const float HK35 = HK21*HK31 + HK29*(-HK32 - HK33 - HK34);
+        const float HK36 = HK21*(HK32 + HK33 + HK34) + HK29*HK31;
+        const float HK37 = HK21*HK23 + HK29*(-HK1 - HK4 + HK7);
+        const float HK38 = -HK13 + HK14;
+        const float HK39 = HK21*HK26 + HK29*(HK27 + HK38);
+        const float HK40 = -HK11;
+        const float HK41 = HK21*HK28 + HK29*(HK25 + HK40);
+        const float HK42 = HK21*HK24 + HK29*(HK8 - HK9);
+        const float HK43 = HK19*HK29 + HK21*(HK10 + HK40);
+        const float HK44 = HK12*HK29 + HK21*(HK18 + HK38);
+        const float HK45 = HK30*P[0][0] + HK35*P[0][1] + HK36*P[0][2] + HK37*P[0][3] + HK39*P[0][4] + HK41*P[0][5] + HK42*P[0][6] + HK43*P[0][22] + HK44*P[0][23];
+        const float HK46 = HK30*P[0][6] + HK35*P[1][6] + HK36*P[2][6] + HK37*P[3][6] + HK39*P[4][6] + HK41*P[5][6] + HK42*P[6][6] + HK43*P[6][22] + HK44*P[6][23];
+        const float HK47 = HK30*P[0][4] + HK35*P[1][4] + HK36*P[2][4] + HK37*P[3][4] + HK39*P[4][4] + HK41*P[4][5] + HK42*P[4][6] + HK43*P[4][22] + HK44*P[4][23];
+        const float HK48 = HK30*P[0][22] + HK35*P[1][22] + HK36*P[2][22] + HK37*P[3][22] + HK39*P[4][22] + HK41*P[5][22] + HK42*P[6][22] + HK43*P[22][22] + HK44*P[22][23];
+        const float HK49 = HK30*P[0][5] + HK35*P[1][5] + HK36*P[2][5] + HK37*P[3][5] + HK39*P[4][5] + HK41*P[5][5] + HK42*P[5][6] + HK43*P[5][22] + HK44*P[5][23];
+        const float HK50 = HK30*P[0][23] + HK35*P[1][23] + HK36*P[2][23] + HK37*P[3][23] + HK39*P[4][23] + HK41*P[5][23] + HK42*P[6][23] + HK43*P[22][23] + HK44*P[23][23];
+        const float HK51 = HK30*P[0][1] + HK35*P[1][1] + HK36*P[1][2] + HK37*P[1][3] + HK39*P[1][4] + HK41*P[1][5] + HK42*P[1][6] + HK43*P[1][22] + HK44*P[1][23];
+        const float HK52 = HK30*P[0][2] + HK35*P[1][2] + HK36*P[2][2] + HK37*P[2][3] + HK39*P[2][4] + HK41*P[2][5] + HK42*P[2][6] + HK43*P[2][22] + HK44*P[2][23];
+        const float HK53 = HK30*P[0][3] + HK35*P[1][3] + HK36*P[2][3] + HK37*P[3][3] + HK39*P[3][4] + HK41*P[3][5] + HK42*P[3][6] + HK43*P[3][22] + HK44*P[3][23];
+        const float HK54 = 1.0F/(HK30*HK45 + HK35*HK51 + HK36*HK52 + HK37*HK53 + HK39*HK47 + HK41*HK49 + HK42*HK46 + HK43*HK48 + HK44*HK50 + R_BETA);
 
-        if (!inhibitDelAngBiasStates) {
-            Kfusion[10] = SK_BETA[0]*(P[10][0]*SK_BETA[5] + P[10][1]*SK_BETA[4] - P[10][4]*SK_BETA[1] + P[10][5]*SK_BETA[2] + P[10][2]*SK_BETA[6] + P[10][6]*SK_BETA[3] - P[10][3]*SK_BETA[7] + P[10][22]*SK_BETA[1] - P[10][23]*SK_BETA[2]);
-            Kfusion[11] = SK_BETA[0]*(P[11][0]*SK_BETA[5] + P[11][1]*SK_BETA[4] - P[11][4]*SK_BETA[1] + P[11][5]*SK_BETA[2] + P[11][2]*SK_BETA[6] + P[11][6]*SK_BETA[3] - P[11][3]*SK_BETA[7] + P[11][22]*SK_BETA[1] - P[11][23]*SK_BETA[2]);
-            Kfusion[12] = SK_BETA[0]*(P[12][0]*SK_BETA[5] + P[12][1]*SK_BETA[4] - P[12][4]*SK_BETA[1] + P[12][5]*SK_BETA[2] + P[12][2]*SK_BETA[6] + P[12][6]*SK_BETA[3] - P[12][3]*SK_BETA[7] + P[12][22]*SK_BETA[1] - P[12][23]*SK_BETA[2]);
+        H_BETA[0] = HK30;
+        H_BETA[1] = HK35;
+        H_BETA[2] = HK36;
+        H_BETA[3] = HK37;
+        H_BETA[4] = HK39;
+        H_BETA[5] = HK41;
+        H_BETA[6] = HK42;
+        memset(&H_BETA[7], 0, 60); // zero indexes 7 to 21 = 15*4 bytes
+        H_BETA[22] = HK43;
+        H_BETA[23] = HK44;
+
+        // Calculate Kalman gains
+        // Sideslip should be used to constrain yaw if navigating without a independent source of yaw
+        const bool updateAllStates = !airDataFusionWindOnly ||
+                                     ((effectiveMagCal != MagCal::EXTERNAL_YAW) &&
+                                     (effectiveMagCal != MagCal::EXTERNAL_YAW_FALLBACK) &&
+                                     !use_compass());
+
+        if (updateAllStates) {
+            Kfusion[0] = HK45*HK54;
+            Kfusion[1] = HK51*HK54;
+            Kfusion[2] = HK52*HK54;
+            Kfusion[3] = HK53*HK54;
+            Kfusion[4] = HK47*HK54;
+            Kfusion[5] = HK49*HK54;
+            Kfusion[6] = HK46*HK54;
+            Kfusion[7] = HK54*(HK30*P[0][7] + HK35*P[1][7] + HK36*P[2][7] + HK37*P[3][7] + HK39*P[4][7] + HK41*P[5][7] + HK42*P[6][7] + HK43*P[7][22] + HK44*P[7][23]);
+            Kfusion[8] = HK54*(HK30*P[0][8] + HK35*P[1][8] + HK36*P[2][8] + HK37*P[3][8] + HK39*P[4][8] + HK41*P[5][8] + HK42*P[6][8] + HK43*P[8][22] + HK44*P[8][23]);
+            Kfusion[9] = HK54*(HK30*P[0][9] + HK35*P[1][9] + HK36*P[2][9] + HK37*P[3][9] + HK39*P[4][9] + HK41*P[5][9] + HK42*P[6][9] + HK43*P[9][22] + HK44*P[9][23]);
+        } else {
+            // zero indexes 0 to 9 = 10*4 bytes
+            memset(&Kfusion[0], 0, 40);
+        }
+
+        if (!inhibitDelAngBiasStates && updateAllStates) {
+            Kfusion[10] = HK54*(HK30*P[0][10] + HK35*P[1][10] + HK36*P[2][10] + HK37*P[3][10] + HK39*P[4][10] + HK41*P[5][10] + HK42*P[6][10] + HK43*P[10][22] + HK44*P[10][23]);
+            Kfusion[11] = HK54*(HK30*P[0][11] + HK35*P[1][11] + HK36*P[2][11] + HK37*P[3][11] + HK39*P[4][11] + HK41*P[5][11] + HK42*P[6][11] + HK43*P[11][22] + HK44*P[11][23]);
+            Kfusion[12] = HK54*(HK30*P[0][12] + HK35*P[1][12] + HK36*P[2][12] + HK37*P[3][12] + HK39*P[4][12] + HK41*P[5][12] + HK42*P[6][12] + HK43*P[12][22] + HK44*P[12][23]);
         } else {
             // zero indexes 10 to 12 = 3*4 bytes
             memset(&Kfusion[10], 0, 12);
         }
 
-        if (!inhibitDelVelBiasStates) {
-            Kfusion[13] = SK_BETA[0]*(P[13][0]*SK_BETA[5] + P[13][1]*SK_BETA[4] - P[13][4]*SK_BETA[1] + P[13][5]*SK_BETA[2] + P[13][2]*SK_BETA[6] + P[13][6]*SK_BETA[3] - P[13][3]*SK_BETA[7] + P[13][22]*SK_BETA[1] - P[13][23]*SK_BETA[2]);
-            Kfusion[14] = SK_BETA[0]*(P[14][0]*SK_BETA[5] + P[14][1]*SK_BETA[4] - P[14][4]*SK_BETA[1] + P[14][5]*SK_BETA[2] + P[14][2]*SK_BETA[6] + P[14][6]*SK_BETA[3] - P[14][3]*SK_BETA[7] + P[14][22]*SK_BETA[1] - P[14][23]*SK_BETA[2]);
-            Kfusion[15] = SK_BETA[0]*(P[15][0]*SK_BETA[5] + P[15][1]*SK_BETA[4] - P[15][4]*SK_BETA[1] + P[15][5]*SK_BETA[2] + P[15][2]*SK_BETA[6] + P[15][6]*SK_BETA[3] - P[15][3]*SK_BETA[7] + P[15][22]*SK_BETA[1] - P[15][23]*SK_BETA[2]);
+        if (!inhibitDelVelBiasStates && updateAllStates) {
+            Kfusion[13] = HK54*(HK30*P[0][13] + HK35*P[1][13] + HK36*P[2][13] + HK37*P[3][13] + HK39*P[4][13] + HK41*P[5][13] + HK42*P[6][13] + HK43*P[13][22] + HK44*P[13][23]);
+            Kfusion[14] = HK54*(HK30*P[0][14] + HK35*P[1][14] + HK36*P[2][14] + HK37*P[3][14] + HK39*P[4][14] + HK41*P[5][14] + HK42*P[6][14] + HK43*P[14][22] + HK44*P[14][23]);
+            Kfusion[15] = HK54*(HK30*P[0][15] + HK35*P[1][15] + HK36*P[2][15] + HK37*P[3][15] + HK39*P[4][15] + HK41*P[5][15] + HK42*P[6][15] + HK43*P[15][22] + HK44*P[15][23]);
         } else {
             // zero indexes 13 to 15 = 3*4 bytes
             memset(&Kfusion[13], 0, 12);
         }
 
         // zero Kalman gains to inhibit magnetic field state estimation
-        if (!inhibitMagStates) {
-            Kfusion[16] = SK_BETA[0]*(P[16][0]*SK_BETA[5] + P[16][1]*SK_BETA[4] - P[16][4]*SK_BETA[1] + P[16][5]*SK_BETA[2] + P[16][2]*SK_BETA[6] + P[16][6]*SK_BETA[3] - P[16][3]*SK_BETA[7] + P[16][22]*SK_BETA[1] - P[16][23]*SK_BETA[2]);
-            Kfusion[17] = SK_BETA[0]*(P[17][0]*SK_BETA[5] + P[17][1]*SK_BETA[4] - P[17][4]*SK_BETA[1] + P[17][5]*SK_BETA[2] + P[17][2]*SK_BETA[6] + P[17][6]*SK_BETA[3] - P[17][3]*SK_BETA[7] + P[17][22]*SK_BETA[1] - P[17][23]*SK_BETA[2]);
-            Kfusion[18] = SK_BETA[0]*(P[18][0]*SK_BETA[5] + P[18][1]*SK_BETA[4] - P[18][4]*SK_BETA[1] + P[18][5]*SK_BETA[2] + P[18][2]*SK_BETA[6] + P[18][6]*SK_BETA[3] - P[18][3]*SK_BETA[7] + P[18][22]*SK_BETA[1] - P[18][23]*SK_BETA[2]);
-            Kfusion[19] = SK_BETA[0]*(P[19][0]*SK_BETA[5] + P[19][1]*SK_BETA[4] - P[19][4]*SK_BETA[1] + P[19][5]*SK_BETA[2] + P[19][2]*SK_BETA[6] + P[19][6]*SK_BETA[3] - P[19][3]*SK_BETA[7] + P[19][22]*SK_BETA[1] - P[19][23]*SK_BETA[2]);
-            Kfusion[20] = SK_BETA[0]*(P[20][0]*SK_BETA[5] + P[20][1]*SK_BETA[4] - P[20][4]*SK_BETA[1] + P[20][5]*SK_BETA[2] + P[20][2]*SK_BETA[6] + P[20][6]*SK_BETA[3] - P[20][3]*SK_BETA[7] + P[20][22]*SK_BETA[1] - P[20][23]*SK_BETA[2]);
-            Kfusion[21] = SK_BETA[0]*(P[21][0]*SK_BETA[5] + P[21][1]*SK_BETA[4] - P[21][4]*SK_BETA[1] + P[21][5]*SK_BETA[2] + P[21][2]*SK_BETA[6] + P[21][6]*SK_BETA[3] - P[21][3]*SK_BETA[7] + P[21][22]*SK_BETA[1] - P[21][23]*SK_BETA[2]);
+        if (!inhibitMagStates && updateAllStates) {
+            Kfusion[16] = HK54*(HK30*P[0][16] + HK35*P[1][16] + HK36*P[2][16] + HK37*P[3][16] + HK39*P[4][16] + HK41*P[5][16] + HK42*P[6][16] + HK43*P[16][22] + HK44*P[16][23]);
+            Kfusion[17] = HK54*(HK30*P[0][17] + HK35*P[1][17] + HK36*P[2][17] + HK37*P[3][17] + HK39*P[4][17] + HK41*P[5][17] + HK42*P[6][17] + HK43*P[17][22] + HK44*P[17][23]);
+            Kfusion[18] = HK54*(HK30*P[0][18] + HK35*P[1][18] + HK36*P[2][18] + HK37*P[3][18] + HK39*P[4][18] + HK41*P[5][18] + HK42*P[6][18] + HK43*P[18][22] + HK44*P[18][23]);
+            Kfusion[19] = HK54*(HK30*P[0][19] + HK35*P[1][19] + HK36*P[2][19] + HK37*P[3][19] + HK39*P[4][19] + HK41*P[5][19] + HK42*P[6][19] + HK43*P[19][22] + HK44*P[19][23]);
+            Kfusion[20] = HK54*(HK30*P[0][20] + HK35*P[1][20] + HK36*P[2][20] + HK37*P[3][20] + HK39*P[4][20] + HK41*P[5][20] + HK42*P[6][20] + HK43*P[20][22] + HK44*P[20][23]);
+            Kfusion[21] = HK54*(HK30*P[0][21] + HK35*P[1][21] + HK36*P[2][21] + HK37*P[3][21] + HK39*P[4][21] + HK41*P[5][21] + HK42*P[6][21] + HK43*P[21][22] + HK44*P[21][23]);
         } else {
             // zero indexes 16 to 21 = 6*4 bytes
             memset(&Kfusion[16], 0, 24);
         }
 
         if (!inhibitWindStates) {
-            Kfusion[22] = SK_BETA[0]*(P[22][0]*SK_BETA[5] + P[22][1]*SK_BETA[4] - P[22][4]*SK_BETA[1] + P[22][5]*SK_BETA[2] + P[22][2]*SK_BETA[6] + P[22][6]*SK_BETA[3] - P[22][3]*SK_BETA[7] + P[22][22]*SK_BETA[1] - P[22][23]*SK_BETA[2]);
-            Kfusion[23] = SK_BETA[0]*(P[23][0]*SK_BETA[5] + P[23][1]*SK_BETA[4] - P[23][4]*SK_BETA[1] + P[23][5]*SK_BETA[2] + P[23][2]*SK_BETA[6] + P[23][6]*SK_BETA[3] - P[23][3]*SK_BETA[7] + P[23][22]*SK_BETA[1] - P[23][23]*SK_BETA[2]);
+            Kfusion[22] = HK48*HK54;
+            Kfusion[23] = HK50*HK54;
         } else {
             // zero indexes 22 to 23 = 2*4 bytes
             memset(&Kfusion[22], 0, 8);
