@@ -1,4 +1,5 @@
-# Original prediction model, covariance update, 3-axis magnetometer observation model and support functions by [Roman Bapst](https://github.com/RomanBapst)
+# Original prediction model, covariance update, 3-axis magnetometer observation model
+# and support functions by [Roman Bapst](https://github.com/RomanBapst)
 # Other observaton types added by [Paul Riseborough](https://github.com/priseborough)
 
 from sympy import *
@@ -24,6 +25,9 @@ def create_cov_matrix(i, j):
         return Symbol("P[" + str(i) + "][" + str(j) + "]", real=True)
     else:
         return 0
+
+def create_Tbs_matrix(i, j):
+    return Symbol("Tbs[" + str(i) + "][" + str(j) + "]", real=True)
 
 def quat_mult(p,q):
     r = Matrix([p[0] * q[0] - p[1] * q[1] - p[2] * q[2] - p[3] * q[3],
@@ -338,3 +342,41 @@ yaw_code_generator.write_matrix(Matrix(H_YAW312_A_simple[1]).T, "H_YAW")
 yaw_code_generator.print_string("calculate 312 yaw observation matrix - option B")
 yaw_code_generator.write_subexpressions(H_YAW312_B_simple[0])
 yaw_code_generator.write_matrix(Matrix(H_YAW312_B_simple[1]).T, "H_YAW")
+
+# derive equations for sequential fusion of optical flow measurements
+flow_code_generator = CodeGenerator("./flow_generated.cpp")
+range = create_symbol("range", real=True) # range from camera focal point to ground along sensor Z axis
+obs_var = create_symbol("R_LOS", real=True) # optical flow line of sight rate measurement noise variance
+
+# Define rotation matrix from body to sensor frame
+Tbs = Matrix(3,3,create_Tbs_matrix)
+
+# Calculate earth relative velocity in a non-rotating sensor frame
+relVelSensor = Tbs * R_to_body * Matrix([vx,vy,vz])
+
+# Divide by range to get predicted angular LOS rates relative to X and Y
+# axes. Note these are rates in a non-rotating sensor frame
+losRateSensorX = +relVelSensor[1]/range
+losRateSensorY = -relVelSensor[0]/range
+
+# calculate the observation Jacobian and Kalman gains for the X axis
+H_LOSX = Matrix([losRateSensorX]).jacobian(state)
+flow_innov_var_X = H_LOSX * P * H_LOSX.T + Matrix([obs_var])
+K_LOSX = (P * H_LOSX.T) / flow_innov_var_X
+HK_flow_x_simple = cse(Matrix([H_LOSX.transpose(),K_LOSX]), symbols("SX0:1000"), optimizations='basic')
+
+flow_code_generator.print_string("X axis")
+flow_code_generator.write_subexpressions(HK_flow_x_simple[0])
+flow_code_generator.write_matrix(Matrix(HK_flow_x_simple[1][0][0:24]), "H_LOS")
+flow_code_generator.write_matrix(Matrix(HK_flow_x_simple[1][0][24:]), "Kfusion")
+
+# calculate the observation Jacobian and Kalman gains for the Y axis
+H_LOSY = Matrix([losRateSensorY]).jacobian(state)
+flow_innov_var_y = H_LOSY * P * H_LOSY.T + Matrix([obs_var])
+K_LOSY = (P * H_LOSY.T) / flow_innov_var_y
+HK_flow_y_simple = cse(Matrix([H_LOSY.transpose(),K_LOSY]), symbols("SY0:1000"), optimizations='basic')
+
+flow_code_generator.print_string("Y axis")
+flow_code_generator.write_subexpressions(HK_flow_y_simple[0])
+flow_code_generator.write_matrix(Matrix(HK_flow_y_simple[1][0][0:24]), "H_LOS")
+flow_code_generator.write_matrix(Matrix(HK_flow_y_simple[1][0][24:]), "Kfusion")
