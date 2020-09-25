@@ -2012,3 +2012,9 @@ bool NavEKF3::yawAlignmentComplete(void) const
     }
     return core[primary].have_aligned_yaw();
 }
+
+// return error score for currently active lane
+float NavEKF3::errorScore(void) const
+{
+    return core[primary].errorScore();
+}
