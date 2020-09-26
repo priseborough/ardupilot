@@ -60,6 +60,14 @@ const AP_Param::Info Plane::var_info[] = {
     // @Bitmask: 0:Roll,1:Pitch,2:Yaw,3:Steering,4:Landing
     GSCALAR(gcs_pid_mask,           "GCS_PID_MASK",     0),
 
+    // @Param: KFF_PTCH2RLL
+    // @DisplayName: Pitch rate to roll angle decoupling gain
+    // @Description: Amount that roll angle is adjusted to compensate for pitch rate induced load factor variation when navigation loop is active.
+    // @Range: 0 1
+    // @Increment: 0.01
+    // @User: Standard
+    GSCALAR(kff_pitch_rate_to_roll, "KFF_PTCH2RLL", 0.0f),
+
     // @Param: KFF_RDDRMIX
     // @DisplayName: Rudder Mix
     // @Description: Amount of rudder to add during aileron movement. Increase if nose initially yaws away from roll. Reduces adverse yaw.

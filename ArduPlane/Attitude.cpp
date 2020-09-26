@@ -666,7 +666,32 @@ void Plane::calc_nav_roll()
     }
 
     nav_roll_cd = constrain_int32(commanded_roll, -roll_limit_cd, roll_limit_cd);
+
+    correct_roll_demand();
+
     update_load_factor();
+}
+
+/*
+  Correct nav_roll_cd for changes in normal acceleration caused by the pitch controller
+  so as to maintain the same lateral acceleration or turn rate.
+ */
+void Plane::correct_roll_demand(void)
+{
+    float true_airspeed;
+    if (ahrs.airspeed_estimate(true_airspeed)) {
+        true_airspeed = ahrs.get_EAS2TAS() * MAX(true_airspeed, 0.8f * (float)aparm.airspeed_min);
+        const float commanded_roll_rad = radians(0.01f*(float)nav_roll_cd);
+        const float pitch_rate_offset = radians(pitchController.get_coordination_rate_offset());
+        const float pitch_rate_demand = radians(pitchController.get_rate_demand());
+        const float excess_rate = pitch_rate_demand - pitch_rate_offset;
+        const float excess_accel = excess_rate  * true_airspeed * ahrs.get_EAS2TAS();
+        const float normal_accel_for_const_hgt = GRAVITY_MSS / cosf(commanded_roll_rad);
+        const float turn_accel_at_const_hgt = normal_accel_for_const_hgt * sinf(commanded_roll_rad);
+        const float roll_demand_adj_rad = asinf(constrain_float(turn_accel_at_const_hgt / (normal_accel_for_const_hgt + g.kff_pitch_rate_to_roll * excess_accel), -1.0f, 1.0f));
+        const int32_t roll_demand_adj_cd = (int32_t)(100.0f*degrees(roll_demand_adj_rad));
+        nav_roll_cd = constrain_int32(roll_demand_adj_cd, -roll_limit_cd, roll_limit_cd);
+    }
 }
 
 /*
