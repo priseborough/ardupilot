@@ -142,6 +142,14 @@ AP_PitchController::AP_PitchController(AP_AHRS &ahrs, const AP_Vehicle::FixedWin
 }
 
 /*
+ Function returns the demanded pitch rate in deg/s
+*/
+float AP_PitchController::get_rate_demand(void)
+{
+	return _last_rate_demand;
+}
+
+/*
   AC_PID based rate controller
 */
 int32_t AP_PitchController::_get_rate_out(float desired_rate, float scaler, bool disable_integrator, float aspeed)
