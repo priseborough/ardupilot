@@ -707,7 +707,7 @@ void Plane::do_accel_vector_nav(void)
         turn_accel_dem = (vert_accel_dem + GRAVITY_MSS) * tanf(radians(0.01f*(float)nav_roll_cd));
 
         // angle error to rate gain
-        const float gain = 3.0f / MAX(cosf(ahrs.roll),0.1f);
+        const float gain = plane.pitchController.get_angle_error_gain() / MAX(cosf(ahrs.roll),0.1f);
 
         // Received an external msg that guides attitude in the last 3 seconds?
         if ((control_mode == &mode_guided || control_mode == &mode_avoidADSB) &&
