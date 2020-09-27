@@ -708,7 +708,7 @@ void Plane::do_accel_vector_nav(void)
         // convert acceeration demand to a body frame pitch rate prioritising height control
         // Note: the lag from pitch rate to acceleration is ignored here
         // TODO apply a lead/lag filter to the demanded pitch rate
-        const float vert_rate = vert_accel_dem / true_airspeed;
+        const float vert_rate =  plane.pitchController.get_coordination_gain() * vert_accel_dem / true_airspeed;
         nav_pitch_rate_rps = vert_rate / MAX(cosf(ahrs.roll),0.001f);
 
         // get the rate limits required to observe the structural load factor limit
