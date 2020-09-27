@@ -144,14 +144,20 @@ void Plane::stabilize_pitch(float speed_scaler)
        demanded_pitch = landing.get_pitch_cd();
    }
 
-    int32_t elevator = pitchController.get_servo_out(demanded_pitch - ahrs.pitch_sensor,
-                                                     speed_scaler,
-                                                     disable_integrator);
+    int32_t elevator; 
     if (g2.sysid.injection_mode == 2 && !rc_failsafe_active()) {
         float t = AP_HAL::millis() * 0.001;
-        elevator += sinf(t * 2 * M_PI / MAX(g2.sysid.period,0.05)) * g2.sysid.elevator_amplitude * 4500 * speed_scaler;
+        elevator = sinf(t * 2 * M_PI / MAX(g2.sysid.period,0.05)) * g2.sysid.elevator_amplitude * 4500 * speed_scaler;
+    } else {
+        elevator = 0;
     }
-    SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, elevator);
+    if (control_mode == &mode_auto) {
+        elevator += pitchController.get_rate_out(degrees(nav_pitch_rate_rps), speed_scaler);
+        SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, elevator);
+    } else {
+        elevator += pitchController.get_servo_out(demanded_pitch - ahrs.pitch_sensor, speed_scaler, disable_integrator);
+        SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, elevator);
+    }
 }
 
 /*
@@ -667,30 +673,79 @@ void Plane::calc_nav_roll()
 
     nav_roll_cd = constrain_int32(commanded_roll, -roll_limit_cd, roll_limit_cd);
 
-    correct_roll_demand();
-
     update_load_factor();
+
+    do_accel_vector_nav();
+
 }
 
 /*
-  Correct nav_roll_cd for changes in normal acceleration caused by the pitch controller
-  so as to maintain the same lateral acceleration or turn rate.
+  calculate a pitch rate and roll angle demand to achieve demanded
+  vertical and horizontal acceleration
  */
-void Plane::correct_roll_demand(void)
+void Plane::do_accel_vector_nav(void)
 {
+    if (control_mode != &mode_auto) {
+        nav_pitch_rate_rps = 0.0f;
+        nav_pitch_clip = 0;
+        return;
+    }
     float true_airspeed;
     if (ahrs.airspeed_estimate(true_airspeed)) {
         true_airspeed = ahrs.get_EAS2TAS() * MAX(true_airspeed, 0.8f * (float)aparm.airspeed_min);
+
+        // calculate roll angle from vertical and horizopntal acceleration demans
+        const float vert_accel_dem = SpdHgt_Controller->get_vert_accel_demand(nav_pitch_clip);
         const float commanded_roll_rad = radians(0.01f*(float)nav_roll_cd);
-        const float pitch_rate_offset = radians(pitchController.get_coordination_rate_offset());
-        const float pitch_rate_demand = radians(pitchController.get_rate_demand());
-        const float excess_rate = pitch_rate_demand - pitch_rate_offset;
-        const float excess_accel = excess_rate  * true_airspeed * ahrs.get_EAS2TAS();
         const float normal_accel_for_const_hgt = GRAVITY_MSS / cosf(commanded_roll_rad);
-        const float turn_accel_at_const_hgt = normal_accel_for_const_hgt * sinf(commanded_roll_rad);
-        const float roll_demand_adj_rad = asinf(constrain_float(turn_accel_at_const_hgt / (normal_accel_for_const_hgt + g.kff_pitch_rate_to_roll * excess_accel), -1.0f, 1.0f));
-        const int32_t roll_demand_adj_cd = (int32_t)(100.0f*degrees(roll_demand_adj_rad));
-        nav_roll_cd = constrain_int32(roll_demand_adj_cd, -roll_limit_cd, roll_limit_cd);
+        float turn_accel_dem = normal_accel_for_const_hgt * sinf(commanded_roll_rad);
+        const float roll_demand_rad = atan2f(turn_accel_dem , vert_accel_dem + GRAVITY_MSS);
+
+        // limit roll and recalculate turn acceleration
+        nav_roll_cd = constrain_int32((int32_t)(100.0f*degrees(roll_demand_rad)), -roll_limit_cd, roll_limit_cd);
+        turn_accel_dem = (vert_accel_dem + GRAVITY_MSS) * tanf(radians(0.01f*(float)nav_roll_cd));
+
+        // convert acceeration demand to a body frame pitch rate prioritising height control
+        // Note: the lag from pitch rate to acceleration is ignored here
+        // TODO apply a lead/lag filter to the demanded pitch rate
+        const float vert_rate = vert_accel_dem / true_airspeed;
+        nav_pitch_rate_rps = vert_rate / MAX(cosf(ahrs.roll),0.001f);
+
+        // get the rate limits required to observe the structural load factor limit
+        float rate_limit_max =  (   g.load_factor_max - cosf(ahrs.roll)) * (GRAVITY_MSS / true_airspeed);
+        float rate_limit_min =  ( - g.load_factor_max - cosf(ahrs.roll)) * (GRAVITY_MSS / true_airspeed);
+
+        // update rate limits to observe pitch angle limits
+        const float gain = 3.0f / MAX(cosf(ahrs.roll),0.1f);
+        rate_limit_max = MIN(gain * (SpdHgt_Controller->get_pitch_max() - ahrs.pitch), rate_limit_max);
+        rate_limit_min = MAX(gain * (SpdHgt_Controller->get_pitch_min() - ahrs.pitch), rate_limit_min);
+        if (rate_limit_max > rate_limit_min) {
+            if (nav_pitch_rate_rps > rate_limit_max) {
+                nav_pitch_rate_rps = rate_limit_max;
+                nav_pitch_clip = 1;
+            } else if (nav_pitch_rate_rps < rate_limit_min) {
+                nav_pitch_rate_rps = rate_limit_min;
+                nav_pitch_clip = -1;
+            } else {
+                nav_pitch_clip = 0;
+            }
+        } else {
+            // error condition so sit between min and max limits and wait for limits to separate
+            nav_pitch_rate_rps = 0.5f * (rate_limit_max + rate_limit_min);
+        }
+        AP::logger().Write("ACVN",
+                        "TimeUS,TAD,VAD,RLU,RLD,NPR,ALU,ALD",
+                        "snnnnnnn",
+                        "F0000000",
+                        "Qfffffff",
+                        AP_HAL::micros(),
+                        turn_accel_dem,
+                        vert_accel_dem,
+                        rate_limit_max,
+                        rate_limit_min,
+                        nav_pitch_rate_rps,
+                        SpdHgt_Controller->get_pitch_max(),
+                        SpdHgt_Controller->get_pitch_min());
     }
 }
 

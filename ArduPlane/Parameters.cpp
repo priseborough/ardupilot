@@ -60,13 +60,13 @@ const AP_Param::Info Plane::var_info[] = {
     // @Bitmask: 0:Roll,1:Pitch,2:Yaw,3:Steering,4:Landing
     GSCALAR(gcs_pid_mask,           "GCS_PID_MASK",     0),
 
-    // @Param: KFF_PTCH2RLL
-    // @DisplayName: Pitch rate to roll angle decoupling gain
-    // @Description: Amount that roll angle is adjusted to compensate for pitch rate induced load factor variation when navigation loop is active.
-    // @Range: 0 1
-    // @Increment: 0.01
+    // @Param: LOAD_FACTOR_MAX
+    // @DisplayName: Maximum load factor
+    // @Description: Maximum load factor that will be commanded during flight modes using automatic height control.
+    // @Range: 2.0 6.0
+    // @Increment: 0.1
     // @User: Standard
-    GSCALAR(kff_pitch_rate_to_roll, "KFF_PTCH2RLL", 0.0f),
+    GSCALAR(load_factor_max, "LOAD_FACTOR_MAX", 4.0f),
 
     // @Param: KFF_RDDRMIX
     // @DisplayName: Rudder Mix
