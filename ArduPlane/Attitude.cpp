@@ -151,7 +151,7 @@ void Plane::stabilize_pitch(float speed_scaler)
     } else {
         elevator = 0;
     }
-    if (control_mode == &mode_auto) {
+    if (g.use_accel_vector_nav == 1 && control_mode->does_auto_throttle()) {
         elevator += pitchController.get_rate_out(degrees(nav_pitch_rate_rps), speed_scaler);
         SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, elevator);
     } else {
@@ -608,22 +608,32 @@ void Plane::calc_nav_yaw_ground(void)
 
 
 /*
-  calculate a new nav_pitch_cd from the speed height controller
+  calculate a new nav_pitch_cd or nav_pitch_rate_rps from the speed height controller
+
+  ********************************************
+  *** MUST BE CALLED AFTER calc_nav_roll() ***
+  ********************************************
+
  */
 void Plane::calc_nav_pitch()
 {
-    // Calculate the Pitch of the plane
-    // --------------------------------
-    int32_t commanded_pitch = SpdHgt_Controller->get_pitch_demand();
+    if (g.use_accel_vector_nav == 1) {
+        // calculates the pitch rate demand and modifies the roll angle demand nav_roll_cd
+        plane.do_accel_vector_nav();
+    } else {
+        // Calculate the Pitch of the plane
+        // --------------------------------
+        int32_t commanded_pitch = SpdHgt_Controller->get_pitch_demand();
 
-    // Received an external msg that guides roll in the last 3 seconds?
-    if (control_mode->is_guided_mode() &&
-            plane.guided_state.last_forced_rpy_ms.y > 0 &&
-            millis() - plane.guided_state.last_forced_rpy_ms.y < 3000) {
-        commanded_pitch = plane.guided_state.forced_rpy_cd.y;
+        // Received an external msg that guides roll in the last 3 seconds?
+        if ((control_mode == &mode_guided || control_mode == &mode_avoidADSB) &&
+                plane.guided_state.last_forced_rpy_ms.y > 0 &&
+                millis() - plane.guided_state.last_forced_rpy_ms.y < 3000) {
+            commanded_pitch = plane.guided_state.forced_rpy_cd.y;
+        }
+
+        nav_pitch_cd = constrain_int32(commanded_pitch, pitch_limit_min_cd, aparm.pitch_limit_max_cd.get());
     }
-
-    nav_pitch_cd = constrain_int32(commanded_pitch, pitch_limit_min_cd, aparm.pitch_limit_max_cd.get());
 }
 
 
@@ -674,22 +684,13 @@ void Plane::calc_nav_roll()
     nav_roll_cd = constrain_int32(commanded_roll, -roll_limit_cd, roll_limit_cd);
 
     update_load_factor();
-
-    do_accel_vector_nav();
-
 }
 
 /*
-  calculate a pitch rate and roll angle demand to achieve demanded
-  vertical and horizontal acceleration
+  calculate a pitch rate and roll angle demand to achieve demanded vertical and horizontal acceleration
  */
 void Plane::do_accel_vector_nav(void)
 {
-    if (control_mode != &mode_auto) {
-        nav_pitch_rate_rps = 0.0f;
-        nav_pitch_clip = 0;
-        return;
-    }
     float true_airspeed;
     if (ahrs.airspeed_estimate(true_airspeed)) {
         true_airspeed = ahrs.get_EAS2TAS() * MAX(true_airspeed, 0.8f * (float)aparm.airspeed_min);
@@ -705,18 +706,27 @@ void Plane::do_accel_vector_nav(void)
         nav_roll_cd = constrain_int32((int32_t)(100.0f*degrees(roll_demand_rad)), -roll_limit_cd, roll_limit_cd);
         turn_accel_dem = (vert_accel_dem + GRAVITY_MSS) * tanf(radians(0.01f*(float)nav_roll_cd));
 
-        // convert acceeration demand to a body frame pitch rate prioritising height control
-        // Note: the lag from pitch rate to acceleration is ignored here
-        // TODO apply a lead/lag filter to the demanded pitch rate
-        const float vert_rate =  plane.pitchController.get_coordination_gain() * vert_accel_dem / true_airspeed;
-        nav_pitch_rate_rps = vert_rate / MAX(cosf(ahrs.roll),0.001f);
+        // angle error to rate gain
+        const float gain = 3.0f / MAX(cosf(ahrs.roll),0.1f);
+
+        // Received an external msg that guides attitude in the last 3 seconds?
+        if ((control_mode == &mode_guided || control_mode == &mode_avoidADSB) &&
+                plane.guided_state.last_forced_rpy_ms.y > 0 &&
+                millis() - plane.guided_state.last_forced_rpy_ms.y < 3000) {
+            nav_pitch_rate_rps = gain * (radians(0.01f * plane.guided_state.forced_rpy_cd.y) - ahrs.pitch);
+        } else {
+            // convert acceeration demand to a body frame pitch rate prioritising height control
+            // Note: the lag from pitch rate to acceleration is ignored here
+            // TODO apply a lead/lag filter to the demanded pitch rate
+            const float vert_rate =  plane.pitchController.get_coordination_gain() * vert_accel_dem / true_airspeed;
+            nav_pitch_rate_rps = vert_rate / MAX(cosf(ahrs.roll),0.001f);
+        }
 
         // get the rate limits required to observe the structural load factor limit
         float rate_limit_max =  (   g.load_factor_max - cosf(ahrs.roll)) * (GRAVITY_MSS / true_airspeed);
         float rate_limit_min =  ( - g.load_factor_max - cosf(ahrs.roll)) * (GRAVITY_MSS / true_airspeed);
 
         // update rate limits to observe pitch angle limits
-        const float gain = 3.0f / MAX(cosf(ahrs.roll),0.1f);
         rate_limit_max = MIN(gain * (SpdHgt_Controller->get_pitch_max() - ahrs.pitch), rate_limit_max);
         rate_limit_min = MAX(gain * (SpdHgt_Controller->get_pitch_min() - ahrs.pitch), rate_limit_min);
         if (rate_limit_max > rate_limit_min) {

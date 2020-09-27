@@ -62,11 +62,18 @@ const AP_Param::Info Plane::var_info[] = {
 
     // @Param: LOAD_FACTOR_MAX
     // @DisplayName: Maximum load factor
-    // @Description: Maximum load factor that will be commanded during flight modes using automatic height control.
+    // @Description: Maximum load factor that will be commanded during flight modes using automatic height control with NAV_TYPE_ACC active.
     // @Range: 2.0 6.0
     // @Increment: 0.1
     // @User: Standard
     GSCALAR(load_factor_max, "LOAD_FACTOR_MAX", 4.0f),
+
+    // @Param: NAV_TYPE_ACC
+    // @DisplayName: Enables acceleration vector navigation
+    // @Description: If NAV_TYPE_ACC is set to 1, then when the speed and height controller is active, a vertical acceleration converted to a pitch rate rather than pitch angle will be demanded and pitch rate demand will be limited to respect the load factor limit set by LOAD_FACTOR_MAX. Pitch angle limaits will still be respected.
+    // @Values: 0:Disabled,1:Enabled
+    // @User: Standard
+    GSCALAR(use_accel_vector_nav, "NAV_TYPE_ACC", 0),
 
     // @Param: KFF_RDDRMIX
     // @DisplayName: Rudder Mix
