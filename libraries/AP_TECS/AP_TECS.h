@@ -67,6 +67,24 @@ public:
         return int32_t(_pitch_dem * 5729.5781f);
     }
 
+    // get upper pitch angle limit in rad/s
+    float get_pitch_max(void) override {
+        return _PITCHmaxf;
+    }
+
+    // get lower pitch angle limit in rad/s
+    float get_pitch_min(void) override {
+        return _PITCHminf;
+    }
+
+    // demanded vertical acceleration in m/s/s - up is positive
+    // clipping is 1 when acceleraton is clipping in the up direction
+    // clipping is -1 when acceleration is clipping in the down direction
+    float get_vert_accel_demand(int8_t clipping) override {
+        _vert_accel_clip = clipping;
+        return _vert_accel_dem;
+    }
+
     // Rate of change of velocity along X body axis in m/s^2
     float get_VXdot(void) override {
         return _vel_dot;
@@ -194,6 +212,7 @@ private:
 
     AP_Float _pitch_ff_v0;
     AP_Float _pitch_ff_k;
+    AP_Float _accel_gf;
 
     // temporary _pitch_max_limit. Cleared on each loop. Clear when >= 90
     int8_t _pitch_max_limit = 90;
@@ -355,6 +374,13 @@ private:
 
     // Specific energy error quantities
     float _STE_error;
+
+    // demanded vertical acceleration in m/s/s - up is positive
+    float _vert_accel_dem;
+
+    // 1 when acceleration is clpping externally in the up direction
+    // -1 when acceleration is clpping externally in the down direction
+    int8_t _vert_accel_clip;
 
     // Time since last update of main TECS loop (seconds)
     float _DT;

@@ -290,6 +290,13 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("HDEM_TCONST", 33, AP_TECS, _hgt_dem_tconst, 2.0f),
 
+    // @Param: ACCEL_GF
+    // @DisplayName: Vertical acceleration gain factor.
+    // @Description: Factor applied to the calculation of vertical acceleration demand
+    // @Range: 1.0 10.0
+    // @User: Advanced
+    AP_GROUPINFO("ACCEL_GF", 34, AP_TECS, _accel_gf, 5.0),
+
     AP_GROUPEND
 };
 
@@ -952,7 +959,7 @@ void AP_TECS::_update_pitch(void)
     _pitch_dem_unc = (SEBdot_dem_total + _integSEB_state + integSEB_delta) / gainInv;
 
     // integrate SEB rate error and apply integrator state limits
-    const bool inhibit_integrator = (_pitch_dem_unc > _PITCHmaxf && integSEB_delta > 0.0f) || (_pitch_dem_unc < _PITCHminf && integSEB_delta < 0.0f);
+    const bool inhibit_integrator = (_pitch_dem_unc > _PITCHmaxf && integSEB_delta > 0.0f) || (_pitch_dem_unc < _PITCHminf && integSEB_delta < 0.0f) || _vert_accel_clip != 0;
     if (!inhibit_integrator) {
         _integSEB_state += integSEB_delta;
     } else if (is_positive(integSEB_delta * _hgt_rate_err_integ)) {
@@ -982,8 +989,14 @@ void AP_TECS::_update_pitch(void)
                     (double)integSEB_max,               // S8
                     (double)_integSEB_state);           // S9
 
+    // calculate a demanded vertical velocity
+    const float energy_loop_tconst = timeConstant();
+    const float vel_dem = constrain_float((SEBdot_dem_total + _integSEB_state) / (energy_loop_tconst * GRAVITY_MSS), -_maxSinkRate, _maxClimbRate);
 
-    // Add a feedforward term from demanded airspeed to pitch.
+    // calculate a demanded vertical acceleration
+    _vert_accel_dem = constrain_float((vel_dem - _climb_rate) * (_accel_gf / energy_loop_tconst) , -_vertAccLim, _vertAccLim);
+
+    // Add a feedforward term from demanded airspeed to pitch
     if (_flags.is_gliding) {
         _pitch_dem_unc += (_TAS_dem_adj - _pitch_ff_v0) * _pitch_ff_k;
     }
