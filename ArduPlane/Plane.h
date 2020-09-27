@@ -604,6 +604,12 @@ private:
     // The instantaneous desired pitch angle.  Hundredths of a degree
     int32_t nav_pitch_cd;
 
+    // The instantaneous desired pitch rate in rad/s
+    float nav_pitch_rate_rps;
+
+    // 1 if pitch is past the upper limit, -1 if past the lower limit, 0 if between
+    int8_t nav_pitch_clip;
+
     // the aerodymamic load factor. This is calculated from the demanded
     // roll before the roll is clipped, using 1/sqrt(cos(nav_roll))
     float aerodynamic_load_factor = 1.0f;
@@ -812,7 +818,7 @@ private:
     // Attitude.cpp
     void adjust_nav_pitch_throttle(void);
     void update_load_factor(void);
-    void correct_roll_demand(void);
+    void do_accel_vector_nav(void);
     void adjust_altitude_target();
     void setup_glide_slope(void);
     int32_t get_RTL_altitude() const;

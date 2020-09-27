@@ -55,7 +55,7 @@ public:
         k_param_log_bitmask_old,  // unused
         k_param_pitch_trim_cd,
         k_param_mix_mode,
-        k_param_reverse_elevons, // unused
+        k_param_load_factor_max,
         k_param_reverse_ch1_elevon, // unused
         k_param_reverse_ch2_elevon, // unused
         k_param_flap_1_percent,
@@ -277,7 +277,7 @@ public:
         //
         // 200: Feed-forward gains
         //
-        k_param_kff_pitch_rate_to_roll = 200,
+        k_param_kff_pitch_rate_to_roll = 200, //unused
         k_param_kff_rudder_mix,
         k_param_kff_pitch_to_throttle, // unused
         k_param_kff_throttle_to_pitch,
@@ -369,7 +369,6 @@ public:
 
     // Feed-forward gains
     //
-    AP_Float kff_pitch_rate_to_roll;
     AP_Float kff_rudder_mix;
     AP_Float kff_pitch_to_throttle;
     AP_Float kff_throttle_to_pitch;
@@ -437,6 +436,7 @@ public:
     AP_Int16 acro_roll_rate;
     AP_Int16 acro_pitch_rate;
     AP_Int8  acro_locking;
+    AP_Float load_factor_max;
 
     // Misc
     //
