@@ -696,10 +696,17 @@ void Plane::do_accel_vector_nav(void)
         true_airspeed = ahrs.get_EAS2TAS() * MAX(true_airspeed, 0.8f * (float)aparm.airspeed_min);
 
         // calculate roll angle from vertical and horizopntal acceleration demans
-        const float vert_accel_dem = SpdHgt_Controller->get_vert_accel_demand(nav_pitch_clip);
+        float vert_accel_dem = SpdHgt_Controller->get_vert_accel_demand(nav_pitch_clip);
         const float commanded_roll_rad = radians(0.01f*(float)nav_roll_cd);
         const float normal_accel_for_const_hgt = GRAVITY_MSS / cosf(commanded_roll_rad);
         float turn_accel_dem = normal_accel_for_const_hgt * sinf(commanded_roll_rad);
+
+        // correct demanded vertical and turn acceleration for lateral g due to sideslip and airframe asymmetry
+        lateral_accel_filt.apply(AP::ins().get_accel().y);
+        const float accel_y = lateral_accel_filt.get();
+        vert_accel_dem += accel_y * sinf(ahrs.roll);
+        turn_accel_dem -= accel_y * cosf(ahrs.roll);
+
         const float roll_demand_rad = atan2f(turn_accel_dem , vert_accel_dem + GRAVITY_MSS);
 
         // limit roll and recalculate turn acceleration
