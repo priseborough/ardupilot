@@ -608,7 +608,7 @@ void Plane::calc_nav_yaw_ground(void)
 
 
 /*
-  calculate a new nav_pitch_cd or nav_pitch_rate_rps from the speed height controller
+  calculate a new nav_pitch_cd or nav_body_pitch_rate_rps from the speed height controller
 
   ********************************************
   *** MUST BE CALLED AFTER calc_nav_roll() ***
@@ -713,13 +713,17 @@ void Plane::do_accel_vector_nav(void)
         if ((control_mode == &mode_guided || control_mode == &mode_avoidADSB) &&
                 plane.guided_state.last_forced_rpy_ms.y > 0 &&
                 millis() - plane.guided_state.last_forced_rpy_ms.y < 3000) {
-            nav_pitch_rate_rps = gain * (radians(0.01f * plane.guided_state.forced_rpy_cd.y) - ahrs.pitch);
+            nav_body_pitch_rate_rps = gain * (radians(0.01f * plane.guided_state.forced_rpy_cd.y) - ahrs.pitch);
         } else {
-            // convert acceeration demand to a body frame pitch rate prioritising height control
-            // Note: the lag from pitch rate to acceleration is ignored here
-            // TODO apply a lead/lag filter to the demanded pitch rate
+            // Convert acceeration demand to a body frame pitch rate using measured roll angle predicted ahead
+            // for the lag from pitch rate to load factor.
+            // TODO investigate use of a lead/lag filter instead.
             const float vert_rate =  plane.pitchController.get_coordination_gain() * vert_accel_dem / true_airspeed;
-            nav_pitch_rate_rps = vert_rate / MAX(cosf(ahrs.roll),0.001f);
+            const float turn_rate =  plane.pitchController.get_coordination_gain() * turn_accel_dem / true_airspeed;
+            const Vector3f ang_rate = ahrs.get_gyro_latest();
+            const float predicted_roll = ahrs.roll + g.load_factor_lag * ang_rate.x;
+            nav_body_pitch_rate_rps =  vert_rate * cosf(predicted_roll);
+            nav_body_pitch_rate_rps += turn_rate * sinf(predicted_roll);
         }
 
         // get the rate limits required to observe the structural load factor limit
@@ -730,18 +734,18 @@ void Plane::do_accel_vector_nav(void)
         rate_limit_max = MIN(gain * (SpdHgt_Controller->get_pitch_max() - ahrs.pitch), rate_limit_max);
         rate_limit_min = MAX(gain * (SpdHgt_Controller->get_pitch_min() - ahrs.pitch), rate_limit_min);
         if (rate_limit_max > rate_limit_min) {
-            if (nav_pitch_rate_rps > rate_limit_max) {
-                nav_pitch_rate_rps = rate_limit_max;
+            if (nav_body_pitch_rate_rps > rate_limit_max) {
+                nav_body_pitch_rate_rps = rate_limit_max;
                 nav_pitch_clip = 1;
-            } else if (nav_pitch_rate_rps < rate_limit_min) {
-                nav_pitch_rate_rps = rate_limit_min;
+            } else if (nav_body_pitch_rate_rps < rate_limit_min) {
+                nav_body_pitch_rate_rps = rate_limit_min;
                 nav_pitch_clip = -1;
             } else {
                 nav_pitch_clip = 0;
             }
         } else {
             // error condition so sit between min and max limits and wait for limits to separate
-            nav_pitch_rate_rps = 0.5f * (rate_limit_max + rate_limit_min);
+            nav_body_pitch_rate_rps = 0.5f * (rate_limit_max + rate_limit_min);
         }
         AP::logger().Write("ACVN",
                         "TimeUS,TAD,VAD,RLU,RLD,NPR,ALU,ALD",
@@ -753,7 +757,7 @@ void Plane::do_accel_vector_nav(void)
                         vert_accel_dem,
                         rate_limit_max,
                         rate_limit_min,
-                        nav_pitch_rate_rps,
+                        nav_body_pitch_rate_rps,
                         SpdHgt_Controller->get_pitch_max(),
                         SpdHgt_Controller->get_pitch_min());
     }
