@@ -706,14 +706,13 @@ void Plane::do_accel_vector_nav(void)
         nav_roll_cd = constrain_int32((int32_t)(100.0f*degrees(roll_demand_rad)), -roll_limit_cd, roll_limit_cd);
         turn_accel_dem = (vert_accel_dem + GRAVITY_MSS) * tanf(radians(0.01f*(float)nav_roll_cd));
 
-        // angle error to rate gain
-        const float gain = plane.pitchController.get_angle_error_gain() / MAX(cosf(ahrs.roll),0.1f);
+        const float pitch_error_gain = plane.pitchController.get_angle_error_gain() / MAX(cosf(ahrs.roll),0.1f);
 
         // Received an external msg that guides attitude in the last 3 seconds?
         if ((control_mode == &mode_guided || control_mode == &mode_avoidADSB) &&
                 plane.guided_state.last_forced_rpy_ms.y > 0 &&
                 millis() - plane.guided_state.last_forced_rpy_ms.y < 3000) {
-            nav_body_pitch_rate_rps = gain * (radians(0.01f * plane.guided_state.forced_rpy_cd.y) - ahrs.pitch);
+            nav_body_pitch_rate_rps = pitch_error_gain * (radians(0.01f * plane.guided_state.forced_rpy_cd.y) - ahrs.pitch);
         } else {
             // Convert acceeration demand to a body frame pitch rate using measured roll angle predicted ahead
             // for the lag from pitch rate to load factor.
@@ -731,8 +730,8 @@ void Plane::do_accel_vector_nav(void)
         float rate_limit_min =  ( - g.load_factor_max - cosf(ahrs.roll)) * (GRAVITY_MSS / true_airspeed);
 
         // update rate limits to observe pitch angle limits
-        rate_limit_max = MIN(gain * (SpdHgt_Controller->get_pitch_max() - ahrs.pitch), rate_limit_max);
-        rate_limit_min = MAX(gain * (SpdHgt_Controller->get_pitch_min() - ahrs.pitch), rate_limit_min);
+        rate_limit_max = MIN(pitch_error_gain * (SpdHgt_Controller->get_pitch_max() - ahrs.pitch), rate_limit_max);
+        rate_limit_min = MAX(pitch_error_gain * (SpdHgt_Controller->get_pitch_min() - ahrs.pitch), rate_limit_min);
         if (rate_limit_max > rate_limit_min) {
             if (nav_body_pitch_rate_rps > rate_limit_max) {
                 nav_body_pitch_rate_rps = rate_limit_max;
