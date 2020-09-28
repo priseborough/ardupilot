@@ -607,6 +607,9 @@ private:
     // The instantaneous desired body pitch rate in rad/s
     float nav_body_pitch_rate_rps;
 
+    // filter applied to lateral body frame (Y) acceleration
+    LowPassFilterFloat lateral_accel_filt;
+
     // 1 if pitch is past the upper limit, -1 if past the lower limit, 0 if between
     int8_t nav_pitch_clip;
 
