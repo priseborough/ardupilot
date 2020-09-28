@@ -604,8 +604,8 @@ private:
     // The instantaneous desired pitch angle.  Hundredths of a degree
     int32_t nav_pitch_cd;
 
-    // The instantaneous desired pitch rate in rad/s
-    float nav_pitch_rate_rps;
+    // The instantaneous desired body pitch rate in rad/s
+    float nav_body_pitch_rate_rps;
 
     // 1 if pitch is past the upper limit, -1 if past the lower limit, 0 if between
     int8_t nav_pitch_clip;

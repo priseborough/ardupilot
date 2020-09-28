@@ -57,7 +57,7 @@ public:
         k_param_mix_mode,
         k_param_load_factor_max,
         k_param_use_accel_vector_nav,
-        k_param_reverse_ch2_elevon, // unused
+        k_param_load_factor_lag,
         k_param_flap_1_percent,
         k_param_flap_1_speed,
         k_param_flap_2_percent,
@@ -437,6 +437,7 @@ public:
     AP_Int16 acro_pitch_rate;
     AP_Int8  acro_locking;
     AP_Float load_factor_max;
+    AP_Float load_factor_lag;
 
     // Misc
     //
