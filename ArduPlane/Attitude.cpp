@@ -754,10 +754,10 @@ void Plane::do_accel_vector_nav(void)
             nav_body_pitch_rate_rps = 0.5f * (rate_limit_max + rate_limit_min);
         }
         AP::logger().Write("ACVN",
-                        "TimeUS,TAD,VAD,RLU,RLD,NPR,ALU,ALD",
-                        "snnnnnnn",
-                        "F0000000",
-                        "Qfffffff",
+                        "TimeUS,TAD,VAD,RLU,RLD,NPR,ALU,ALD,CRR,DRD,AY",
+                        "snnnnnnnnnn",
+                        "F0000000000",
+                        "Qffffffffff",
                         AP_HAL::micros(),
                         turn_accel_dem,
                         vert_accel_dem,
@@ -765,7 +765,10 @@ void Plane::do_accel_vector_nav(void)
                         rate_limit_min,
                         nav_body_pitch_rate_rps,
                         SpdHgt_Controller->get_pitch_max(),
-                        SpdHgt_Controller->get_pitch_min());
+                        SpdHgt_Controller->get_pitch_min(),
+                        commanded_roll_rad,
+                        roll_demand_rad,
+                        accel_y);
     }
 }
 
