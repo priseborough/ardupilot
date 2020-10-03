@@ -704,8 +704,8 @@ void Plane::do_accel_vector_nav(void)
         // correct demanded vertical and turn acceleration for lateral g due to sideslip and airframe asymmetry
         lateral_accel_filt.apply(AP::ins().get_accel().y);
         const float accel_y = lateral_accel_filt.get();
-        vert_accel_dem += accel_y * sinf(ahrs.roll);
-        turn_accel_dem -= accel_y * cosf(ahrs.roll);
+        vert_accel_dem += accel_y * sinf(ahrs.roll) * g.lat_acc_compensation_gain;
+        turn_accel_dem -= accel_y * cosf(ahrs.roll) * g.lat_acc_compensation_gain;
 
         const float roll_demand_rad = atan2f(turn_accel_dem , vert_accel_dem + GRAVITY_MSS);
 

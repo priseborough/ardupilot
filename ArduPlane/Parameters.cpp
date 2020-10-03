@@ -83,6 +83,14 @@ const AP_Param::Info Plane::var_info[] = {
     // @User: Standard
     GSCALAR(use_accel_vector_nav, "NAV_TYPE_ACC", 0),
 
+    // @Param: LAT_ACC_GAIN
+    // @DisplayName: Compensation gain for lateral g
+    // @Description: This gain controls how much the navigation loop conpensates for sideslip induced lateral g when NAV_TYPE_ACC = 1.
+    // @Range: 0.0 1.0
+    // @Increment: 0.1
+    // @User: Standard
+    GSCALAR(lat_acc_compensation_gain, "LAT_ACC_GAIN", 0.0f),
+
     // @Param: KFF_RDDRMIX
     // @DisplayName: Rudder Mix
     // @Description: Amount of rudder to add during aileron movement. Increase if nose initially yaws away from roll. Reduces adverse yaw.
