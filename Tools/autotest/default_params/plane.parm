@@ -55,10 +55,11 @@ RLL2SRV_I        0.3
 RLL2SRV_P        2.5
 RLL2SRV_RMAX     0
 RLL2SRV_TCONST   0.5
-PTCH2SRV_D       0.2
-PTCH2SRV_I       0.3
-PTCH2SRV_P       2.5
-PTCH2SRV_RLL     1
+PTCH2SRV_D       0.5
+PTCH2SRV_FF      0.35
+PTCH2SRV_I       1.5
+PTCH2SRV_P       0.0
+PTCH2SRV_RLL     1.0
 NAVL1_PERIOD     15
 ACRO_LOCKING     1
 # we need small INS_ACC offsets so INS is recognised as being calibrated
