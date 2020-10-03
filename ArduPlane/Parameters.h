@@ -63,7 +63,7 @@ public:
         k_param_flap_2_percent,
         k_param_flap_2_speed,
         k_param_reset_switch_chan, // unused - moved to RC option
-        k_param_manual_level, // unused
+        k_param_lat_acc_compensation_gain,
         k_param_land_pitch_cd,  // unused - moved to AP_Landing
         k_param_ins_old,            // *** Deprecated, remove with next eeprom number change
         k_param_stick_mixing,
@@ -438,6 +438,7 @@ public:
     AP_Int8  acro_locking;
     AP_Float load_factor_max;
     AP_Float load_factor_lag;
+    AP_Float lat_acc_compensation_gain;
 
     // Misc
     //
