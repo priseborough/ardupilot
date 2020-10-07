@@ -152,11 +152,9 @@ void Plane::takeoff_calc_roll(void)
 void Plane::takeoff_calc_pitch(void)
 {
     if (auto_state.highest_airspeed < g.takeoff_rotate_speed) {
-        // we have not reached rotate speed, use a target pitch of 5
-        // degrees. This should be enough to get the tail off the
-        // ground, while making it unlikely that overshoot in the
-        // pitch controller will cause a prop strike
-        nav_pitch_cd = 500;
+        // we have not reached rotate speed, use the specified
+        // takeoff run target pitch angle.
+        nav_pitch_cd = g.takeoff_ground_pitch_cd;
         return;
     }
 
