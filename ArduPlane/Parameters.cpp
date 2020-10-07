@@ -119,12 +119,12 @@ const AP_Param::Info Plane::var_info[] = {
 
     // @Param: TKOFF_GND_PITCH
     // @DisplayName: Takeoff run pitch demand
-    // @Description: Centi-degrees of pitch angle demanded during the takeoff run before speed reaches TKOFF_ROTATE_SPD. For taildraggers set to 3-point ground pitch angle and use TKOFF_TDRAG_ELEV to prevent nose tipover. For nose-wheel steer aircraft set to the ground pitch angle and if a reduction in nose-wheel load is required as speed rises, use a positive offset in TKOFF_GND_PITCH of up to 500 centi-deg above the angle on ground and increment in 100 centi-deg steps, checking for premature rotation and takeoff. To increase nose-wheel load, use a negative TKOFF_TDRAG_ELEV and refer to notes on TKOFF_TDRAG_ELEV before making adjustments.
-    // @Units: cdeg
-    // @Range: -500 1000
-    // @Increment: 10
+    // @Description: Degrees of pitch angle demanded during the takeoff run before speed reaches TKOFF_ROTATE_SPD. For taildraggers set to 3-point ground pitch angle and use TKOFF_TDRAG_ELEV to prevent nose tipover. For nose-wheel steer aircraft set to the ground pitch angle and if a reduction in nose-wheel load is required as speed rises, use a positive offset in TKOFF_GND_PITCH of up to 5 degrees above the angle on ground, starting at the mesured pitch angle and incrementing in 1 degree steps whilst checking for premature rotation and takeoff with each increment. To increase nose-wheel load, use a negative TKOFF_TDRAG_ELEV and refer to notes on TKOFF_TDRAG_ELEV before making adjustments.
+    // @Units: deg
+    // @Range: -5.0 10.0
+    // @Increment: 0.1
     // @User: Standard
-    GSCALAR(takeoff_ground_pitch_cd, "TKOFF_GND_PITCH", 500),
+    GSCALAR(takeoff_ground_pitch, "TKOFF_GND_PITCH", 5.0f),
 
     // @Param: TKOFF_THR_MINSPD
     // @DisplayName: Takeoff throttle min speed

@@ -154,7 +154,7 @@ void Plane::takeoff_calc_pitch(void)
     if (auto_state.highest_airspeed < g.takeoff_rotate_speed) {
         // we have not reached rotate speed, use the specified
         // takeoff run target pitch angle.
-        nav_pitch_cd = g.takeoff_ground_pitch_cd;
+        nav_pitch_cd = int32_t(100.0f * g.takeoff_ground_pitch);
         return;
     }
 
