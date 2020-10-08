@@ -70,7 +70,7 @@ private:
 
     /*
       variables used by functionality that allows pilot to bias the rate demand when
-      operating in an angle cor lateral acceleration ontrol mode
+      operating in an angle cr lateral acceleration control mode
     */
     float _last_rate_bias;      // last received rate bias in deg/sec
     uint32_t _last_rate_bias_t; // system time _last_rate_bias was updated (msec)
