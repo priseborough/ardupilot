@@ -54,7 +54,7 @@ public:
 
     void set_rate_bias(float rate_bias) {
         _last_rate_bias = rate_bias;
-        _last_rate_bias_t = _last_t;
+        _last_rate_bias_updated_t = _last_t;
     }
 
 private:
@@ -73,7 +73,7 @@ private:
       operating in an angle cr lateral acceleration control mode
     */
     float _last_rate_bias;      // last received rate bias in deg/sec
-    uint32_t _last_rate_bias_t; // system time _last_rate_bias was updated (msec)
+    uint32_t _last_rate_bias_updated_t; // system time _last_rate_bias was updated (msec)
 
 	AP_Float _deratespeed;
 	AP_Float _deratefactor;

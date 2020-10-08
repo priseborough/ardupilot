@@ -224,7 +224,7 @@ int32_t AP_SteerController::get_steering_out_lat_accel(float desired_accel)
     }
 
     // Add recent pilot rate bias demand allowing for a minimum 10Hz pilot update rate plus jitter margin
-    if (_last_t - _last_rate_bias_t < 150) {
+    if (_last_t - _last_rate_bias_updated_t < 150) {
         desired_rate += _last_rate_bias;
     }
 
@@ -245,7 +245,7 @@ int32_t AP_SteerController::get_steering_out_angle_error(int32_t angle_err)
 	float desired_rate = angle_err * 0.01f / _tau;
 
     // Add recent pilot rate bias demand allowing for a minimum 10Hz pilot update rate plus jitter margin
-    if (_last_t - _last_rate_bias_t < 150) {
+    if (_last_t - _last_rate_bias_updated_t < 150) {
         desired_rate += _last_rate_bias;
     }
 
