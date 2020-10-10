@@ -46,6 +46,7 @@ public:
 
     // Update the control loop calculations
     void update_pitch_throttle(int32_t hgt_dem_cm,
+                               float hgt_rate_dem_ms, // first time derivative of 0.01*hgt_dem_cm
                                int32_t EAS_dem_cm,
                                enum AP_Vehicle::FixedWing::FlightStage flight_stage,
                                float distance_beyond_land_wp,
@@ -182,9 +183,13 @@ private:
     AP_Int8  _land_pitch_max;
     AP_Float _maxSinkRate_approach;
     AP_Int32 _options;
+    AP_Int8  _land_pitch_trim;
+    AP_Float _flare_holdoff_hgt;
+    AP_Float _hgt_dem_tconst;
 
     enum {
         OPTION_GLIDER_ONLY=(1<<0),
+        OPTION_NO_HGT_SMOOTHNG=(1<<1),
     };
 
     AP_Float _pitch_ff_v0;
@@ -251,13 +256,23 @@ private:
     float _EAS_dem;
 
     // height demands
-    float _hgt_dem;
-    float _hgt_dem_in_old;
-    float _hgt_dem_adj;
-    float _hgt_dem_adj_last;
-    float _hgt_rate_dem;
-    float _hgt_dem_prev;
-    float _land_hgt_dem;
+    float _hgt_dem_in;          // height demand input from autopilot (m)
+    float _hgt_dem_in_prev;     // previous value of _hgt_dem_in (m)
+    float _hgt_dem_lpf;         // height demand after application of low pass filtering (m)
+    float _flare_hgt_dem_adj;   // height rate demand duirng flare adjusted for height tracking offset at flare entry (m)
+    float _flare_hgt_dem_ideal; // height we want to fly at during flare (m)
+    float _hgt_dem;             // height demand sent to control loops (m)
+
+    // height rate demands
+    float _hgt_rate_dem_in;     // height rate demand input from the autopilot (m/s)
+    float _hgt_dem_rate_ltd;    // height demand after application of the rate limiter (m)
+    float _hgt_rate_dem;        // height rate demand sent to control loops
+
+    // offset applied to height demand post takeoff to compensate for height demand filter lag
+    float _post_TO_hgt_offset;
+
+    // last lag compensation offset applied to height demand
+    float _lag_comp_hgt_offset;
 
     // Speed demand after application of rate limiting
     // This is the demand tracked by the TECS control loops
@@ -331,6 +346,13 @@ private:
     float _SPEdot;
     float _SKEdot;
 
+    // misc variables used for alternative precision landing pitch control
+    float _hgt_rate_err_integ;
+    float _hgt_at_start_of_flare;
+    float _hgt_rate_at_flare_entry;
+    float _hgt_afe;
+    float _pitch_min_at_flare_entry;
+
     // Specific energy error quantities
     float _STE_error;
 
@@ -353,9 +375,10 @@ private:
     // need to reset on next loop
     bool _need_reset;
 
+    float _SKE_weighting;
+
     // internal variables to be logged
     struct {
-        float SKE_weighting;
         float SPE_error;
         float SKE_error;
         float SEB_delta;
