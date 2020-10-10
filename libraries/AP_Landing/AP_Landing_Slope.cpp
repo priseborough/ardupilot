@@ -276,7 +276,7 @@ void AP_Landing::type_slope_setup_landing_glide_slope(const Location &prev_WP_lo
     }
 
     // time before landing that we will flare
-    float flare_time = aim_height / SpdHgt_Controller->get_land_sinkrate();
+    float flare_time = 0.0f;//aim_height / SpdHgt_Controller->get_land_sinkrate();
 
     // distance to flare is based on ground speed, adjusted as we
     // get closer. This takes into account the wind
