@@ -258,6 +258,15 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("LAND_PTRIM", 29, AP_TECS, _land_pitch_trim, 0),
 
+    // @Param: FLARE_HGT
+    // @DisplayName: Flare holdoff height
+    // @Description: When height above ground is below this, the sink ratr will be held at TECS_LAND_SINK. use this to perform a hold-of manoeuvre when combined with a zero value for TECS_LAND_SINK
+    // @Range: -10 15
+    // @Units: deg
+    // @Increment: 1
+    // @User: Advanced
+    AP_GROUPINFO("FLARE_HGT", 30, AP_TECS, _flare_holdoff_hgt, 1.0f),
+
     AP_GROUPEND
 };
 
@@ -493,43 +502,53 @@ void AP_TECS::_update_height_demand(void)
         if (_flare_counter == 0) {
             _hgt_rate_dem = _climb_rate;
             _land_hgt_dem = _hgt_dem_adj;
+            _hgt_at_start_of_flare = _hgt_afe;
+            _hgt_rate_at_flare_entry = _climb_rate;
         }
 
         // adjust the flare sink rate to increase/decrease as your travel further beyond the land wp
         float land_sink_rate_adj = _land_sink + _land_sink_rate_change*_distance_beyond_land_wp;
 
-        // bring it in over 1s to prevent overshoot
-        if (_flare_counter < 10) {
-            _hgt_rate_dem = _hgt_rate_dem * 0.8f - 0.2f * land_sink_rate_adj;
-            _flare_counter++;
+        // bring it in at half the flare time constant
+        // const float coef = constrain_float(_DT / (0.5f * _landing.get_flare_sec()), 0.0f, 1.0f);
+        // _hgt_rate_dem = _hgt_rate_dem * (1.0f - coef) - coef * land_sink_rate_adj;
+
+        // alternatively bring it in linearly with height
+        float p;
+        if (_hgt_at_start_of_flare > _flare_holdoff_hgt) {
+            p = constrain_float((_hgt_at_start_of_flare - _hgt_afe) / (_hgt_at_start_of_flare - _flare_holdoff_hgt), 0.0f, 1.0f);
         } else {
-            _hgt_rate_dem = - land_sink_rate_adj;
+            p = 1.0f;
         }
-        _land_hgt_dem += 0.1f * _hgt_rate_dem;
+        _hgt_rate_dem = _hgt_rate_at_flare_entry * (1.0f - p) + land_sink_rate_adj * p;
+
+        _flare_counter++;
+        _land_hgt_dem += _DT * _hgt_rate_dem;
         _hgt_dem_adj = _land_hgt_dem;
+        _hgt_dem_adj_last = _land_hgt_dem;
     } else {
-        _hgt_rate_dem = (_hgt_dem_adj - _hgt_dem_adj_last) / 0.1f;
+        _hgt_rate_dem = (_hgt_dem_adj - _hgt_dem_adj_last) / _DT;
         _flare_counter = 0;
+        // for landing approach we will predict ahead by the time constant
+        // plus the lag produced by the first order filter. This avoids a
+        // lagged height demand while constantly descending which causes
+        // us to consistently be above the desired glide slope. This will
+        // be replaced with a better zero-lag filter in the future.
+        float new_hgt_dem = _hgt_dem_adj;
+        if (_flags.is_doing_auto_land ) {
+            if (hgt_dem_lag_filter_slew < 1) {
+                hgt_dem_lag_filter_slew += 0.1f; // increment at 10Hz to gradually apply the compensation at first
+            } else {
+                hgt_dem_lag_filter_slew = 1;
+            }
+            new_hgt_dem += hgt_dem_lag_filter_slew*(_hgt_dem_adj - _hgt_dem_adj_last)*10.0f*(timeConstant()+1);
+        } else {
+            hgt_dem_lag_filter_slew = 0;
+        }
+        _hgt_dem_adj_last = _hgt_dem_adj;
+        _hgt_dem_adj = new_hgt_dem;
     }
 
-    // for landing approach we will predict ahead by the time constant
-    // plus the lag produced by the first order filter. This avoids a
-    // lagged height demand while constantly descending which causes
-    // us to consistently be above the desired glide slope. This will
-    // be replaced with a better zero-lag filter in the future.
-    float new_hgt_dem = _hgt_dem_adj;
-    if (_flags.is_doing_auto_land) {
-        if (hgt_dem_lag_filter_slew < 1) {
-            hgt_dem_lag_filter_slew += 0.1f; // increment at 10Hz to gradually apply the compensation at first
-        } else {
-            hgt_dem_lag_filter_slew = 1;
-        }
-        new_hgt_dem += hgt_dem_lag_filter_slew*(_hgt_dem_adj - _hgt_dem_adj_last)*10.0f*(timeConstant()+1);
-    } else {
-        hgt_dem_lag_filter_slew = 0;
-    }
-    _hgt_dem_adj_last = _hgt_dem_adj;
-    _hgt_dem_adj = new_hgt_dem;
 }
 
 void AP_TECS::_detect_underspeed(void)
@@ -907,6 +926,7 @@ void AP_TECS::_update_pitch(void)
             K_D = _ptchDamp;
             K_I = _integGain_land;
         }
+        //const float pos_err = _landing.is_flaring() ? 0.0f : _hgt_dem_adj - _height;
         const float pos_err = _hgt_dem_adj - _height;
         float vel_dem = _hgt_rate_dem + pos_err * K_P + _vel_err_integ * K_I;
         const float vel_err = vel_dem - _climb_rate;
@@ -952,6 +972,7 @@ void AP_TECS::_initialise_states(int32_t ptchMinCO_cd, float hgt_afe)
         _integSEB_state      = 0.0f;
         _last_throttle_dem = aparm.throttle_cruise * 0.01f;
         _last_pitch_dem    = _ahrs.pitch;
+        _hgt_afe           = hgt_afe;
         _hgt_dem_adj_last  = hgt_afe;
         _hgt_dem_adj       = _hgt_dem_adj_last;
         _hgt_dem_prev      = _hgt_dem_adj_last;
@@ -963,11 +984,14 @@ void AP_TECS::_initialise_states(int32_t ptchMinCO_cd, float hgt_afe)
         _DT                = 0.1f; // when first starting TECS, use a
         // small time constant
         _need_reset = false;
-        _vel_err_integ - 0.0f;
+        _vel_err_integ = 0.0f;
+        _hgt_at_start_of_flare = 0.0f;
+        _hgt_rate_at_flare_entry = 0.0f;
     }
     else if (_flight_stage == AP_Vehicle::FixedWing::FLIGHT_TAKEOFF || _flight_stage == AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND)
     {
         _PITCHminf          = 0.000174533f * ptchMinCO_cd;
+        _hgt_afe           = hgt_afe;
         _hgt_dem_adj_last  = hgt_afe;
         _hgt_dem_adj       = _hgt_dem_adj_last;
         _hgt_dem_prev      = _hgt_dem_adj_last;
@@ -1013,6 +1037,7 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
     // Convert inputs
     _hgt_dem = hgt_dem_cm * 0.01f;
     _EAS_dem = EAS_dem_cm * 0.01f;
+    _hgt_afe = hgt_afe;
 
     // Update the speed estimate using a 2nd order complementary filter
     _update_speed(load_factor);
@@ -1063,8 +1088,8 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
         // smoothly move the min pitch to the required minimum at touchdown
         const float height_loss_predicted = -_climb_rate * _landing.get_flare_sec();
         float p;
-        if (height_loss_predicted > hgt_afe) {
-            p = hgt_afe / height_loss_predicted;
+        if (height_loss_predicted > _hgt_afe) {
+            p = _hgt_afe / height_loss_predicted;
         } else {
             p = 1.0f;
         }

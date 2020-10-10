@@ -173,6 +173,7 @@ private:
     AP_Float _maxSinkRate_approach;
     AP_Int32 _options;
     AP_Int8  _land_pitch_trim;
+    AP_Float _flare_holdoff_hgt;
 
     enum {
         OPTION_GLIDER_ONLY=(1<<0),
@@ -309,6 +310,11 @@ private:
 
     // height error to pitch control law quantities
     float _vel_err_integ;
+
+    // flare height rate logic
+    float _hgt_at_start_of_flare;
+    float _hgt_rate_at_flare_entry;
+    float _hgt_afe;
 
     // Specific energy error quantities
     float _STE_error;
