@@ -249,6 +249,15 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("OPTIONS", 28, AP_TECS, _options, 0),
 
+    // @Param: LAND_PTRIM
+    // @DisplayName: Pitch angle for level flight in landing confiuration
+    // @Description: This sets the pitch angle required to fly straight and level with flaps and gear in the landing configuration. It is used to calculate the lower pitch limit applied during landing up antil the flare. This can be set to the average value of the AOA.AOA log data taken from a landing approach.
+    // @Range: -10 15
+    // @Units: deg
+    // @Increment: 1
+    // @User: Advanced
+    AP_GROUPINFO("LAND_PTRIM", 29, AP_TECS, _land_pitch_trim, 0),
+
     AP_GROUPEND
 };
 
@@ -1033,23 +1042,22 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
         // and allow zero throttle
         _THRminf = 0;
     } else if (_landing.is_on_approach() && (-_climb_rate) > _land_sink) {
+        // calculate the expected pitch angle from the demanded climb rate and airspeed
+        const float pitch_predicted_deg = degrees(atanf(_hgt_rate_dem / _TAS_state)) + (float)_land_pitch_trim;
+
         // constrain the pitch in landing as we get close to the flare
-        // point. Use a simple linear limit from 15 meters after the
-        // landing point
+        // point.
         float time_to_flare = (- hgt_afe / _climb_rate) - _landing.get_flare_sec();
         if (time_to_flare < 0) {
             // we should be flaring already
             _PITCHminf = MAX(_PITCHminf, _landing.get_pitch_cd() * 0.01f);
         } else if (time_to_flare < timeConstant()*2) {
-            // smoothly move the min pitch to the flare min pitch over
+            // smoothly move the min pitch to the required pitch at flare entry over
             // twice the time constant
-            float p = time_to_flare/(2*timeConstant());
-            float pitch_limit_cd = p*aparm.pitch_limit_min_cd + (1-p)*_landing.get_pitch_cd();
-#if 0
-            ::printf("ttf=%.1f hgt_afe=%.1f _PITCHminf=%.1f pitch_limit=%.1f climb=%.1f\n",
-                     time_to_flare, hgt_afe, _PITCHminf, pitch_limit_cd*0.01f, _climb_rate);
-#endif
-            _PITCHminf = MAX(_PITCHminf, pitch_limit_cd*0.01f);
+            const float p = time_to_flare/(2*timeConstant());
+            const float pitch_margin = p * 5.0f;
+            const float pitch_limit_deg = p * 0.01f * aparm.pitch_limit_min_cd + (1.0f - p) * (pitch_predicted_deg - pitch_margin);
+            _PITCHminf = MAX(_PITCHminf, pitch_limit_deg);
         }
     }
 
