@@ -260,7 +260,7 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
 
     // @Param: FLARE_HGT
     // @DisplayName: Flare holdoff height
-    // @Description: When height above ground is below this, the sink ratr will be held at TECS_LAND_SINK. use this to perform a hold-of manoeuvre when combined with a zero value for TECS_LAND_SINK
+    // @Description: When height above ground is below this, the sink rate will be held at TECS_LAND_SINK. Use this to perform a hold-of manoeuvre when combined with small values for TECS_LAND_SINK.
     // @Range: -10 15
     // @Units: deg
     // @Increment: 1
@@ -501,7 +501,8 @@ void AP_TECS::_update_height_demand(void)
         _integSEB_state = 0;
         if (_flare_counter == 0) {
             _hgt_rate_dem = _climb_rate;
-            _land_hgt_dem = _hgt_dem_adj;
+            _land_hgt_dem = _hgt_dem_adj; 
+            _land_hgt_dem_ideal = _hgt_afe; 
             _hgt_at_start_of_flare = _hgt_afe;
             _hgt_rate_at_flare_entry = _climb_rate;
         }
@@ -520,12 +521,17 @@ void AP_TECS::_update_height_demand(void)
         } else {
             p = 1.0f;
         }
-        _hgt_rate_dem = _hgt_rate_at_flare_entry * (1.0f - p) + land_sink_rate_adj * p;
+        _hgt_rate_dem = _hgt_rate_at_flare_entry * (1.0f - p) - land_sink_rate_adj * p;
 
         _flare_counter++;
-        _land_hgt_dem += _DT * _hgt_rate_dem;
-        _hgt_dem_adj = _land_hgt_dem;
-        _hgt_dem_adj_last = _land_hgt_dem;
+
+        _land_hgt_dem_ideal += _DT * _hgt_rate_dem; // the ideal height profile to follow
+        _land_hgt_dem       += _DT * _hgt_rate_dem; // the demanded height profile that includes the pre-flare height tracking offset
+
+        // fade across to the ideal height profile
+        // TODO use ideal profile from start and bump integrator to compensate for removal of height error correction
+        _hgt_dem_adj = _land_hgt_dem * (1.0f - p) + _land_hgt_dem_ideal * p;
+        _hgt_dem_adj_last = _hgt_dem_adj;
     } else {
         _hgt_rate_dem = (_hgt_dem_adj - _hgt_dem_adj_last) / _DT;
         _flare_counter = 0;
@@ -926,19 +932,47 @@ void AP_TECS::_update_pitch(void)
             K_D = _ptchDamp;
             K_I = _integGain_land;
         }
+
+        // flight path height rate plus height error correction gives a desired vertical velocity profile
         //const float pos_err = _landing.is_flaring() ? 0.0f : _hgt_dem_adj - _height;
         const float pos_err = _hgt_dem_adj - _height;
-        float vel_dem = _hgt_rate_dem + pos_err * K_P + _vel_err_integ * K_I;
-        const float vel_err = vel_dem - _climb_rate;
-        vel_dem += vel_err * K_D;
-        _pitch_dem_unc = atanf(vel_dem / _TAS_state);
+        _hgt_rate_dem_alt = _hgt_rate_dem + pos_err * K_P;
+
+        // vertical velocity error
+        const float vel_err = _hgt_rate_dem_alt - _climb_rate;
+
+        // integrated velocity error
         const bool inhibit_integrator = (_pitch_dem_unc > _PITCHmaxf && vel_err > 0.0f) || (_pitch_dem_unc < _PITCHminf && vel_err < 0.0f);
         if (!inhibit_integrator) {
-            _vel_err_integ += vel_err * _DT * K_I;
+            _hgt_rate_err_integ += vel_err * _DT;
         } else {
             // fade out integrator
-            _vel_err_integ *= (1.0f - K_P * _DT);
+            _hgt_rate_err_integ *= (1.0f - K_P * _DT);
         }
+
+        // PI law applied to vertical velocity error
+        const float vel_dem = _hgt_rate_dem_alt + vel_err * K_D + _hgt_rate_err_integ * K_I;
+
+        // convert to pitch demand assuming flight path angle follows pitch angle
+        _pitch_dem_unc = atanf(vel_dem / _TAS_state);
+
+        // if landing or flaring, use user provided trim data
+        if (_landing.is_on_approach() || _landing.is_flaring()) {
+            _pitch_dem_unc += radians(_land_pitch_trim);
+        }
+
+        AP::logger().Write("TEC3", "TimeUS,perr,verr,ierr,ff,pcor,vcor,ivcor",
+                        "s-------",
+                        "F-------",
+                        "Qfffffff",
+                        AP_HAL::micros(),
+                        (double)pos_err,
+                        (double)vel_err,
+                        (double)_hgt_rate_err_integ,
+                        (double)_hgt_rate_dem,
+                        (double)(pos_err * K_P),
+                        (double)(vel_err * K_D),
+                        (double)(_hgt_rate_err_integ * K_I));
     }
 
     // Constrain pitch demand
@@ -984,9 +1018,13 @@ void AP_TECS::_initialise_states(int32_t ptchMinCO_cd, float hgt_afe)
         _DT                = 0.1f; // when first starting TECS, use a
         // small time constant
         _need_reset = false;
-        _vel_err_integ = 0.0f;
+
+        // misc variables used for alternative precision landing pitch control
+        _hgt_rate_err_integ = 0.0f;
         _hgt_at_start_of_flare = 0.0f;
         _hgt_rate_at_flare_entry = 0.0f;
+        _hgt_afe = 0.0f;
+        _hgt_rate_dem_alt = 0.0f;
     }
     else if (_flight_stage == AP_Vehicle::FixedWing::FLIGHT_TAKEOFF || _flight_stage == AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND)
     {
@@ -1120,15 +1158,6 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
             const float p = time_to_flare/(2*timeConstant());
             const float pitch_margin = p * 5.0f;
             const float pitch_limit_deg = p * 0.01f * aparm.pitch_limit_min_cd + (1.0f - p) * (pitch_predicted_deg - pitch_margin);
-            AP::logger().Write("TEC3", "TimeUS,p,PLM,PPD,PM,PLD,PMF",
-                            "Qffffff",
-                            now,
-                            (double)p,
-                            (double)0.01f*aparm.pitch_limit_min_cd ,
-                            (double)pitch_predicted_deg,
-                            (double)pitch_margin,
-                            (double)pitch_limit_deg,
-                            (double)_PITCHminf);
             _PITCHminf = MAX(_PITCHminf, pitch_limit_deg);
         }
     }

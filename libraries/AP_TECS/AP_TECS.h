@@ -247,6 +247,7 @@ private:
     float _hgt_rate_dem;
     float _hgt_dem_prev;
     float _land_hgt_dem;
+    float _land_hgt_dem_ideal;
 
     // Speed demand after application of rate limiting
     // This is the demand tracked by the TECS control loops
@@ -308,13 +309,12 @@ private:
     float _SPEdot;
     float _SKEdot;
 
-    // height error to pitch control law quantities
-    float _vel_err_integ;
-
-    // flare height rate logic
+    // misc variables used for alternative precision landing pitch control
+    float _hgt_rate_err_integ;
     float _hgt_at_start_of_flare;
     float _hgt_rate_at_flare_entry;
     float _hgt_afe;
+    float _hgt_rate_dem_alt;
 
     // Specific energy error quantities
     float _STE_error;
