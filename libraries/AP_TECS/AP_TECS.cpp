@@ -893,7 +893,33 @@ void AP_TECS::_update_pitch(void)
     _integSEB_state = constrain_float(_integSEB_state + integSEB_delta, integSEB_min, integSEB_max);
 
     // Calculate pitch demand from specific energy balance signals
-    _pitch_dem_unc = (temp + _integSEB_state) / gainInv;
+    if (SKE_weighting > 0.0f || _spdWeightLand < 0.0f) {
+        _pitch_dem_unc = (temp + _integSEB_state) / gainInv;
+    } else {
+        // use a direct height error to pitch law
+        float K_P, K_I, K_D;
+        if (_landing.is_on_approach()) {
+            K_P = 1.0f / _landTimeConst;
+            K_D = _land_pitch_damp;
+            K_I = _integGain_land;
+        } else {
+            K_P = 1.0f / _timeConst;
+            K_D = _ptchDamp;
+            K_I = _integGain_land;
+        }
+        const float pos_err = _hgt_dem_adj - _height;
+        float vel_dem = _hgt_rate_dem + pos_err * K_P + _vel_err_integ * K_I;
+        const float vel_err = vel_dem - _climb_rate;
+        vel_dem += vel_err * K_D;
+        _pitch_dem_unc = atanf(vel_dem / _TAS_state);
+        const bool inhibit_integrator = (_pitch_dem_unc > _PITCHmaxf && vel_err > 0.0f) || (_pitch_dem_unc < _PITCHminf && vel_err < 0.0f);
+        if (!inhibit_integrator) {
+            _vel_err_integ += vel_err * _DT * K_I;
+        } else {
+            // fade out integrator
+            _vel_err_integ *= (1.0f - K_P * _DT);
+        }
+    }
 
     // Constrain pitch demand
     _pitch_dem = constrain_float(_pitch_dem_unc, _PITCHminf, _PITCHmaxf);
@@ -937,6 +963,7 @@ void AP_TECS::_initialise_states(int32_t ptchMinCO_cd, float hgt_afe)
         _DT                = 0.1f; // when first starting TECS, use a
         // small time constant
         _need_reset = false;
+        _vel_err_integ - 0.0f;
     }
     else if (_flight_stage == AP_Vehicle::FixedWing::FLIGHT_TAKEOFF || _flight_stage == AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND)
     {
@@ -1029,9 +1056,23 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
         _land_pitch_min = _PITCHminf;
     }
     
+    // calculate the expected pitch angle from the demanded climb rate and airspeed
+    const float pitch_predicted_deg = degrees(atanf(_hgt_rate_dem / _TAS_state)) + (float)_land_pitch_trim;
+
     if (_landing.is_flaring()) {
+        // smoothly move the min pitch to the required minimum at touchdown
+        const float height_loss_predicted = -_climb_rate * _landing.get_flare_sec();
+        float p;
+        if (height_loss_predicted > hgt_afe) {
+            p = hgt_afe / height_loss_predicted;
+        } else {
+            p = 1.0f;
+        }
+        p = MAX(p, 0.0f);
+        const float pitch_limit_deg = p * pitch_predicted_deg + (1.0f - p) * 0.01f * _landing.get_pitch_cd();
+
         // in flare use min pitch from LAND_PITCH_CD
-        _PITCHminf = MAX(_PITCHminf, _landing.get_pitch_cd() * 0.01f);
+        _PITCHminf = MAX(_PITCHminf, pitch_limit_deg);
 
         // and use max pitch from TECS_LAND_PMAX
         if (_land_pitch_max != 0) {
@@ -1042,9 +1083,6 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
         // and allow zero throttle
         _THRminf = 0;
     } else if (_landing.is_on_approach() && (-_climb_rate) > _land_sink) {
-        // calculate the expected pitch angle from the demanded climb rate and airspeed
-        const float pitch_predicted_deg = degrees(atanf(_hgt_rate_dem / _TAS_state)) + (float)_land_pitch_trim;
-
         // constrain the pitch in landing as we get close to the flare
         // point.
         float time_to_flare = (- hgt_afe / _climb_rate) - _landing.get_flare_sec();
@@ -1057,6 +1095,15 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
             const float p = time_to_flare/(2*timeConstant());
             const float pitch_margin = p * 5.0f;
             const float pitch_limit_deg = p * 0.01f * aparm.pitch_limit_min_cd + (1.0f - p) * (pitch_predicted_deg - pitch_margin);
+            AP::logger().Write("TEC3", "TimeUS,p,PLM,PPD,PM,PLD,PMF",
+                            "Qffffff",
+                            now,
+                            (double)p,
+                            (double)0.01f*aparm.pitch_limit_min_cd ,
+                            (double)pitch_predicted_deg,
+                            (double)pitch_margin,
+                            (double)pitch_limit_deg,
+                            (double)_PITCHminf);
             _PITCHminf = MAX(_PITCHminf, pitch_limit_deg);
         }
     }
@@ -1093,7 +1140,8 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
     
     // convert to radians
     _PITCHmaxf = radians(_PITCHmaxf);
-    _PITCHminf = radians(_PITCHminf);
+    //_PITCHminf = radians(_PITCHminf);
+    _PITCHminf = radians(0.01f * aparm.pitch_limit_min_cd);
 
     // don't allow max pitch to go below min pitch
     _PITCHmaxf = MAX(_PITCHmaxf, _PITCHminf);

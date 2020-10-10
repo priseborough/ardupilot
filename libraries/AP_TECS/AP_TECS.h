@@ -307,6 +307,9 @@ private:
     float _SPEdot;
     float _SKEdot;
 
+    // height error to pitch control law quantities
+    float _vel_err_integ;
+
     // Specific energy error quantities
     float _STE_error;
 
