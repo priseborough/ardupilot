@@ -505,6 +505,11 @@ void AP_TECS::_update_height_demand(void)
             _land_hgt_dem_ideal = _hgt_afe; 
             _hgt_at_start_of_flare = _hgt_afe;
             _hgt_rate_at_flare_entry = _climb_rate;
+
+            // adjust flare height controller integrator
+            const float K_P = 1.0f / _landTimeConst;
+            const float hgt_offset = _land_hgt_dem - _land_hgt_dem_ideal;
+            _hgt_rate_err_integ += hgt_offset * K_P;
         }
 
         // adjust the flare sink rate to increase/decrease as your travel further beyond the land wp
@@ -528,9 +533,14 @@ void AP_TECS::_update_height_demand(void)
         _land_hgt_dem_ideal += _DT * _hgt_rate_dem; // the ideal height profile to follow
         _land_hgt_dem       += _DT * _hgt_rate_dem; // the demanded height profile that includes the pre-flare height tracking offset
 
-        // fade across to the ideal height profile
-        // TODO use ideal profile from start and bump integrator to compensate for removal of height error correction
-        _hgt_dem_adj = _land_hgt_dem * (1.0f - p) + _land_hgt_dem_ideal * p;
+        if (_SKE_weighting > 0.0f || _spdWeightLand < 0.0f) {
+            // fade across to the ideal height profile
+            _hgt_dem_adj = _land_hgt_dem * (1.0f - p) + _land_hgt_dem_ideal * p;
+        } else {
+            // using the alternate height to pitch control law with integrator adjsuted to enable tracking
+            // of ideal height profiel from start of flare
+            _hgt_dem_adj = _land_hgt_dem_ideal;
+        }
         _hgt_dem_adj_last = _hgt_dem_adj;
     } else {
         _hgt_rate_dem = (_hgt_dem_adj - _hgt_dem_adj_last) / _DT;
@@ -818,36 +828,34 @@ void AP_TECS::_update_pitch(void)
     // A SKE_weighting of 0 provides 100% priority to height control. This is used when no airspeed measurement is available
     // A SKE_weighting of 2 provides 100% priority to speed control. This is used when an underspeed condition is detected. In this instance, if airspeed
     // rises above the demanded value, the pitch angle will be increased by the TECS controller.
-    float SKE_weighting = constrain_float(_spdWeight, 0.0f, 2.0f);
+    _SKE_weighting = constrain_float(_spdWeight, 0.0f, 2.0f);
     if (!_ahrs.airspeed_sensor_enabled()) {
-        SKE_weighting = 0.0f;
+        _SKE_weighting = 0.0f;
     } else if (_flight_stage == AP_Vehicle::FixedWing::FLIGHT_VTOL) {
         // if we are in VTOL mode then control pitch without regard to
         // speed. Speed is also taken care of independently of
         // height. This is needed as the usual relationship of speed
         // and height is broken by the VTOL motors
-        SKE_weighting = 0.0f;        
+        _SKE_weighting = 0.0f;        
     } else if ( _flags.underspeed || _flight_stage == AP_Vehicle::FixedWing::FLIGHT_TAKEOFF || _flight_stage == AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND) {
-        SKE_weighting = 2.0f;
+        _SKE_weighting = 2.0f;
     } else if (_flags.is_doing_auto_land) {
         if (_spdWeightLand < 0) {
             // use sliding scale from normal weight down to zero at landing
             float scaled_weight = _spdWeight * (1.0f - constrain_float(_path_proportion,0,1));
-            SKE_weighting = constrain_float(scaled_weight, 0.0f, 2.0f);
+            _SKE_weighting = constrain_float(scaled_weight, 0.0f, 2.0f);
         } else {
-            SKE_weighting = constrain_float(_spdWeightLand, 0.0f, 2.0f);
+            _SKE_weighting = constrain_float(_spdWeightLand, 0.0f, 2.0f);
         }
     }
 
-    logging.SKE_weighting = SKE_weighting;
-    
-    float SPE_weighting = 2.0f - SKE_weighting;
+    float SPE_weighting = 2.0f - _SKE_weighting;
 
     // Calculate Specific Energy Balance demand, and error
-    float SEB_dem      = _SPE_dem * SPE_weighting - _SKE_dem * SKE_weighting;
-    float SEBdot_dem   = _SPEdot_dem * SPE_weighting - _SKEdot_dem * SKE_weighting;
-    float SEB_error    = SEB_dem - (_SPE_est * SPE_weighting - _SKE_est * SKE_weighting);
-    float SEBdot_error = SEBdot_dem - (_SPEdot * SPE_weighting - _SKEdot * SKE_weighting);
+    float SEB_dem      = _SPE_dem * SPE_weighting - _SKE_dem * _SKE_weighting;
+    float SEBdot_dem   = _SPEdot_dem * SPE_weighting - _SKEdot_dem * _SKE_weighting;
+    float SEB_error    = SEB_dem - (_SPE_est * SPE_weighting - _SKE_est * _SKE_weighting);
+    float SEBdot_error = SEBdot_dem - (_SPEdot * SPE_weighting - _SKEdot * _SKE_weighting);
 
     logging.SKE_error = _SKE_dem - _SKE_est;
     logging.SPE_error = _SPE_dem - _SPE_est;
@@ -918,12 +926,12 @@ void AP_TECS::_update_pitch(void)
     _integSEB_state = constrain_float(_integSEB_state + integSEB_delta, integSEB_min, integSEB_max);
 
     // Calculate pitch demand from specific energy balance signals
-    if (SKE_weighting > 0.0f || _spdWeightLand < 0.0f) {
+    if (_SKE_weighting > 0.0f || _spdWeightLand < 0.0f) {
         _pitch_dem_unc = (temp + _integSEB_state) / gainInv;
     } else {
         // use a direct height error to pitch law
         float K_P, K_I, K_D;
-        if (_landing.is_on_approach()) {
+        if (_landing.is_on_approach() || _landing.is_flaring()) {
             K_P = 1.0f / _landTimeConst;
             K_D = _land_pitch_damp;
             K_I = _integGain_land;
@@ -1002,8 +1010,9 @@ void AP_TECS::_initialise_states(int32_t ptchMinCO_cd, float hgt_afe)
     // Initialise states and variables if DT > 1 second or in climbout
     if (_DT > 1.0f || _need_reset)
     {
-        _integTHR_state      = 0.0f;
-        _integSEB_state      = 0.0f;
+        _SKE_weighting     = 1.0f;
+        _integTHR_state    = 0.0f;
+        _integSEB_state    = 0.0f;
         _last_throttle_dem = aparm.throttle_cruise * 0.01f;
         _last_pitch_dem    = _ahrs.pitch;
         _hgt_afe           = hgt_afe;
@@ -1012,23 +1021,23 @@ void AP_TECS::_initialise_states(int32_t ptchMinCO_cd, float hgt_afe)
         _hgt_dem_prev      = _hgt_dem_adj_last;
         _hgt_dem_in_old    = _hgt_dem_adj_last;
         _TAS_dem_adj       = _TAS_dem;
-        _flags.underspeed        = false;
-        _flags.badDescent        = false;
+        _DT                = 0.1f; // when first starting TECS, use a small time constant
+
+        _flags.underspeed            = false;
+        _flags.badDescent            = false;
         _flags.reached_speed_takeoff = false;
-        _DT                = 0.1f; // when first starting TECS, use a
-        // small time constant
-        _need_reset = false;
+        _need_reset                  = false;
 
         // misc variables used for alternative precision landing pitch control
-        _hgt_rate_err_integ = 0.0f;
-        _hgt_at_start_of_flare = 0.0f;
+        _hgt_rate_err_integ      = 0.0f;
+        _hgt_at_start_of_flare   = 0.0f;
         _hgt_rate_at_flare_entry = 0.0f;
-        _hgt_afe = 0.0f;
-        _hgt_rate_dem_alt = 0.0f;
+        _hgt_afe                 = 0.0f;
+        _hgt_rate_dem_alt        = 0.0f;
     }
     else if (_flight_stage == AP_Vehicle::FixedWing::FLIGHT_TAKEOFF || _flight_stage == AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND)
     {
-        _PITCHminf          = 0.000174533f * ptchMinCO_cd;
+        _PITCHminf         = 0.000174533f * ptchMinCO_cd;
         _hgt_afe           = hgt_afe;
         _hgt_dem_adj_last  = hgt_afe;
         _hgt_dem_adj       = _hgt_dem_adj_last;
@@ -1261,7 +1270,7 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
         (double)_throttle_dem,
         (double)_pitch_dem,
         (double)_TAS_rate_dem,
-        (double)logging.SKE_weighting,
+        (double)_SKE_weighting,
         _flags_byte);
     AP::logger().Write("TEC2", "TimeUS,pmax,pmin,KErr,PErr,EDelta,LF",
                        "s------",

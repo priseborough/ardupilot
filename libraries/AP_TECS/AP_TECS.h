@@ -338,9 +338,10 @@ private:
     // need to reset on next loop
     bool _need_reset;
 
+    float _SKE_weighting;
+
     // internal variables to be logged
     struct {
-        float SKE_weighting;
         float SPE_error;
         float SKE_error;
         float SEB_delta;
