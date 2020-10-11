@@ -942,8 +942,8 @@ void AP_TECS::_update_pitch(void)
         }
 
         // flight path height rate plus height error correction gives a desired vertical velocity profile
-        //const float pos_err = _landing.is_flaring() ? 0.0f : _hgt_dem_adj - _height;
-        const float pos_err = _hgt_dem_adj - _height;
+        // const float pos_err = _landing.is_flaring() ? 0.0f : _hgt_dem_adj - _height;
+        const float pos_err = _landing.is_flaring() ? _hgt_dem_adj - _hgt_afe : _hgt_dem_adj - _height;
         _hgt_rate_dem_alt = _hgt_rate_dem + pos_err * K_P;
 
         // vertical velocity error
@@ -969,11 +969,12 @@ void AP_TECS::_update_pitch(void)
             _pitch_dem_unc += radians(_land_pitch_trim);
         }
 
-        AP::logger().Write("TEC3", "TimeUS,perr,verr,ierr,ff,pcor,vcor,ivcor",
-                        "s-------",
-                        "F-------",
-                        "Qfffffff",
+        AP::logger().Write("TEC3", "TimeUS,hafe,perr,verr,ierr,ff,pcor,vcor,ivcor",
+                        "s--------",
+                        "F--------",
+                        "Qffffffff",
                         AP_HAL::micros(),
+                        (double)_hgt_afe,
                         (double)pos_err,
                         (double)vel_err,
                         (double)_hgt_rate_err_integ,
