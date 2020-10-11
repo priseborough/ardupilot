@@ -851,24 +851,46 @@ void AP_TECS::_update_pitch(void)
 
     float SPE_weighting = 2.0f - _SKE_weighting;
 
-    // Calculate Specific Energy Balance demand, and error
-    float SEB_dem      = _SPE_dem * SPE_weighting - _SKE_dem * _SKE_weighting;
-    float SEBdot_dem   = _SPEdot_dem * SPE_weighting - _SKEdot_dem * _SKE_weighting;
-    float SEB_error    = SEB_dem - (_SPE_est * SPE_weighting - _SKE_est * _SKE_weighting);
+    // either weight can fade to 0, but don't go above 1 to prevent instability if tuned at a speed weight of 1 and wieghting is varied to end points in flight.
+    SPE_weighting = MIN(SPE_weighting, 1.0f);
+    _SKE_weighting = MIN(_SKE_weighting, 1.0f);
+
+    // Calculate demanded specific energy balance and error
+    float SEB_dem   = _SPE_dem * SPE_weighting - _SKE_dem * _SKE_weighting;
+    float SEB_error = SEB_dem - (_SPE_est * SPE_weighting - _SKE_est * _SKE_weighting);
+
+    // calcualate predicted specific energy balance rate of change
+    float SEBdot_dem_predicted = _SPEdot_dem * SPE_weighting - _SKEdot_dem * _SKE_weighting;
+
+    // add energy balance error feedback
+    float SEBdot_dem = SEBdot_dem_predicted + SEB_error / timeConstant();
+
+    // calculate specific energy balance rate error
     float SEBdot_error = SEBdot_dem - (_SPEdot * SPE_weighting - _SKEdot * _SKE_weighting);
 
     logging.SKE_error = _SKE_dem - _SKE_est;
     logging.SPE_error = _SPE_dem - _SPE_est;
     
+    // sum predicted plus damping correction
+    // integral correction is added later
+    // During flare a different damping gain is used
+    float pitch_damp = _ptchDamp;
+    if (_landing.is_flaring()) {
+        pitch_damp = _landDamp;
+    } else if (!is_zero(_land_pitch_damp) && _flags.is_doing_auto_land) {
+        pitch_damp = _land_pitch_damp;
+    }
+    float SEBdot_dem_total = SEBdot_dem_predicted + SEBdot_error * pitch_damp;
+
     // Calculate integrator state, constraining input if pitch limits are exceeded
-    float integSEB_input = SEB_error * _get_i_gain();
+    float integSEB_input = SEBdot_error * _get_i_gain();
     if (_pitch_dem > _PITCHmaxf)
     {
-        integSEB_input = MIN(integSEB_input, _PITCHmaxf - _pitch_dem);
+        integSEB_input = MIN(integSEB_input, 0.0f);
     }
     else if (_pitch_dem < _PITCHminf)
     {
-        integSEB_input = MAX(integSEB_input, _PITCHminf - _pitch_dem);
+        integSEB_input = MAX(integSEB_input, 0.0f);
     }
     float integSEB_delta = integSEB_input * _DT;
 
@@ -887,23 +909,12 @@ void AP_TECS::_update_pitch(void)
     // During climbout/takeoff, bias the demanded pitch angle so that zero speed error produces a pitch angle
     // demand equal to the minimum value (which is )set by the mission plan during this mode). Otherwise the
     // integrator has to catch up before the nose can be raised to reduce speed during climbout.
-    // During flare a different damping gain is used
-    float gainInv = (_TAS_state * timeConstant() * GRAVITY_MSS);
-    float temp = SEB_error + SEBdot_dem * timeConstant();
-
-    float pitch_damp = _ptchDamp;
-    if (_landing.is_flaring()) {
-        pitch_damp = _landDamp;
-    } else if (!is_zero(_land_pitch_damp) && _flags.is_doing_auto_land) {
-        pitch_damp = _land_pitch_damp;
-    }
-    temp += SEBdot_error * pitch_damp;
-
+    float gainInv = (_TAS_state * GRAVITY_MSS);
     if (_flight_stage == AP_Vehicle::FixedWing::FLIGHT_TAKEOFF || _flight_stage == AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND) {
-        temp += _PITCHminf * gainInv;
+        SEBdot_dem_total += _PITCHminf * gainInv;
     }
-    float integSEB_min = (gainInv * (_PITCHminf - 0.0783f)) - temp;
-    float integSEB_max = (gainInv * (_PITCHmaxf + 0.0783f)) - temp;
+    float integSEB_min = (gainInv * (_PITCHminf - 0.0783f)) - SEBdot_dem_total;
+    float integSEB_max = (gainInv * (_PITCHmaxf + 0.0783f)) - SEBdot_dem_total;
     float integSEB_range = integSEB_max - integSEB_min;
 
     logging.SEB_delta = integSEB_delta;
@@ -927,7 +938,7 @@ void AP_TECS::_update_pitch(void)
 
     // Calculate pitch demand from specific energy balance signals
     if (_SKE_weighting > 0.0f || _spdWeightLand < 0.0f) {
-        _pitch_dem_unc = (temp + _integSEB_state) / gainInv;
+        _pitch_dem_unc = (SEBdot_dem_total + _integSEB_state) / gainInv;
     } else {
         // use a direct height error to pitch law
         float K_P, K_I, K_D;
