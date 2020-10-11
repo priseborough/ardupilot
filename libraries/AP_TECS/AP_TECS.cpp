@@ -936,6 +936,21 @@ void AP_TECS::_update_pitch(void)
     // integrate
     _integSEB_state = constrain_float(_integSEB_state + integSEB_delta, integSEB_min, integSEB_max);
 
+    AP::logger().Write("TEC4", "TimeUS,S1,S2,S3,S4,S5,S6,S7,S8,S9",
+                    "s---------",
+                    "F---------",
+                    "Qfffffffff",
+                    AP_HAL::micros(),
+                    (double)SPE_weighting,              // S1
+                    (double)SEB_dem,                    // S2
+                    (double)SEB_error,                  // S3
+                    (double)SEBdot_dem_predicted,       // S4
+                    (double)SEBdot_dem,                 // S5
+                    (double)SEBdot_error,               // S6
+                    (double)(SEBdot_error * pitch_damp),// S7
+                    (double)SEBdot_dem_total,           // S8
+                    (double)_integSEB_state);           // S9
+
     // Calculate pitch demand from specific energy balance signals
     if (_SKE_weighting > 0.0f || _spdWeightLand < 0.0f) {
         _pitch_dem_unc = (SEBdot_dem_total + _integSEB_state) / gainInv;
