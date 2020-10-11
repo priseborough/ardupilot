@@ -276,11 +276,15 @@ void AP_Landing::type_slope_setup_landing_glide_slope(const Location &prev_WP_lo
     }
 
     // time before landing that we will flare
-    float flare_time = 0.0f;//aim_height / SpdHgt_Controller->get_land_sinkrate();
+    // assume velocity decays smoothly from sink_rate to SpdHgt_Controller->get_land_sinkrate()
+    const float avg_sinkrate = 0.33f * sink_rate + 0.67f * SpdHgt_Controller->get_land_sinkrate();
+
+    // additional time added by flare
+    float time_increase = aim_height / avg_sinkrate - aim_height / sink_rate;
 
     // distance to flare is based on ground speed, adjusted as we
     // get closer. This takes into account the wind
-    float flare_distance = groundspeed * flare_time;
+    float flare_distance = groundspeed * time_increase;
 
     // don't allow the flare before half way along the final leg
     if (flare_distance > total_distance/2) {
