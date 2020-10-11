@@ -315,6 +315,7 @@ private:
     float _hgt_rate_at_flare_entry;
     float _hgt_afe;
     float _hgt_rate_dem_alt;
+    float _pitch_min_at_flare_entry;
 
     // Specific energy error quantities
     float _STE_error;

@@ -1061,6 +1061,7 @@ void AP_TECS::_initialise_states(int32_t ptchMinCO_cd, float hgt_afe)
         _hgt_rate_at_flare_entry = 0.0f;
         _hgt_afe                 = 0.0f;
         _hgt_rate_dem_alt        = 0.0f;
+        _pitch_min_at_flare_entry    = 0.0f;
     }
     else if (_flight_stage == AP_Vehicle::FixedWing::FLIGHT_TAKEOFF || _flight_stage == AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND)
     {
@@ -1155,20 +1156,18 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
         _land_pitch_min = _PITCHminf;
     }
     
-    // calculate the expected pitch angle from the demanded climb rate and airspeed
-    const float pitch_predicted_deg = degrees(atanf(_hgt_rate_dem / _TAS_state)) + (float)_land_pitch_trim;
-
+    // calculate the expected pitch angle from the demanded climb rate and airspeed fo ruse during approach and flare
     if (_landing.is_flaring()) {
         // smoothly move the min pitch to the required minimum at touchdown
-        const float height_loss_predicted = -_climb_rate * _landing.get_flare_sec();
-        float p;
-        if (height_loss_predicted > _hgt_afe) {
-            p = _hgt_afe / height_loss_predicted;
+        float p; // 0 at start of flare, 1 at finish
+        if (_flare_counter == 0) {
+            p = 0.0f;
+        } else if (_hgt_at_start_of_flare > _flare_holdoff_hgt) {
+            p = constrain_float((_hgt_at_start_of_flare - _hgt_afe) / _hgt_at_start_of_flare, 0.0f, 1.0f);
         } else {
             p = 1.0f;
         }
-        p = MAX(p, 0.0f);
-        const float pitch_limit_deg = p * pitch_predicted_deg + (1.0f - p) * 0.01f * _landing.get_pitch_cd();
+        const float pitch_limit_deg = (1.0f - p) * _pitch_min_at_flare_entry + p * 0.01f * _landing.get_pitch_cd();
 
         // in flare use min pitch from LAND_PITCH_CD
         _PITCHminf = MAX(_PITCHminf, pitch_limit_deg);
@@ -1181,21 +1180,9 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
 
         // and allow zero throttle
         _THRminf = 0;
-    } else if (_landing.is_on_approach() && (-_climb_rate) > _land_sink) {
-        // constrain the pitch in landing as we get close to the flare
-        // point.
-        float time_to_flare = (- hgt_afe / _climb_rate) - _landing.get_flare_sec();
-        if (time_to_flare < 0) {
-            // we should be flaring already
-            _PITCHminf = MAX(_PITCHminf, _landing.get_pitch_cd() * 0.01f);
-        } else if (time_to_flare < timeConstant()*2) {
-            // smoothly move the min pitch to the required pitch at flare entry over
-            // twice the time constant
-            const float p = time_to_flare/(2*timeConstant());
-            const float pitch_margin = p * 5.0f;
-            const float pitch_limit_deg = p * 0.01f * aparm.pitch_limit_min_cd + (1.0f - p) * (pitch_predicted_deg - pitch_margin);
-            _PITCHminf = MAX(_PITCHminf, pitch_limit_deg);
-        }
+    } else if (_landing.is_on_approach()) {
+        _PITCHminf = MAX(_PITCHminf, 0.01f * aparm.pitch_limit_min_cd);
+        _pitch_min_at_flare_entry = _PITCHminf;
     }
 
     if (_landing.is_on_approach()) {
@@ -1230,8 +1217,7 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
     
     // convert to radians
     _PITCHmaxf = radians(_PITCHmaxf);
-    //_PITCHminf = radians(_PITCHminf);
-    _PITCHminf = radians(0.01f * aparm.pitch_limit_min_cd);
+    _PITCHminf = radians(_PITCHminf);
 
     // don't allow max pitch to go below min pitch
     _PITCHmaxf = MAX(_PITCHmaxf, _PITCHminf);
