@@ -980,7 +980,7 @@ void AP_TECS::_update_pitch(void)
         const bool inhibit_integrator = (_pitch_dem_unc > _PITCHmaxf && vel_err > 0.0f) || (_pitch_dem_unc < _PITCHminf && vel_err < 0.0f);
         if (!inhibit_integrator) {
             _hgt_rate_err_integ += vel_err * _DT;
-        } else {
+        } else if (is_positive(vel_err * _hgt_rate_err_integ)) {
             // fade out integrator
             _hgt_rate_err_integ *= (1.0f - K_P * _DT);
         }
