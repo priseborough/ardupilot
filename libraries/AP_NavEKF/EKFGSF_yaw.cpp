@@ -166,17 +166,28 @@ void EKFGSF_yaw::fuseVelData(const Vector2f &vel, const float velAcc)
 
             if (!state_update_failed) {
                 // Calculate weighting for each model assuming a normal error distribution
+                const float minWeight = 1e-5f;
+                uint8_t weightClipCount = 0;
                 for (uint8_t mdl_idx = 0; mdl_idx < N_MODELS_EKFGSF; mdl_idx ++) {
-                    newWeight[mdl_idx]= fmaxf(gaussianDensity(mdl_idx) * GSF.weights[mdl_idx], 0.0f);
+                    newWeight[mdl_idx] = gaussianDensity(mdl_idx) * GSF.weights[mdl_idx];
+                    if (newWeight[mdl_idx] < minWeight) {
+                        newWeight[mdl_idx] = minWeight;
+                        weightClipCount++;
+                    }
                     total_w += newWeight[mdl_idx];
                 }
 
                 // Normalise the sum of weights to unity
-                if (vel_fuse_running && is_positive(total_w)) {
+                if (vel_fuse_running && weightClipCount < N_MODELS_EKFGSF) {
                     float total_w_inv = 1.0f / total_w;
                     for (uint8_t mdl_idx = 0; mdl_idx < N_MODELS_EKFGSF; mdl_idx ++) {
                         GSF.weights[mdl_idx]  = newWeight[mdl_idx] * total_w_inv;
                     }
+                } else {
+                    // The calculation of weights has underflowed due to high innovation
+                    // variances on all EKF's so stop fusion. The EKF's and GSF will be
+                    // reset and started when the next velocity observation is received.
+                    vel_fuse_running = false;
                 }
             }
         }
