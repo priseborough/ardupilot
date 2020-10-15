@@ -241,13 +241,13 @@ private:
 
     // height demands
     float _hgt_dem;
-    float _hgt_dem_in_old;
     float _hgt_dem_adj;
     float _hgt_dem_adj_last;
     float _hgt_rate_dem;
     float _hgt_dem_prev;
     float _land_hgt_dem;
     float _land_hgt_dem_ideal;
+    float _flare_hgt_rate_dem;
 
     // Speed demand after application of rate limiting
     // This is the demand tracked by the TECS control loops
@@ -314,7 +314,6 @@ private:
     float _hgt_at_start_of_flare;
     float _hgt_rate_at_flare_entry;
     float _hgt_afe;
-    float _hgt_rate_dem_alt;
     float _pitch_min_at_flare_entry;
 
     // Specific energy error quantities
