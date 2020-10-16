@@ -1642,3 +1642,10 @@ bool NavEKF2::isExtNavUsedForYaw() const
     return false;
 }
 
+bool NavEKF2::isYawAligned() const
+{
+    if (core) {
+        return core[primary].isYawAligned();
+    }
+    return false;
+}

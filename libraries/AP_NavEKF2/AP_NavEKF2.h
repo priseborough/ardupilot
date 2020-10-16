@@ -360,6 +360,8 @@ public:
     // check if external navigation is being used for yaw observation
     bool isExtNavUsedForYaw(void) const;
 
+    bool isYawAligned(void) const;
+
 private:
     uint8_t num_cores; // number of allocated cores
     uint8_t primary;   // current primary core

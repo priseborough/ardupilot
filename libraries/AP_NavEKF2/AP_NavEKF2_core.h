@@ -333,6 +333,8 @@ public:
     // return true when external nav data is also being used as a yaw observation
     bool isExtNavUsedForYaw(void);
 
+    bool isYawAligned(void) { return yawAlignComplete; };
+
 private:
     // Reference to the global EKF frontend for parameters
     NavEKF2 *frontend;
