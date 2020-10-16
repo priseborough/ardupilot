@@ -526,7 +526,18 @@ bool Plane::verify_takeoff(const AP_Mission::Mission_Command &cmd)
 
     int16_t wp_takeoff_heading = -1; // used for reporting purposes only
 
-    bool ekf_yaw_aligned_to_mission = false;
+    if ((g2.flight_options & FlightOptions::USE_TAKEOFF_LOC) &&
+        !ahrs.yaw_initialised() &&
+        !takeoff_state.ekf_yaw_aligned_to_wp &&
+        !takeoff_state.start_loc.is_zero()) {
+        // Send a yaw alignment command to the EKF's assuming the vehicle
+        // is starting takeoff pointing towards the takeoff waypoint
+        // without a yaw sensor. This will be ignored if the EKF already
+        // has aligned the yaw.
+        const float loc_course_rad = takeoff_state.start_loc.get_bearing(cmd.content.location);
+        takeoff_state.ekf_yaw_aligned_to_wp = ahrs.set_ekf_yaw_alignment(loc_course_rad);
+    }
+
     if (ahrs.yaw_initialised() && steer_state.hold_course_cd == -1) {
         /*
          optionally take course from location of takeoff waypoint
@@ -541,18 +552,13 @@ bool Plane::verify_takeoff(const AP_Mission::Mission_Command &cmd)
             const float margin = radians(15);
             // sanity check that will fail if aircraft is badly misaligned with runway
             // or there is a large nav yaw error
-            if (fabsf(wrap_PI(loc_course_rad - takeoff_heading)) < margin) {
+            if (fabsf(wrap_PI(loc_course_rad - takeoff_heading)) < margin || takeoff_state.ekf_yaw_aligned_to_wp) {
                 takeoff_heading = wrap_PI(loc_course_rad);
                 takeoff_heading_set = true;
                 if (g2.flight_options & FlightOptions::TAKEOFF_XTRACK) {
                     auto_state.crosstrack = true;
                 }
             }
-            // Send a yaw alignment command to the EKF's assuming the vehicle
-            // is starting takeoff pointing towards the takeoff waypoint
-            // without a yaw sensor. This will be ignored if the EKF already
-            // has aligned the yaw.
-            ekf_yaw_aligned_to_mission = ahrs.set_ekf_yaw_alignment(loc_course_rad);
         } else {
             const float min_gps_speed = 5;
             if (auto_state.takeoff_speed_time_ms == 0 &&
@@ -591,9 +597,8 @@ bool Plane::verify_takeoff(const AP_Mission::Mission_Command &cmd)
     }
 
     if (steer_state.hold_course_cd != -1) {
-        // abort takeoff is EKF was aligned to mission yaw and there is a subsequent
-        // yaw reset and we are below the decision speed
-        if(ekf_yaw_aligned_to_mission) {
+        // abort takeoff if alignment of EKF to WP heading causes loss of navigation
+        if(takeoff_state.ekf_yaw_aligned_to_wp) {
             float position_variance, vel_variance, height_variance, tas_variance;
             Vector3f mag_variance;
             Vector2f offset;
@@ -602,7 +607,7 @@ bool Plane::verify_takeoff(const AP_Mission::Mission_Command &cmd)
                 if (!ahrs.airspeed_estimate(&speed)) {
                     speed = ahrs.groundspeed();
                 }
-                if (vel_variance > 1.0f && speed < 0.7f * (float)aparm.airspeed_min) {
+                if (vel_variance > 0.7f && speed < 0.7f * (float)aparm.airspeed_min) {
                     // bad variance could be casued by vehicle not aligned with mission
                     // so abort takeoff.
                     gcs().send_text(MAV_SEVERITY_INFO, "Takeoff aborted - bad yaw alignment");
