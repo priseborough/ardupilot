@@ -367,6 +367,8 @@ public:
     // get timing statistics structure
     void getTimingStatistics(struct ekf_timing &timing);
 
+    bool isYawAligned(void) { return yawAlignComplete; };
+
 private:
     // Reference to the global EKF frontend for parameters
     NavEKF3 *frontend;

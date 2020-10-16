@@ -1691,3 +1691,10 @@ void NavEKF3::getTimingStatistics(int8_t instance, struct ekf_timing &timing) co
     }
 }
 
+bool NavEKF3::isYawAligned() const
+{
+    if (core) {
+        return core[primary].isYawAligned();
+    }
+    return false;
+}
