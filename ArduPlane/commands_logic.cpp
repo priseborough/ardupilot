@@ -526,6 +526,7 @@ bool Plane::verify_takeoff(const AP_Mission::Mission_Command &cmd)
 
     int16_t wp_takeoff_heading = -1; // used for reporting purposes only
 
+    bool ekf_yaw_aligned_to_mission = false;
     if (ahrs.yaw_initialised() && steer_state.hold_course_cd == -1) {
         /*
          optionally take course from location of takeoff waypoint
@@ -547,6 +548,11 @@ bool Plane::verify_takeoff(const AP_Mission::Mission_Command &cmd)
                     auto_state.crosstrack = true;
                 }
             }
+            // Send a yaw alignment command to the EKF's assuming the vehicle
+            // is starting takeoff pointing towards the takeoff waypoint
+            // without a yaw sensor. This will be ignored if the EKF already
+            // has aligned the yaw.
+            ekf_yaw_aligned_to_mission = ahrs.set_ekf_yaw_alignment(loc_course_rad);
         } else {
             const float min_gps_speed = 5;
             if (auto_state.takeoff_speed_time_ms == 0 &&
@@ -585,6 +591,28 @@ bool Plane::verify_takeoff(const AP_Mission::Mission_Command &cmd)
     }
 
     if (steer_state.hold_course_cd != -1) {
+        // abort takeoff is EKF was aligned to mission yaw and there is a subsequent
+        // yaw reset and we are below the decision speed
+        if(ekf_yaw_aligned_to_mission) {
+            float position_variance, vel_variance, height_variance, tas_variance;
+            Vector3f mag_variance;
+            Vector2f offset;
+            if(ahrs.get_variances(vel_variance, position_variance, height_variance, mag_variance, tas_variance, offset)) {
+                float speed;
+                if (!ahrs.airspeed_estimate(&speed)) {
+                    speed = ahrs.groundspeed();
+                }
+                if (vel_variance > 1.0f && speed < 0.7f * (float)aparm.airspeed_min) {
+                    // bad variance could be casued by vehicle not aligned with mission
+                    // so abort takeoff.
+                    gcs().send_text(MAV_SEVERITY_INFO, "Takeoff aborted - bad yaw alignment");
+                    mission.reset();
+                    takeoff_state.start_time_ms = 0;
+                    set_mode(mode_fbwa, ModeReason::UNKNOWN);
+                }
+            }
+        }
+
         // Don't attempt cross-track when below slow taxi speed as it can result in limit cycling depending on
         // location of the IMU wrt the main UC wheels. USe hysteresis on speed threshold.
         if ((g2.flight_options & FlightOptions::TAKEOFF_XTRACK) && !auto_state.crosstrack && gps.ground_speed() > 2.0f) {
