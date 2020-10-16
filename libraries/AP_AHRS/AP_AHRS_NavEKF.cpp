@@ -1888,5 +1888,19 @@ bool AP_AHRS_NavEKF::is_ext_nav_used_for_yaw(void) const
     }
 }
 
-#endif // AP_AHRS_NAVEKF_AVAILABLE
+bool AP_AHRS_NavEKF::yaw_initialised(void) const
+{
+    switch (ekf_type()) {
+    case 2:
+        return EKF2.isYawAligned();
 
+    case 3:
+        return EKF3.isYawAligned();
+
+    default:
+        break;
+    }
+    return false;
+}
+
+#endif // AP_AHRS_NAVEKF_AVAILABLE

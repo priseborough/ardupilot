@@ -276,6 +276,8 @@ public:
     // Returns true if accepted
     bool set_ekf_yaw_alignment(float yaw);
 
+    bool yaw_initialised(void) const;
+
 private:
     enum EKF_TYPE {EKF_TYPE_NONE=0,
                    EKF_TYPE3=3,
