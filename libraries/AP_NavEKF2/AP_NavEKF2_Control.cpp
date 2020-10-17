@@ -401,11 +401,7 @@ bool NavEKF2_core::readyToUseExtNav(void) const
 // return true if we should use the compass
 bool NavEKF2_core::use_compass(void) const
 {
-    if (frontend->_optionsMask & MASK_EXT_YAW_ALIGN) {
-        return false;
-    } else {
-        return _ahrs->get_compass() && _ahrs->get_compass()->use_for_yaw(magSelectIndex) && !allMagSensorsFailed;
-    }
+    return _ahrs->get_compass() && _ahrs->get_compass()->use_for_yaw(magSelectIndex) && !allMagSensorsFailed;
 }
 
 /*
@@ -545,6 +541,9 @@ bool NavEKF2_core::setYawAlignAngle(float yaw)
 
     // zero the attitude covariances because the correlations will now be invalid
     zeroAttCovOnly();
+
+    // record the yaw reset event
+    recordYawReset();
 
     // calculate the change in the quaternion state and apply it to the ouput history buffer
     prevQuat = stateStruct.quat / prevQuat;

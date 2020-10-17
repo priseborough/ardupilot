@@ -173,12 +173,6 @@ void NavEKF2_core::controlMagYawReset()
 // vector from GPS. It is used to align the yaw angle after launch or takeoff.
 void NavEKF2_core::realignYawGPS()
 {
-    if (frontend->_optionsMask & MASK_EXT_YAW_ALIGN && !yawAlignComplete && onGround) {
-        // ignore initial alignment requests if on ground and waiting for  external
-        // yaw alignment data via setYawAlignAngle
-        return;
-    }
-
     if ((sq(gpsDataDelayed.vel.x) + sq(gpsDataDelayed.vel.y)) > 25.0f) {
         // get quaternion from existing filter states and calculate roll, pitch and yaw angles
         Vector3f eulerAngles;

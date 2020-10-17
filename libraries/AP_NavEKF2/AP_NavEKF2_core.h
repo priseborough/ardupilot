@@ -44,9 +44,6 @@
 #define MASK_GPS_VERT_SPD   (1<<6)
 #define MASK_GPS_HORIZ_SPD  (1<<7)
 
-// Bit positions controlling miscellaneous functions
-#define MASK_EXT_YAW_ALIGN  (1<<0)
-
 // active height source
 #define HGT_SOURCE_BARO 0
 #define HGT_SOURCE_RNG  1
