@@ -582,6 +582,14 @@ const AP_Param::GroupInfo NavEKF2::var_info[] = {
     // @RebootRequired: False
     AP_GROUPINFO("HRT_FILT", 53, NavEKF2, _hrt_filt_freq, 2.0f),
 
+    // @Param: OPTIONS
+    // @DisplayName: Bitmask controlling miscellaneous options
+    // @Description: 1 byte bitmap controlling activation of miscellaneous options. Select External Yaw Alignment if the EKF should wait for a yaw angle from the vehicle control code befoe aligning the yaw.
+    // @Bitmask: 0:External Yaw Alignment
+    // @User: Advanced
+    // @RebootRequired: True
+    AP_GROUPINFO("OPTIONS", 54, NavEKF2, _optionsMask, 0),
+
     AP_GROUPEND
 };
 
