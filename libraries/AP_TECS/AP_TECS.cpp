@@ -506,28 +506,7 @@ void AP_TECS::_update_height_demand(void)
 
         // fade across to the ideal height profile
         _hgt_dem_adj = _land_hgt_dem * (1.0f - p) + _land_hgt_dem_ideal * p;
-
-    } else {
-        _flare_counter = 0;
-        // for landing approach we will predict ahead by the time constant
-        // to avoid lagged height demand while constantly descending which
-        // causes us to consistently be above the desired glide slope.
-        // This will be replaced with a better zero-lag filter in the future.
-        float new_hgt_dem = _hgt_dem_adj;
-        if (_flags.is_doing_auto_land ) {
-            if (hgt_dem_lag_filter_slew < 1) {
-                hgt_dem_lag_filter_slew += _DT;
-            } else {
-                hgt_dem_lag_filter_slew = 1;
-            }
-            new_hgt_dem += hgt_dem_lag_filter_slew*(_hgt_dem_adj - _hgt_dem_adj_last)*_DT*(timeConstant());
-        } else {
-            hgt_dem_lag_filter_slew = 0;
-        }
-        _hgt_dem_adj_last = _hgt_dem_adj;
-        _hgt_dem_adj = new_hgt_dem;
     }
-
 }
 
 void AP_TECS::_detect_underspeed(void)
