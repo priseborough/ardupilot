@@ -497,20 +497,16 @@ void AP_TECS::_update_height_demand(void)
             p = 1.0f;
         }
         _flare_hgt_rate_dem = _hgt_rate_at_flare_entry * (1.0f - p) - land_sink_rate_adj * p;
+        _hgt_rate_predicted = _flare_hgt_rate_dem;
 
         _flare_counter++;
 
         _land_hgt_dem_ideal += _DT * _flare_hgt_rate_dem; // the ideal height profile to follow
         _land_hgt_dem       += _DT * _flare_hgt_rate_dem; // the demanded height profile that includes the pre-flare height tracking offset
 
-        if (_SKE_weighting > 0.0f || _spdWeightLand < 0.0f) {
-            // fade across to the ideal height profile
-            _hgt_dem_adj = _land_hgt_dem * (1.0f - p) + _land_hgt_dem_ideal * p;
-        } else {
-            // using the alternate height to pitch control law with integrator adjsuted to enable tracking
-            // of ideal height profiel from start of flare
-            _hgt_dem_adj = _land_hgt_dem_ideal;
-        }
+        // fade across to the ideal height profile
+        _hgt_dem_adj = _land_hgt_dem * (1.0f - p) + _land_hgt_dem_ideal * p;
+
     } else {
         _flare_counter = 0;
         // for landing approach we will predict ahead by the time constant
@@ -574,6 +570,7 @@ void AP_TECS::_update_energies(void)
     _SKE_dem = 0.5f * _TAS_dem_adj * _TAS_dem_adj;
 
     // Calculate specific energy rate demands
+    _SPEdot_dem_predicted = _hgt_rate_predicted;
     _SKEdot_dem = _TAS_state * _TAS_rate_dem;
 
     // Calculate specific energy
@@ -836,13 +833,10 @@ void AP_TECS::_update_pitch(void)
     float SEB_error = SEB_dem - (_SPE_est * SPE_weighting - _SKE_est * _SKE_weighting);
 
     // track demanded height using the specified time constant
-    float SEBdot_dem = constrain_float(SEB_error / timeConstant(), -max_sink_rate * GRAVITY_MSS, _maxClimbRate * GRAVITY_MSS);
+    float SEBdot_dem = constrain_float(_hgt_rate_predicted * GRAVITY_MSS + SEB_error / timeConstant(), -max_sink_rate * GRAVITY_MSS, _maxClimbRate * GRAVITY_MSS);
 
     // rate of change of potential energy is required by total energy controller
     _SPEdot_dem = (_SPE_dem * SPE_weighting - _SPE_est) * SPE_weighting / timeConstant();
-
-    // equivalent height rate demand is required for blending into flare maneouvre
-    _hgt_rate_dem = _SPEdot_dem / GRAVITY_MSS;
 
     // calculate specific energy balance rate error
     float SEBdot_error = SEBdot_dem - (_SPEdot * SPE_weighting - _SKEdot * _SKE_weighting);
@@ -993,6 +987,7 @@ void AP_TECS::_update_STE_rate_lim(void)
 
 
 void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
+                                    float hgt_rate_dem_ms,
                                     int32_t EAS_dem_cm,
                                     enum AP_Vehicle::FixedWing::FlightStage flight_stage,
                                     float distance_beyond_land_wp,
@@ -1015,6 +1010,7 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
     _hgt_dem = hgt_dem_cm * 0.01f;
     _EAS_dem = EAS_dem_cm * 0.01f;
     _hgt_afe = hgt_afe;
+    _hgt_rate_predicted = hgt_rate_dem_ms;
 
     // Update the speed estimate using a 2nd order complementary filter
     _update_speed(load_factor);
@@ -1176,7 +1172,7 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
         (double)_height,
         (double)_climb_rate,
         (double)_hgt_dem_adj,
-        (double)_hgt_rate_dem,
+        (double)_hgt_rate_predicted,
         (double)_TAS_dem_adj,
         (double)_TAS_state,
         (double)_vel_dot,

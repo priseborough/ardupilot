@@ -46,6 +46,7 @@ public:
 
     // Update the control loop calculations
     void update_pitch_throttle(int32_t hgt_dem_cm,
+                               float hgt_rate_dem_ms, // first time derivative of 0.01*hgt_dem_cm
                                int32_t EAS_dem_cm,
                                enum AP_Vehicle::FixedWing::FlightStage flight_stage,
                                float distance_beyond_land_wp,
@@ -99,7 +100,7 @@ public:
 
     // return height rate demand, in m/s
     float get_height_rate_demand(void) const {
-        return _hgt_rate_dem;
+        return _hgt_rate_predicted;
     }
 
     // set path_proportion
@@ -243,7 +244,7 @@ private:
     float _hgt_dem;
     float _hgt_dem_adj;
     float _hgt_dem_adj_last;
-    float _hgt_rate_dem;
+    float _hgt_rate_predicted;
     float _hgt_dem_prev;
     float _land_hgt_dem;
     float _land_hgt_dem_ideal;
@@ -303,6 +304,7 @@ private:
     float _SPE_dem;
     float _SKE_dem;
     float _SPEdot_dem;
+    float _SPEdot_dem_predicted;
     float _SKEdot_dem;
     float _SPE_est;
     float _SKE_est;
