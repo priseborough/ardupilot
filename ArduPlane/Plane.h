@@ -727,6 +727,9 @@ private:
         // centimeters. Used for glide slope handling
         int32_t offset_cm;
 
+        // target rate in m/s used where lag free tracking of climbing or descending profiles is required
+        float hgt_rate_dem_ms;
+
 #if AP_TERRAIN_AVAILABLE
         // are we trying to follow terrain?
         bool terrain_following;

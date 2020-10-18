@@ -31,6 +31,7 @@ void Plane::adjust_altitude_target()
         control_mode == &mode_cruise) {
         return;
     }
+    target_altitude.hgt_rate_dem_ms = 0.0f;
 #if OFFBOARD_GUIDED == ENABLED
     if (control_mode == &mode_guided && ((guided_state.target_alt_time_ms != 0) || guided_state.target_alt > -0.001 )) { // target_alt now defaults to -1, and _time_ms defaults to zero.
         // offboard altitude demanded
@@ -58,6 +59,7 @@ void Plane::adjust_altitude_target()
         set_target_altitude_location(next_WP_loc);
     } else if (landing.is_on_approach()) {
         landing.setup_landing_glide_slope(prev_WP_loc, next_WP_loc, current_loc, target_altitude.offset_cm);
+        target_altitude.hgt_rate_dem_ms = -auto_state.sink_rate;
         landing.adjust_landing_slope_for_rangefinder_bump(rangefinder_state, prev_WP_loc, next_WP_loc, current_loc, auto_state.wp_distance, target_altitude.offset_cm);
     } else if (landing.get_target_altitude_location(target_location)) {
        set_target_altitude_location(target_location);
@@ -193,6 +195,7 @@ void Plane::set_target_altitude_current(void)
     // record altitude above sea level at the current time as our
     // target altitude
     target_altitude.amsl_cm = current_loc.alt;
+    target_altitude.hgt_rate_dem_ms = 0.0f;
 
     // reset any glide slope offset
     reset_offset_altitude();
@@ -221,6 +224,7 @@ void Plane::set_target_altitude_current_adjusted(void)
 
     // use adjusted_altitude_cm() to take account of ALTITUDE_OFFSET
     target_altitude.amsl_cm = adjusted_altitude_cm();
+    target_altitude.hgt_rate_dem_ms = 0.0f;
 }
 
 /*
@@ -229,6 +233,7 @@ void Plane::set_target_altitude_current_adjusted(void)
 void Plane::set_target_altitude_location(const Location &loc)
 {
     target_altitude.amsl_cm = loc.alt;
+    target_altitude.hgt_rate_dem_ms = 0.0f;
     if (loc.relative_alt) {
         target_altitude.amsl_cm += home.alt;
     }

@@ -511,6 +511,7 @@ void Plane::update_alt()
         }
 
         SpdHgt_Controller->update_pitch_throttle(target_alt,
+                                                 target_altitude.hgt_rate_dem_ms,
                                                  target_airspeed_cm,
                                                  flight_stage,
                                                  distance_beyond_land_wp,
