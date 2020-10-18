@@ -25,6 +25,7 @@ public:
 	// Update of the pitch and throttle demands
 	// Should be called at 10Hz or faster
 	virtual void update_pitch_throttle( int32_t hgt_dem_cm,
+										float hgt_rate_dem_ms, // first time derivative of 0.01*hgt_dem_cm
 										int32_t EAS_dem_cm,
 										enum AP_Vehicle::FixedWing::FlightStage flight_stage,
                                         float distance_beyond_land_wp,
