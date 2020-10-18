@@ -864,46 +864,37 @@ void AP_TECS::_update_pitch(void)
     // inverse of gain from SEB to pitch angle
     float gainInv = (_TAS_state * GRAVITY_MSS);
 
-    // Apply max and min values for integrator state that will allow for no more than
-    // 5deg of saturation. This allows for some pitch variation due to gusts before the
-    // integrator is clipped. Otherwise the effectiveness of the integrator will be reduced in turbulence
     // During climbout/takeoff, bias the demanded pitch angle so that zero speed error produces a pitch angle
     // demand equal to the minimum value (which is )set by the mission plan during this mode). Otherwise the
     // integrator has to catch up before the nose can be raised to reduce speed during climbout.
     if (_flight_stage == AP_Vehicle::FixedWing::FLIGHT_TAKEOFF || _flight_stage == AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND) {
         SEBdot_dem_total += _PITCHminf * gainInv;
     }
-    float integSEB_min = (gainInv * (_PITCHminf - 0.0783f)) - SEBdot_dem_total;
-    float integSEB_max = (gainInv * (_PITCHmaxf + 0.0783f)) - SEBdot_dem_total;
-    float integSEB_range = integSEB_max - integSEB_min;
+
+    // Calculate max and min values for integrator state that will allow for no more than
+    // 5deg of saturation. This allows for some pitch variation due to gusts before the
+    // integrator is clipped. Otherwise the effectiveness of the integrator will be reduced in turbulence
+    float integSEB_min = (gainInv * (_PITCHminf - radians(5.0f))) - SEBdot_dem_total;
+    float integSEB_max = (gainInv * (_PITCHmaxf + radians(5.0f))) - SEBdot_dem_total;
 
     // Calculate integrator state, constraining input if pitch limits are exceeded
-    // don't allow the integrator to rise by more than 20% of its full
+    // don't allow the integrator to rise by more than 10% of its full
     // range in one step. This prevents single value glitches from
     // causing massive integrator changes. See Issue#4066
+    float integSEB_range = integSEB_max - integSEB_min;
     float integSEB_delta = constrain_float(SEBdot_error * _get_i_gain() * _DT, -integSEB_range*0.1f, integSEB_range*0.1f);
 
     // predict what pitch will be with uncontrained integration
     _pitch_dem_unc = (SEBdot_dem_total + _integSEB_state + integSEB_delta) / gainInv;
 
-    // integrate SEB rate error
+    // integrate SEB rate error and apply integrator state limits
     const bool inhibit_integrator = (_pitch_dem_unc > _PITCHmaxf && integSEB_delta > 0.0f) || (_pitch_dem_unc < _PITCHminf && integSEB_delta < 0.0f);
     if (!inhibit_integrator) {
         _integSEB_state += integSEB_delta;
     } else if (is_positive(integSEB_delta * _hgt_rate_err_integ)) {
-        // fade out integrator
+        // fade out integrator if saturating
         _integSEB_state *= (1.0f - _DT / timeConstant());
     }
-
-    // perform constrained integration
-    // prevent the constraint on pitch integrator _integSEB_state from
-    // itself injecting step changes in the variable. We only want the
-    // constraint to prevent large changes due to integSEB_delta, not
-    // to cause step changes due to a change in the constrain
-    // limits. Large steps in _integSEB_state can cause long term
-    // pitch changes
-    integSEB_min = MIN(integSEB_min, _integSEB_state);
-    integSEB_max = MAX(integSEB_max, _integSEB_state);
     _integSEB_state = constrain_float(_integSEB_state, integSEB_min, integSEB_max);
 
     logging.SEB_delta = integSEB_delta;
@@ -911,19 +902,21 @@ void AP_TECS::_update_pitch(void)
     // Calculate pitch demand from specific energy balance signals
     _pitch_dem_unc = (SEBdot_dem_total + _integSEB_state) / gainInv;
 
-    AP::logger().Write("TEC3", "TimeUS,S1,S2,S3,S4,S5,S6,S7,S8",
-                    "s--------",
-                    "F--------",
-                    "Qffffffff",
+    AP::logger().Write("TEC3", "TimeUS,S0,S1,S2,S3,S4,S5,S6,S7,S8,S9",
+                    "s----------",
+                    "F----------",
+                    "Qffffffffff",
                     AP_HAL::micros(),
-                    (double)SPE_weighting,              // S1
-                    (double)SEB_dem,                    // S2
-                    (double)SEB_error,                  // S3
-                    (double)SEBdot_dem,                 // S4
-                    (double)SEBdot_error,               // S5
-                    (double)(SEBdot_error * pitch_damp),// S6
-                    (double)SEBdot_dem_total,           // S7
-                    (double)_integSEB_state);           // S8
+                    (double)SPE_weighting,              // S0
+                    (double)SEB_dem,                    // S1
+                    (double)SEB_error,                  // S2
+                    (double)SEBdot_dem,                 // S3
+                    (double)SEBdot_error,               // S4
+                    (double)(SEBdot_error * pitch_damp),// S5
+                    (double)SEBdot_dem_total,           // S6
+                    (double)integSEB_min,               // S7
+                    (double)integSEB_max,               // S8
+                    (double)_integSEB_state);           // S9
 
     // Constrain pitch demand
     _pitch_dem = constrain_float(_pitch_dem_unc, _PITCHminf, _PITCHmaxf);
