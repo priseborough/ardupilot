@@ -466,7 +466,47 @@ void AP_TECS::_update_speed_demand(void)
 
 void AP_TECS::_update_height_demand(void)
 {
-    _hgt_dem_adj = _hgt_dem;
+    const bool generate_rate_demand = is_zero(_hgt_rate_predicted);
+    if (generate_rate_demand) {
+        // Apply 2 point moving average to demanded height
+        _hgt_dem = 0.5f * (_hgt_dem + _hgt_dem_in_old);
+        _hgt_dem_in_old = _hgt_dem;
+
+        float max_sink_rate = _maxSinkRate;
+        if (_maxSinkRate_approach > 0 && _flags.is_doing_auto_land) {
+            // special sink rate for approach to accommodate steep slopes and reverse thrust.
+            // A special check must be done to see if we're LANDing on approach but also if
+            // we're in that tiny window just starting NAV_LAND but still in NORMAL mode. If
+            // we have a steep slope with a short approach we'll want to allow acquiring the
+            // glide slope right away.
+            max_sink_rate = _maxSinkRate_approach;
+        }
+
+        // Limit height rate of change
+        if ((_hgt_dem - _hgt_dem_prev) > (_maxClimbRate * _DT))
+        {
+            _hgt_dem = _hgt_dem_prev + _maxClimbRate * _DT;
+        }
+        else if ((_hgt_dem - _hgt_dem_prev) < (-max_sink_rate * _DT))
+        {
+            _hgt_dem = _hgt_dem_prev - max_sink_rate * _DT;
+        }
+        _hgt_dem_prev = _hgt_dem;
+
+        // Apply 2 second first order lag to height demand and compensate for lag when commencing height
+        // control after takeoff to prevent plane pushing nose to level before climbing again. Post takeoff
+        // compensation offset is decayed using the same time constant as the height demand filter.
+        const float coef = MIN(_DT / _hgt_dem_lag, 1.0f);
+        _post_TO_hgt_offset *= (1.0f - coef);
+        _hgt_dem_adj = (_hgt_dem + _post_TO_hgt_offset) * coef + (1.0f - coef) * _hgt_dem_adj_last;
+        _hgt_rate_dem = (_hgt_dem_adj - _hgt_dem_adj_last) / _DT;
+    } else {
+        _hgt_dem_adj = _hgt_dem;
+        _hgt_dem_adj_last = _hgt_dem;
+        _hgt_dem_prev = _hgt_dem;
+        _hgt_dem_in_old = _hgt_dem;
+        _hgt_rate_dem = _hgt_rate_predicted;
+    }
 
     // when flaring force height rate demand to the
     // configured sink rate and adjust the demanded height to
@@ -497,7 +537,7 @@ void AP_TECS::_update_height_demand(void)
             p = 1.0f;
         }
         _flare_hgt_rate_dem = _hgt_rate_at_flare_entry * (1.0f - p) - land_sink_rate_adj * p;
-        _hgt_rate_predicted = _flare_hgt_rate_dem;
+        _hgt_rate_dem = _flare_hgt_rate_dem;
 
         _flare_counter++;
 
@@ -507,6 +547,7 @@ void AP_TECS::_update_height_demand(void)
         // fade across to the ideal height profile
         _hgt_dem_adj = _land_hgt_dem * (1.0f - p) + _land_hgt_dem_ideal * p;
     }
+    _hgt_dem_adj_last = _hgt_dem_adj;
 }
 
 void AP_TECS::_detect_underspeed(void)
@@ -549,7 +590,6 @@ void AP_TECS::_update_energies(void)
     _SKE_dem = 0.5f * _TAS_dem_adj * _TAS_dem_adj;
 
     // Calculate specific energy rate demands
-    _SPEdot_dem_predicted = _hgt_rate_predicted;
     _SKEdot_dem = _TAS_state * _TAS_rate_dem;
 
     // Calculate specific energy
@@ -812,7 +852,7 @@ void AP_TECS::_update_pitch(void)
     float SEB_error = SEB_dem - (_SPE_est * SPE_weighting - _SKE_est * _SKE_weighting);
 
     // track demanded height using the specified time constant
-    float SEBdot_dem = constrain_float(_hgt_rate_predicted * GRAVITY_MSS + SEB_error / timeConstant(), -max_sink_rate * GRAVITY_MSS, _maxClimbRate * GRAVITY_MSS);
+    float SEBdot_dem = constrain_float(_hgt_rate_dem * GRAVITY_MSS + SEB_error / timeConstant(), -max_sink_rate * GRAVITY_MSS, _maxClimbRate * GRAVITY_MSS);
 
     // rate of change of potential energy is required by total energy controller
     _SPEdot_dem = (_SPE_dem * SPE_weighting - _SPE_est) * SPE_weighting / timeConstant();
@@ -921,10 +961,13 @@ void AP_TECS::_initialise_states(int32_t ptchMinCO_cd, float hgt_afe)
         _last_pitch_dem    = _ahrs.pitch;
         _hgt_afe           = hgt_afe;
         _hgt_dem_adj_last  = hgt_afe;
+        _hgt_dem_in_old    = _hgt_dem_adj_last;
         _hgt_dem_adj       = _hgt_dem_adj_last;
         _hgt_dem_prev      = _hgt_dem_adj_last;
         _TAS_dem_adj       = _TAS_dem;
         _DT                = 0.1f; // when first starting TECS, use a small time constant
+        _lag_comp_hgt_offset = 0.0f;
+        _post_TO_hgt_offset = 0.0f;
 
         _flags.underspeed            = false;
         _flags.badDescent            = false;
@@ -946,6 +989,7 @@ void AP_TECS::_initialise_states(int32_t ptchMinCO_cd, float hgt_afe)
         _hgt_dem_adj       = _hgt_dem_adj_last;
         _hgt_dem_prev      = _hgt_dem_adj_last;
         _TAS_dem_adj       = _TAS_dem;
+        _post_TO_hgt_offset = _climb_rate * _hgt_dem_lag;
         _flags.underspeed        = false;
         _flags.badDescent  = false;
     }
@@ -1151,7 +1195,7 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
         (double)_height,
         (double)_climb_rate,
         (double)_hgt_dem_adj,
-        (double)_hgt_rate_predicted,
+        (double)_hgt_rate_dem,
         (double)_TAS_dem_adj,
         (double)_TAS_state,
         (double)_vel_dot,

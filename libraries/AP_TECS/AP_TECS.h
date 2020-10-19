@@ -100,7 +100,7 @@ public:
 
     // return height rate demand, in m/s
     float get_height_rate_demand(void) const {
-        return _hgt_rate_predicted;
+        return _hgt_rate_dem;
     }
 
     // set path_proportion
@@ -180,6 +180,9 @@ private:
         OPTION_GLIDER_ONLY=(1<<0),
     };
 
+    // lag of fist order filter applied to height demand (sec)
+    const float _hgt_dem_lag = 2.0f;
+
     // temporary _pitch_max_limit. Cleared on each loop. Clear when >= 90
     int8_t _pitch_max_limit = 90;
     
@@ -249,6 +252,14 @@ private:
     float _land_hgt_dem;
     float _land_hgt_dem_ideal;
     float _flare_hgt_rate_dem;
+    float _hgt_dem_in_old;
+    float _hgt_rate_dem;
+
+    // offset applied to height demand post takeoff to compensate for height demand filter lag
+    float _post_TO_hgt_offset;
+
+    // last lag compensation offset applied to height demand
+    float _lag_comp_hgt_offset;
 
     // Speed demand after application of rate limiting
     // This is the demand tracked by the TECS control loops
@@ -304,7 +315,6 @@ private:
     float _SPE_dem;
     float _SKE_dem;
     float _SPEdot_dem;
-    float _SPEdot_dem_predicted;
     float _SKEdot_dem;
     float _SPE_est;
     float _SKE_est;
