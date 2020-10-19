@@ -245,7 +245,7 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
     // @Param: OPTIONS
     // @DisplayName: Extra TECS options
     // @Description: This allows the enabling of special features in the speed/height controller
-    // @Bitmask: 0:GliderOnly
+    // @Bitmask: 0:GliderOnly,1:No Height Demand Smoothing
     // @User: Advanced
     AP_GROUPINFO("OPTIONS", 28, AP_TECS, _options, 0),
 
@@ -466,8 +466,15 @@ void AP_TECS::_update_speed_demand(void)
 
 void AP_TECS::_update_height_demand(void)
 {
-    const bool generate_rate_demand = is_zero(_hgt_rate_predicted);
-    if (generate_rate_demand) {
+    if (_options & OPTION_NO_HGT_SMOOTHNG) {
+        // follow the demanded height and height rate profile without filtering when
+        // a height rate demand is provided
+        _hgt_dem_adj = _hgt_dem;
+        _hgt_dem_adj_last = _hgt_dem;
+        _hgt_dem_prev = _hgt_dem;
+        _hgt_dem_in_old = _hgt_dem;
+        _hgt_rate_dem = _hgt_rate_predicted;
+    } else {
         // Apply 2 point moving average to demanded height
         _hgt_dem = 0.5f * (_hgt_dem + _hgt_dem_in_old);
         _hgt_dem_in_old = _hgt_dem;
@@ -500,12 +507,7 @@ void AP_TECS::_update_height_demand(void)
         _post_TO_hgt_offset *= (1.0f - coef);
         _hgt_dem_adj = (_hgt_dem + _post_TO_hgt_offset) * coef + (1.0f - coef) * _hgt_dem_adj_last;
         _hgt_rate_dem = (_hgt_dem_adj - _hgt_dem_adj_last) / _DT;
-    } else {
-        _hgt_dem_adj = _hgt_dem;
-        _hgt_dem_adj_last = _hgt_dem;
-        _hgt_dem_prev = _hgt_dem;
-        _hgt_dem_in_old = _hgt_dem;
-        _hgt_rate_dem = _hgt_rate_predicted;
+
     }
 
     // when flaring force height rate demand to the

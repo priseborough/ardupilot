@@ -178,6 +178,7 @@ private:
 
     enum {
         OPTION_GLIDER_ONLY=(1<<0),
+        OPTION_NO_HGT_SMOOTHNG=(1<<1),
     };
 
     // lag of fist order filter applied to height demand (sec)
