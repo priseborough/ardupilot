@@ -14,7 +14,6 @@
  */
 
 #include "Plane.h"
-
 /*
   altitude handling routines. These cope with both barometric control
   and terrain following control
@@ -77,9 +76,24 @@ void Plane::adjust_altitude_target()
                !current_loc.past_interval_finish_line(prev_WP_loc, next_WP_loc)) {
         // control climb/descent rate
         set_target_altitude_proportion(next_WP_loc, 1.0f-auto_state.wp_proportion);
-
         // stay within the range of the start and end locations in altitude
+        const int32_t alt_before_limiting = target_altitude.amsl_cm;
         constrain_target_altitude_location(next_WP_loc, prev_WP_loc);
+        // If demanded altitude isn't being clipped, demand a climb rate to assist the
+        // speed and height controller to track the height profile without lag
+        if (alt_before_limiting == target_altitude.amsl_cm) {
+            const float delta_dist = prev_WP_loc.get_distance(next_WP_loc);
+            int32_t prev_alt_cm, next_alt_cm;
+            if (delta_dist > 1.0f &&
+                prev_WP_loc.get_alt_cm(Location::AltFrame::ABOVE_HOME, prev_alt_cm) &&
+                next_WP_loc.get_alt_cm(Location::AltFrame::ABOVE_HOME, next_alt_cm)) {
+                const float delta_hgt = 0.01f * (float)(next_alt_cm - prev_alt_cm);
+                const Vector2f vel_NE = ahrs.groundspeed_vector();
+                const Vector2f track_NE_unit = prev_WP_loc.get_distance_NE(next_WP_loc).normalized();
+                const float along_track_vel = track_NE_unit * vel_NE;
+                target_altitude.hgt_rate_dem_ms = along_track_vel * (delta_hgt / delta_dist);
+            }
+        }
     } else {
         set_target_altitude_location(next_WP_loc);
     }
