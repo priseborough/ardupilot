@@ -175,14 +175,12 @@ private:
     AP_Int32 _options;
     AP_Int8  _land_pitch_trim;
     AP_Float _flare_holdoff_hgt;
+    AP_Float _hgt_dem_tconst;
 
     enum {
         OPTION_GLIDER_ONLY=(1<<0),
         OPTION_NO_HGT_SMOOTHNG=(1<<1),
     };
-
-    // lag of fist order filter applied to height demand (sec)
-    const float _hgt_dem_lag = 2.0f;
 
     // temporary _pitch_max_limit. Cleared on each loop. Clear when >= 90
     int8_t _pitch_max_limit = 90;
@@ -245,16 +243,17 @@ private:
     float _EAS_dem;
 
     // height demands
-    float _hgt_dem;
-    float _hgt_dem_adj;
-    float _hgt_dem_adj_last;
-    float _hgt_rate_predicted;
-    float _hgt_dem_prev;
-    float _land_hgt_dem;
-    float _land_hgt_dem_ideal;
-    float _flare_hgt_rate_dem;
-    float _hgt_dem_in_old;
-    float _hgt_rate_dem;
+    float _hgt_dem_in;          // height demand input from autopilot (m)
+    float _hgt_dem_in_prev;     // previous value of _hgt_dem_in (m)
+    float _hgt_dem_lpf;         // height demand after application of low pass filtering (m)
+    float _flare_hgt_dem_adj;   // height rate demand duirng flare adjusted for height tracking offset at flare entry (m)
+    float _flare_hgt_dem_ideal; // height we want to fly at during flare (m)
+    float _hgt_dem;             // height demand sent to control loops (m)
+
+    // height rate demands
+    float _hgt_rate_dem_in;     // height rate demand input from the autopilot (m/s)
+    float _hgt_dem_rate_ltd;    // height demand after application of the rate limiter (m)
+    float _hgt_rate_dem;        // height rate demand sent to control loops
 
     // offset applied to height demand post takeoff to compensate for height demand filter lag
     float _post_TO_hgt_offset;

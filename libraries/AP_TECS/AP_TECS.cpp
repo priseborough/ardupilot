@@ -244,7 +244,7 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
 
     // @Param: OPTIONS
     // @DisplayName: Extra TECS options
-    // @Description: This allows the enabling of special features in the speed/height controller
+    // @Description: This allows the enabling of special features in the speed/height controller.
     // @Bitmask: 0:GliderOnly,1:No Height Demand Smoothing
     // @User: Advanced
     AP_GROUPINFO("OPTIONS", 28, AP_TECS, _options, 0),
@@ -266,6 +266,15 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
     // @Increment: 1
     // @User: Advanced
     AP_GROUPINFO("FLARE_HGT", 30, AP_TECS, _flare_holdoff_hgt, 1.0f),
+
+    // @Param: HDEM_TCONST
+    // @DisplayName: Height Demand Time Constant
+    // @Description: This sets the time constant of the low pass filter that is applied to the height demand input when bit 1 of TECS_OPTIONS is not selected.
+    // @Range: -1.0 5.0
+    // @Units: s
+    // @Increment: 0.2
+    // @User: Advanced
+    AP_GROUPINFO("HDEM_TCONST", 31, AP_TECS, _hgt_dem_tconst, 2.0f),
 
     AP_GROUPEND
 };
@@ -428,7 +437,7 @@ void AP_TECS::_update_speed_demand(void)
     // into the ground due to an unachievable airspeed value
     if ((_flags.badDescent) || (_flags.underspeed))
     {
-        _TAS_dem     = _TASmin;
+        _TAS_dem = _TASmin;
     }
 
     // Constrain speed demand, taking into account the load factor
@@ -467,17 +476,19 @@ void AP_TECS::_update_speed_demand(void)
 void AP_TECS::_update_height_demand(void)
 {
     if (_options & OPTION_NO_HGT_SMOOTHNG) {
-        // follow the demanded height and height rate profile without filtering when
-        // a height rate demand is provided
-        _hgt_dem_adj = _hgt_dem;
-        _hgt_dem_adj_last = _hgt_dem;
-        _hgt_dem_prev = _hgt_dem;
-        _hgt_dem_in_old = _hgt_dem;
-        _hgt_rate_dem = _hgt_rate_predicted;
-    } else {
+        // follow the demanded height and height rate profile without filtering
+        _hgt_dem      = _hgt_dem_in;
+        _hgt_rate_dem = _hgt_rate_dem_in;
+
+        // set all height filter states to current height to prevent transients if option changed in-flight
+        _hgt_dem_lpf      = _height;
+        _hgt_dem_rate_ltd = _height;
+        _hgt_dem_in_prev  = _height;
+
+    } else if (!_landing.is_flaring()) {
         // Apply 2 point moving average to demanded height
-        _hgt_dem = 0.5f * (_hgt_dem + _hgt_dem_in_old);
-        _hgt_dem_in_old = _hgt_dem;
+        const float hgt_dem = 0.5f * (_hgt_dem_in + _hgt_dem_in_prev);
+        _hgt_dem_in_prev = _hgt_dem_in;
 
         float max_sink_rate = _maxSinkRate;
         if (_maxSinkRate_approach > 0 && _flags.is_doing_auto_land) {
@@ -490,41 +501,47 @@ void AP_TECS::_update_height_demand(void)
         }
 
         // Limit height rate of change
-        if ((_hgt_dem - _hgt_dem_prev) > (_maxClimbRate * _DT))
+        if ((hgt_dem - _hgt_dem_rate_ltd) > (_maxClimbRate * _DT))
         {
-            _hgt_dem = _hgt_dem_prev + _maxClimbRate * _DT;
+            _hgt_dem_rate_ltd = _hgt_dem_rate_ltd + _maxClimbRate * _DT;
         }
-        else if ((_hgt_dem - _hgt_dem_prev) < (-max_sink_rate * _DT))
+        else if ((hgt_dem - _hgt_dem_rate_ltd) < (-max_sink_rate * _DT))
         {
-            _hgt_dem = _hgt_dem_prev - max_sink_rate * _DT;
+            _hgt_dem_rate_ltd = _hgt_dem_rate_ltd - max_sink_rate * _DT;
+        } else {
+            _hgt_dem_rate_ltd = hgt_dem;
         }
-        _hgt_dem_prev = _hgt_dem;
 
         // Apply 2 second first order lag to height demand and compensate for lag when commencing height
         // control after takeoff to prevent plane pushing nose to level before climbing again. Post takeoff
         // compensation offset is decayed using the same time constant as the height demand filter.
-        const float coef = MIN(_DT / _hgt_dem_lag, 1.0f);
+        const float coef = MIN(_DT / _hgt_dem_tconst, 1.0f);
         _post_TO_hgt_offset *= (1.0f - coef);
-        _hgt_dem_adj = (_hgt_dem + _post_TO_hgt_offset) * coef + (1.0f - coef) * _hgt_dem_adj_last;
-        _hgt_rate_dem = (_hgt_dem_adj - _hgt_dem_adj_last) / _DT;
+        const float lpf_input = (_hgt_dem_rate_ltd + _post_TO_hgt_offset);
+        _hgt_rate_dem = (lpf_input - _hgt_dem_lpf) / _hgt_dem_tconst;
+        _hgt_dem_lpf = lpf_input * coef + (1.0f - coef) * _hgt_dem_lpf;
 
-    }
+        _hgt_dem = _hgt_dem_lpf;
 
-    // when flaring force height rate demand to the
-    // configured sink rate and adjust the demanded height to
-    // be kinematically consistent with the height rate.
-    if (_landing.is_flaring()) {
-        _integSEB_state = 0;
+    } else {
+        // when flaring force height rate demand to the
+        // configured sink rate and adjust the demanded height to
+        // be kinematically consistent with the height rate.
+
+        // set all height filter states to current height to prevent large pith transients if flare is aborted
+        _hgt_dem_lpf      = _height;
+        _hgt_dem_rate_ltd = _height;
+        _hgt_dem_in_prev  = _height;
+
         if (_flare_counter == 0) {
-            _flare_hgt_rate_dem = _climb_rate;
-            _land_hgt_dem = _hgt_dem_adj; 
-            _land_hgt_dem_ideal = _hgt_afe; 
+            _flare_hgt_dem_adj = _hgt_dem; 
+            _flare_hgt_dem_ideal = _hgt_afe; 
             _hgt_at_start_of_flare = _hgt_afe;
             _hgt_rate_at_flare_entry = _climb_rate;
 
-            // adjust flare height controller integrator
+            // adjust flare height controller integrator so that at flare entry the pitch
             const float K_P = 1.0f / _landTimeConst;
-            const float hgt_offset = _land_hgt_dem - _land_hgt_dem_ideal;
+            const float hgt_offset = _flare_hgt_dem_adj - _flare_hgt_dem_ideal;
             _hgt_rate_err_integ += hgt_offset * K_P;
         }
 
@@ -538,18 +555,19 @@ void AP_TECS::_update_height_demand(void)
         } else {
             p = 1.0f;
         }
-        _flare_hgt_rate_dem = _hgt_rate_at_flare_entry * (1.0f - p) - land_sink_rate_adj * p;
-        _hgt_rate_dem = _flare_hgt_rate_dem;
+        _hgt_rate_dem = _hgt_rate_at_flare_entry * (1.0f - p) - land_sink_rate_adj * p;
 
         _flare_counter++;
 
-        _land_hgt_dem_ideal += _DT * _flare_hgt_rate_dem; // the ideal height profile to follow
-        _land_hgt_dem       += _DT * _flare_hgt_rate_dem; // the demanded height profile that includes the pre-flare height tracking offset
+        _flare_hgt_dem_ideal += _DT * _hgt_rate_dem; // the ideal height profile to follow
+        _flare_hgt_dem_adj   += _DT * _hgt_rate_dem; // the demanded height profile that includes the pre-flare height tracking offset
 
         // fade across to the ideal height profile
-        _hgt_dem_adj = _land_hgt_dem * (1.0f - p) + _land_hgt_dem_ideal * p;
+        _hgt_dem = _flare_hgt_dem_adj * (1.0f - p) + _flare_hgt_dem_ideal * p;
+
+        // correct for offset between height above ground and height above datum used by control loops
+        _hgt_dem += (_hgt_afe - _height);
     }
-    _hgt_dem_adj_last = _hgt_dem_adj;
 }
 
 void AP_TECS::_detect_underspeed(void)
@@ -568,7 +586,7 @@ void AP_TECS::_detect_underspeed(void)
     } else if (((_TAS_state < _TASmin * 0.9f) &&
             (_throttle_dem >= _THRmaxf * 0.95f) &&
             !_landing.is_flaring()) ||
-            ((_height < _hgt_dem_adj) && _flags.underspeed))
+            ((_height < _hgt_dem) && _flags.underspeed))
     {
         _flags.underspeed = true;
         if (_TAS_state < _TASmin * 0.9f) {
@@ -588,7 +606,7 @@ void AP_TECS::_detect_underspeed(void)
 void AP_TECS::_update_energies(void)
 {
     // Calculate specific energy demands
-    _SPE_dem = _hgt_dem_adj * GRAVITY_MSS;
+    _SPE_dem = _hgt_dem * GRAVITY_MSS;
     _SKE_dem = 0.5f * _TAS_dem_adj * _TAS_dem_adj;
 
     // Calculate specific energy rate demands
@@ -956,20 +974,19 @@ void AP_TECS::_initialise_states(int32_t ptchMinCO_cd, float hgt_afe)
     // Initialise states and variables if DT > 1 second or in climbout
     if (_DT > 1.0f || _need_reset)
     {
-        _SKE_weighting     = 1.0f;
-        _integTHR_state    = 0.0f;
-        _integSEB_state    = 0.0f;
-        _last_throttle_dem = aparm.throttle_cruise * 0.01f;
-        _last_pitch_dem    = _ahrs.pitch;
-        _hgt_afe           = hgt_afe;
-        _hgt_dem_adj_last  = hgt_afe;
-        _hgt_dem_in_old    = _hgt_dem_adj_last;
-        _hgt_dem_adj       = _hgt_dem_adj_last;
-        _hgt_dem_prev      = _hgt_dem_adj_last;
-        _TAS_dem_adj       = _TAS_dem;
-        _DT                = 0.1f; // when first starting TECS, use a small time constant
-        _lag_comp_hgt_offset = 0.0f;
-        _post_TO_hgt_offset = 0.0f;
+        _SKE_weighting        = 1.0f;
+        _integTHR_state       = 0.0f;
+        _integSEB_state       = 0.0f;
+        _last_throttle_dem    = aparm.throttle_cruise * 0.01f;
+        _last_pitch_dem       = _ahrs.pitch;
+        _hgt_afe              = hgt_afe;
+        _hgt_dem_in_prev      = hgt_afe;
+        _hgt_dem_lpf          = hgt_afe;
+        _hgt_dem_rate_ltd = hgt_afe;
+        _TAS_dem_adj          = _TAS_dem;
+        _DT                   = 0.1f; // when first starting TECS, use a small time constant
+        _lag_comp_hgt_offset  = 0.0f;
+        _post_TO_hgt_offset   = 0.0f;
 
         _flags.underspeed            = false;
         _flags.badDescent            = false;
@@ -977,23 +994,22 @@ void AP_TECS::_initialise_states(int32_t ptchMinCO_cd, float hgt_afe)
         _need_reset                  = false;
 
         // misc variables used for alternative precision landing pitch control
-        _hgt_rate_err_integ      = 0.0f;
-        _hgt_at_start_of_flare   = 0.0f;
-        _hgt_rate_at_flare_entry = 0.0f;
-        _hgt_afe                 = 0.0f;
+        _hgt_rate_err_integ       = 0.0f;
+        _hgt_at_start_of_flare    = 0.0f;
+        _hgt_rate_at_flare_entry  = 0.0f;
+        _hgt_afe                  = 0.0f;
         _pitch_min_at_flare_entry = 0.0f;
     }
     else if (_flight_stage == AP_Vehicle::FixedWing::FLIGHT_TAKEOFF || _flight_stage == AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND)
     {
-        _PITCHminf         = 0.000174533f * ptchMinCO_cd;
-        _hgt_afe           = hgt_afe;
-        _hgt_dem_adj_last  = hgt_afe;
-        _hgt_dem_adj       = _hgt_dem_adj_last;
-        _hgt_dem_prev      = _hgt_dem_adj_last;
-        _TAS_dem_adj       = _TAS_dem;
-        _post_TO_hgt_offset = _climb_rate * _hgt_dem_lag;
-        _flags.underspeed        = false;
-        _flags.badDescent  = false;
+        _PITCHminf            = 0.000174533f * ptchMinCO_cd;
+        _hgt_afe              = hgt_afe;
+        _hgt_dem_lpf          = hgt_afe;
+        _hgt_dem_rate_ltd = hgt_afe;
+        _TAS_dem_adj          = _TAS_dem;
+        _post_TO_hgt_offset   = _climb_rate * _hgt_dem_tconst;
+        _flags.underspeed     = false;
+        _flags.badDescent     = false;
     }
     
     if (_flight_stage != AP_Vehicle::FixedWing::FLIGHT_TAKEOFF && _flight_stage != AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND) {
@@ -1032,10 +1048,10 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
     _flight_stage = flight_stage;
 
     // Convert inputs
-    _hgt_dem = hgt_dem_cm * 0.01f;
+    _hgt_dem_in = hgt_dem_cm * 0.01f;
     _EAS_dem = EAS_dem_cm * 0.01f;
     _hgt_afe = hgt_afe;
-    _hgt_rate_predicted = hgt_rate_dem_ms;
+    _hgt_rate_dem_in = hgt_rate_dem_ms;
 
     // Update the speed estimate using a 2nd order complementary filter
     _update_speed(load_factor);
@@ -1189,14 +1205,15 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
     // log to AP_Logger
     AP::logger().Write(
         "TECS",
-        "TimeUS,h,dh,hdem,dhdem,spdem,sp,dsp,ith,iph,th,ph,dspdem,w,f",
-        "smnmnnnn----o--",
-        "F0000000----0--",
-        "QfffffffffffffB",
+        "TimeUS,h,dh,hin,hdem,dhdem,spdem,sp,dsp,ith,iph,th,ph,dspdem,w,f",
+        "smnmmnnnn----o--",
+        "F00000000----0--",
+        "QffffffffffffffB",
         now,
         (double)_height,
         (double)_climb_rate,
-        (double)_hgt_dem_adj,
+        (double)_hgt_dem_in,
+        (double)_hgt_dem,
         (double)_hgt_rate_dem,
         (double)_TAS_dem_adj,
         (double)_TAS_state,
