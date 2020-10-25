@@ -88,7 +88,7 @@ protected:
         float deltar_max = 0.3491;
         // the X CoG offset should be -0.02, but that makes the plane too tail heavy
         // in manual flight. Adjusted to -0.15 gives reasonable flight
-        Vector3f CGOffset{-0.15, 0, -0.05};
+        Vector3f CGOffset{-0.05, 0, -0.05};
     } coefficient;
 
     float thrust_scale;
