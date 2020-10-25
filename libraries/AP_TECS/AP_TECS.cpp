@@ -945,7 +945,7 @@ void AP_TECS::_update_pitch(void)
         _integSEB_state -= pitch_delta * gainInv;
     }
 
-    // log flare tuning data
+    // log flare tuning data at full rate
     if (_landing.is_flaring()) {
         AP::logger().Write("TECF", "TimeUS,SEBdem,SEBDdem,SEBmea,SEBDmea,GI,I,Imin,Imax,temp,WP,WK",
                         "s-----------",
@@ -1213,40 +1213,43 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
     // Calculate pitch demand
     _update_pitch();
 
-    // log to AP_Logger
-    AP::logger().Write(
-        "TECS",
-        "TimeUS,h,dh,hdem,dhdem,spdem,sp,dsp,ith,iph,th,ph,dspdem,w,f",
-        "smnmnnnn----o--",
-        "F0000000----0--",
-        "QfffffffffffffB",
-        now,
-        (double)_height,
-        (double)_climb_rate,
-        (double)_hgt_dem_adj,
-        (double)_hgt_rate_dem,
-        (double)_TAS_dem_adj,
-        (double)_TAS_state,
-        (double)_vel_dot,
-        (double)_integTHR_state,
-        (double)_integSEB_state,
-        (double)_throttle_dem,
-        (double)_pitch_dem,
-        (double)_TAS_rate_dem,
-        (double)_SKE_weighting,
-        _flags_byte);
-    AP::logger().Write("TEC2", "TimeUS,pmax,punc,pmin,KErr,PErr,EDelta,LF,hdr,hafe",
-                       "s---------",
-                       "F---------",
-                       "Qfffffffff",
-                       now,
-                       (double)degrees(_PITCHmaxf),
-                       (double)degrees(_pitch_dem_unc),
-                       (double)degrees(_PITCHminf),
-                       (double)logging.SKE_error,
-                       (double)logging.SPE_error,
-                       (double)logging.SEB_delta,
-                       (double)load_factor,
-                       (double)logging.hgt_dem_raw,
-                       (double)_hagl);
+    // log to AP_Logger at 10Hz when not flaring
+    if (AP_HAL::millis() - logging.last_log_tine_ms >= 100 || _landing.is_flaring()) {
+        logging.last_log_tine_ms = AP_HAL::millis();
+        AP::logger().Write(
+            "TECS",
+            "TimeUS,h,dh,hdem,dhdem,spdem,sp,dsp,ith,iph,th,ph,dspdem,w,f",
+            "smnmnnnn----o--",
+            "F0000000----0--",
+            "QfffffffffffffB",
+            now,
+            (double)_height,
+            (double)_climb_rate,
+            (double)_hgt_dem_adj,
+            (double)_hgt_rate_dem,
+            (double)_TAS_dem_adj,
+            (double)_TAS_state,
+            (double)_vel_dot,
+            (double)_integTHR_state,
+            (double)_integSEB_state,
+            (double)_throttle_dem,
+            (double)_pitch_dem,
+            (double)_TAS_rate_dem,
+            (double)_SKE_weighting,
+            _flags_byte);
+        AP::logger().Write("TEC2", "TimeUS,pmax,punc,pmin,KErr,PErr,EDelta,LF,hdr,hafe",
+                        "s---------",
+                        "F---------",
+                        "Qfffffffff",
+                        now,
+                        (double)degrees(_PITCHmaxf),
+                        (double)degrees(_pitch_dem_unc),
+                        (double)degrees(_PITCHminf),
+                        (double)logging.SKE_error,
+                        (double)logging.SPE_error,
+                        (double)logging.SEB_delta,
+                        (double)load_factor,
+                        (double)logging.hgt_dem_raw,
+                        (double)_hagl);
+    }
 }
