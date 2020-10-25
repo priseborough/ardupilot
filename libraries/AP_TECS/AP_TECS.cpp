@@ -922,6 +922,24 @@ void AP_TECS::_update_pitch(void)
     // Calculate pitch demand from specific energy balance signals
     _pitch_dem_unc = (temp + _integSEB_state) / gainInv;
 
+    // log flare tuning data
+    if (_landing.is_flaring()) {
+        AP::logger().Write("TECF", "TimeUS,SEBdem,SEBDdem,SEBmea,SEBDmea,GI,I,Imin,Imax,temp",
+                        "s---------",
+                        "F---------",
+                        "Qfffffffff",
+                        AP_HAL::micros(),
+                        (double)SEB_dem,
+                        (double)SEBdot_dem,
+                        (double)(_SPE_est * SPE_weighting - _SKE_est * SKE_weighting),
+                        (double)(_SPEdot * SPE_weighting - _SKEdot * SKE_weighting),
+                        (double)gainInv,
+                        (double)_integSEB_state,
+                        (double)integSEB_min,
+                        (double)integSEB_max,
+                        (double)temp);
+    }
+
     // Constrain pitch demand
     _pitch_dem = constrain_float(_pitch_dem_unc, _PITCHminf, _PITCHmaxf);
 
@@ -1191,12 +1209,13 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
         (double)_TAS_rate_dem,
         (double)logging.SKE_weighting,
         _flags_byte);
-    AP::logger().Write("TEC2", "TimeUS,pmax,pmin,KErr,PErr,EDelta,LF,hdr,hafe",
-                       "s--------",
-                       "F--------",
-                       "Qffffffff",
+    AP::logger().Write("TEC2", "TimeUS,pmax,punc,pmin,KErr,PErr,EDelta,LF,hdr,hafe",
+                       "s---------",
+                       "F---------",
+                       "Qfffffffff",
                        now,
                        (double)degrees(_PITCHmaxf),
+                       (double)degrees(_pitch_dem_unc),
                        (double)degrees(_PITCHminf),
                        (double)logging.SKE_error,
                        (double)logging.SPE_error,
