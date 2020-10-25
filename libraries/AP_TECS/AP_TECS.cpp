@@ -833,10 +833,12 @@ void AP_TECS::_update_pitch(void)
     SPE_weighting = MIN(SPE_weighting, 1.0f);
 
     // Calculate Specific Energy Balance demand, and error
-    float SEB_dem      = _SPE_dem * SPE_weighting - _SKE_dem * SKE_weighting;
-    float SEBdot_dem   = _SPEdot_dem * SPE_weighting - _SKEdot_dem * SKE_weighting;
-    float SEB_error    = SEB_dem - (_SPE_est * SPE_weighting - _SKE_est * SKE_weighting);
-    float SEBdot_error = SEBdot_dem - (_SPEdot * SPE_weighting - _SKEdot * SKE_weighting);
+    const float SEB_dem      = _SPE_dem * _SPE_weighting - _SKE_dem * _SKE_weighting;
+    const float SEB_mea      = _SPE_est * _SPE_weighting - _SKE_est * _SKE_weighting;
+    const float SEBdot_dem   = _SPEdot_dem * _SPE_weighting - _SKEdot_dem * _SKE_weighting;
+    const float SEBdot_mea   = _SPEdot * _SPE_weighting - _SKEdot * _SKE_weighting;
+    const float SEB_error    = SEB_dem - SEB_mea;
+    const float SEBdot_error = SEBdot_dem - SEBdot_mea;
 
     logging.SKE_error = _SKE_dem - _SKE_est;
     logging.SPE_error = _SPE_dem - _SPE_est;
@@ -869,7 +871,7 @@ void AP_TECS::_update_pitch(void)
     // demand equal to the minimum value (which is )set by the mission plan during this mode). Otherwise the
     // integrator has to catch up before the nose can be raised to reduce speed during climbout.
     // During flare a different damping gain is used
-    float gainInv = (_TAS_state * timeConstant() * GRAVITY_MSS);
+    const float gainInv = (_TAS_state * timeConstant() * GRAVITY_MSS);
     float temp = SEB_error + SEBdot_dem * timeConstant();
 
     float pitch_damp = _ptchDamp;
@@ -921,6 +923,24 @@ void AP_TECS::_update_pitch(void)
 
     // Calculate pitch demand from specific energy balance signals
     _pitch_dem_unc = (temp + _integSEB_state) / gainInv;
+
+    // log flare tuning data
+    if (_landing.is_flaring()) {
+        AP::logger().Write("TECF", "TimeUS,SEBdem,SEBDdem,SEBmea,SEBDmea,GI,I,Imin,Imax,temp",
+                        "s---------",
+                        "F---------",
+                        "Qfffffffff",
+                        AP_HAL::micros(),
+                        (double)SEB_dem,
+                        (double)SEBdot_dem,
+                        (double)SEB_mea,
+                        (double)SEBdot_mea,
+                        (double)gainInv,
+                        (double)_integSEB_state,
+                        (double)integSEB_min,
+                        (double)integSEB_max,
+                        (double)temp);
+    }
 
     // Constrain pitch demand
     _pitch_dem = constrain_float(_pitch_dem_unc, _PITCHminf, _PITCHmaxf);
@@ -1191,12 +1211,13 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
         (double)_TAS_rate_dem,
         (double)logging.SKE_weighting,
         _flags_byte);
-    AP::logger().Write("TEC2", "TimeUS,pmax,pmin,KErr,PErr,EDelta,LF,hdr,hafe",
-                       "s--------",
-                       "F--------",
-                       "Qffffffff",
+    AP::logger().Write("TEC2", "TimeUS,pmax,punc,pmin,KErr,PErr,EDelta,LF,hdr,hafe",
+                       "s---------",
+                       "F---------",
+                       "Qfffffffff",
                        now,
                        (double)degrees(_PITCHmaxf),
+                       (double)degrees(_pitch_dem_unc),
                        (double)degrees(_PITCHminf),
                        (double)logging.SKE_error,
                        (double)logging.SPE_error,
