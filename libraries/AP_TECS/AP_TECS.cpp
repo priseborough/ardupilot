@@ -646,17 +646,17 @@ void AP_TECS::_update_throttle_with_airspeed(void)
     {
         // Calculate gain scaler from specific energy error to throttle
         // (_STEdot_max - _STEdot_min) / (_THRmaxf - _THRminf) is the derivative of STEdot wrt throttle measured across the max allowed throttle range.
-        float K_STE2Thr = 1 / (timeConstant() * (_STEdot_max - _STEdot_min) / (_THRmaxf - _THRminf));
+        float K_STE2Thr = 1.0f / (timeConstant() * (_STEdot_max - _STEdot_min) / (_THRmaxf - _THRminf));
 
         // Calculate feed-forward throttle
-        float ff_throttle = 0;
+        float ff_throttle = 0.0f;
         float nomThr = aparm.throttle_cruise * 0.01f;
         const Matrix3f &rotMat = _ahrs.get_rotation_body_to_ned();
         // Use the demanded rate of change of total energy as the feed-forward demand, but add
         // additional component which scales with (1/cos(bank angle) - 1) to compensate for induced
         // drag increase during turns.
         float cosPhi = sqrtf((rotMat.a.y*rotMat.a.y) + (rotMat.b.y*rotMat.b.y));
-        STEdot_dem = STEdot_dem + _rollComp * (1.0f/constrain_float(cosPhi * cosPhi , 0.1f, 1.0f) - 1.0f);
+        STEdot_dem = STEdot_dem + _rollComp * (1.0f / constrain_float(cosPhi * cosPhi , 0.1f, 1.0f) - 1.0f);
         ff_throttle = nomThr + STEdot_dem / (_STEdot_max - _STEdot_min) * (_THRmaxf - _THRminf);
 
         // Calculate PD + FF throttle
@@ -762,7 +762,7 @@ void AP_TECS::_update_throttle_without_airspeed(int16_t throttle_nudge)
     // additional component which scales with (1/cos(bank angle) - 1) to compensate for induced
     // drag increase during turns.
     float cosPhi = sqrtf((rotMat.a.y*rotMat.a.y) + (rotMat.b.y*rotMat.b.y));
-    float STEdot_dem = _rollComp * (1.0f/constrain_float(cosPhi * cosPhi , 0.1f, 1.0f) - 1.0f);
+    float STEdot_dem = _rollComp * (1.0f / constrain_float(cosPhi * cosPhi , 0.1f, 1.0f) - 1.0f);
     _throttle_dem = _throttle_dem + STEdot_dem / (_STEdot_max - _STEdot_min) * (_THRmaxf - _THRminf);
 }
 
@@ -992,39 +992,38 @@ void AP_TECS::_initialise_states(int32_t ptchMinCO_cd, float hgt_afe)
     // Initialise states and variables if DT > 1 second or in climbout
     if (_DT > 1.0f || _need_reset)
     {
-        _integTHR_state      = 0.0f;
-        _integSEB_state      = 0.0f;
-        _last_throttle_dem = aparm.throttle_cruise * 0.01f;
-        _last_pitch_dem    = _ahrs.pitch;
-        _hagl              = hgt_afe;
-        _hgt_dem_adj_last  = hgt_afe;
-        _hgt_dem_adj       = _hgt_dem_adj_last;
-        _hgt_dem_prev      = _hgt_dem_adj_last;
-        _hgt_dem_in_old    = _hgt_dem_adj_last;
-        _TAS_dem_adj       = _TAS_dem;
-        _flags.underspeed        = false;
-        _flags.badDescent        = false;
-        _flags.reached_speed_takeoff = false;
-        _DT                = 0.1f; // when first starting TECS, use a
-        // small time constant
-        _need_reset = false;
-        _pitch_lim_raise_height = 0.0f;
+        _integTHR_state                 = 0.0f;
+        _integSEB_state                 = 0.0f;
+        _last_throttle_dem              = aparm.throttle_cruise * 0.01f;
+        _last_pitch_dem                 = _ahrs.pitch;
+        _hagl                           = hgt_afe;
+        _hgt_dem_adj_last               = hgt_afe;
+        _hgt_dem_adj                    = _hgt_dem_adj_last;
+        _hgt_dem_prev                   = _hgt_dem_adj_last;
+        _hgt_dem_in_old                 = _hgt_dem_adj_last;
+        _TAS_dem_adj                    = _TAS_dem;
+        _flags.underspeed               = false;
+        _flags.badDescent               = false;
+        _flags.reached_speed_takeoff    = false;
+        _DT                             = 0.1f; // default time step
+        _need_reset                     = false;
+        _pitch_lim_raise_height         = 0.0f;
         _flags.pitch_limit_raise_active = false;
-        _lag_comp_hgt_offset = 0.0f;
-        _post_TO_hgt_offset = 0.0f;
+        _lag_comp_hgt_offset            = 0.0f;
+        _post_TO_hgt_offset             = 0.0f;
     }
     else if (_flight_stage == AP_Vehicle::FixedWing::FLIGHT_TAKEOFF || _flight_stage == AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND)
     {
-        _PITCHminf          = 0.000174533f * ptchMinCO_cd;
-        _hagl              = hgt_afe;
-        _hgt_dem_adj_last  = hgt_afe;
-        _hgt_dem_adj       = _hgt_dem_adj_last;
-        _hgt_dem_prev      = _hgt_dem_adj_last;
-        _post_TO_hgt_offset = _climb_rate * _hgt_dem_lag;
-        _TAS_dem_adj       = _TAS_dem;
-        _flags.underspeed        = false;
-        _flags.badDescent  = false;
-        _pitch_lim_raise_height = 0.0f;
+        _PITCHminf                      = radians(0.01f * (float)ptchMinCO_cd);
+        _hagl                           = hgt_afe;
+        _hgt_dem_adj_last               = hgt_afe;
+        _hgt_dem_adj                    = _hgt_dem_adj_last;
+        _hgt_dem_prev                   = _hgt_dem_adj_last;
+        _post_TO_hgt_offset             = _climb_rate * _hgt_dem_lag;
+        _TAS_dem_adj                    = _TAS_dem;
+        _flags.underspeed               = false;
+        _flags.badDescent               = false;
+        _pitch_lim_raise_height         = 0.0f;
         _flags.pitch_limit_raise_active = false;
     }
     
@@ -1147,10 +1146,10 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
             // it to increase rapidly. This prevents oscillation of pitch
             // demand while in landing approach if pitch demand is on lower
             // limit
-            if (_land_pitch_min <= -90) {
+            if (_land_pitch_min <= -90.0f) {
                 _land_pitch_min = _PITCHminf;
             }
-            const float flare_pitch_range = 20;
+            const float flare_pitch_range = 20.0f;
             const float delta_per_loop = (flare_pitch_range/_landTimeConst) * _DT;
             _PITCHminf = MIN(_PITCHminf, _land_pitch_min+delta_per_loop);
             _land_pitch_min = MAX(_land_pitch_min, _PITCHminf);
