@@ -793,7 +793,7 @@ void AP_TECS::_detect_bad_descent(void)
     }
 }
 
-void AP_TECS::_update_pitch(void)
+void AP_TECS::_update_energy_weights(void)
 {
     // Calculate Speed/Height Control Weighting
     // This is used to determine how the pitch control prioritises speed and height control
@@ -801,36 +801,39 @@ void AP_TECS::_update_pitch(void)
     // A SKE_weighting of 0 provides 100% priority to height control. This is used when no airspeed measurement is available
     // A SKE_weighting of 2 provides 100% priority to speed control. This is used when an underspeed condition is detected. In this instance, if airspeed
     // rises above the demanded value, the pitch angle will be increased by the TECS controller.
-    float SKE_weighting = constrain_float(_spdWeight, 0.0f, 2.0f);
+    _SKE_weighting = constrain_float(_spdWeight, 0.0f, 2.0f);
     if (!_ahrs.airspeed_sensor_enabled()) {
-        SKE_weighting = 0.0f;
+        _SKE_weighting = 0.0f;
     } else if (_flight_stage == AP_Vehicle::FixedWing::FLIGHT_VTOL) {
         // if we are in VTOL mode then control pitch without regard to
         // speed. Speed is also taken care of independently of
         // height. This is needed as the usual relationship of speed
         // and height is broken by the VTOL motors
-        SKE_weighting = 0.0f;        
+        _SKE_weighting = 0.0f;
     } else if ( _flags.underspeed || _flight_stage == AP_Vehicle::FixedWing::FLIGHT_TAKEOFF || _flight_stage == AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND) {
-        SKE_weighting = 2.0f;
+        _SKE_weighting = 2.0f;
     } else if (_flags.is_doing_auto_land) {
         if (_spdWeightLand < 0) {
             // use sliding scale from normal weight down to zero at landing
             float scaled_weight = _spdWeight * (1.0f - constrain_float(_path_proportion,0,1));
-            SKE_weighting = constrain_float(scaled_weight, 0.0f, 2.0f);
+            _SKE_weighting = constrain_float(scaled_weight, 0.0f, 2.0f);
         } else {
-            SKE_weighting = constrain_float(_spdWeightLand, 0.0f, 2.0f);
+            _SKE_weighting = constrain_float(_spdWeightLand, 0.0f, 2.0f);
         }
     }
 
-    logging.SKE_weighting = SKE_weighting;
-    
-    float SPE_weighting = 2.0f - SKE_weighting;
+    _SPE_weighting = 2.0f - _SKE_weighting;
 
     // Allow each weighting to fade to zero, but do not increase past 1.0 as this causes
     // feeback gains to increase and feed forward compensation to be incorrect making the
     // height control harder to tune when speed weight is less than 1.0
-    SKE_weighting = MIN(SKE_weighting, 1.0f);
-    SPE_weighting = MIN(SPE_weighting, 1.0f);
+    _SKE_weighting = MIN(_SKE_weighting, 1.0f);
+    _SPE_weighting = MIN(_SPE_weighting, 1.0f);
+}
+
+void AP_TECS::_update_pitch(void)
+{
+    _update_energy_weights();
 
     // Calculate Specific Energy Balance demand, and error
     const float SEB_dem      = _SPE_dem * _SPE_weighting - _SKE_dem * _SKE_weighting;
@@ -1209,7 +1212,7 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
         (double)_throttle_dem,
         (double)_pitch_dem,
         (double)_TAS_rate_dem,
-        (double)logging.SKE_weighting,
+        (double)_SKE_weighting,
         _flags_byte);
     AP::logger().Write("TEC2", "TimeUS,pmax,punc,pmin,KErr,PErr,EDelta,LF,hdr,hafe",
                        "s---------",

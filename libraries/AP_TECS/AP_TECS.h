@@ -344,9 +344,12 @@ private:
     // need to reset on next loop
     bool _need_reset;
 
+    // weights applied to specific kinetic and potential energies
+    float _SKE_weighting;
+    float _SPE_weighting;
+
     // internal variables to be logged
     struct {
-        float SKE_weighting;
         float SPE_error;
         float SKE_error;
         float SEB_delta;
@@ -400,4 +403,7 @@ private:
 
     // current time constant
     float timeConstant(void) const;
+
+    // update weights applied to specific kinetic and potential energy
+    void _update_energy_weights(void);
 };
