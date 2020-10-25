@@ -359,6 +359,7 @@ private:
         float SKE_error;
         float SEB_delta;
         float hgt_dem_raw;
+        uint32_t last_log_tine_ms;
     } logging;
 
     AP_Int8 _use_synthetic_airspeed;
