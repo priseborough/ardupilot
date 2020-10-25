@@ -515,26 +515,18 @@ void AP_TECS::_update_height_demand(void)
         _hgt_rate_dem = (_hgt_dem_adj - _hgt_dem_adj_last) / _DT;
         _flare_counter = 0;
 
-        /*
-        TODO - re-write this section to be consistent with actual _DT value and _hgt_dem_lag
-        becasue the current implementation over compennsates and should be correcting for the
-        actual LPF lag of _hgt_dem_lag only due to feed-forward term making timeConstant()
-        irrelevant. It also assumes a _DT of 0.1.
-        */
-
-        // for landing approach we will predict ahead by the time constant
-        // plus the lag produced by the first order filter. This avoids a
-        // lagged height demand while constantly descending which causes
-        // us to consistently be above the desired glide slope. This will
-        // be replaced with a better zero-lag filter in the future.
+        // for landing approach we will predict ahead by the lag produced by the
+        // _hgt_dem_lag second lag first order filter. This avoids a lagged height demand
+        // while constantly descending which would cause us to consistently be
+        // above the desired glide slope.
         float new_hgt_dem = _hgt_dem_adj;
         if (_flags.is_doing_auto_land) {
-            if (hgt_dem_lag_filter_slew < 1) {
-                hgt_dem_lag_filter_slew += 0.1f; // increment at 10Hz to gradually apply the compensation at first
+            if (hgt_dem_lag_filter_slew < 1,0f) {
+                hgt_dem_lag_filter_slew += (_DT / _hgt_dem_lag); // bring the compensation in over _hgt_dem_lag seconds
             } else {
-                hgt_dem_lag_filter_slew = 1;
+                hgt_dem_lag_filter_slew = 1.0f;
             }
-            _lag_comp_hgt_offset = hgt_dem_lag_filter_slew*(_hgt_dem_adj - _hgt_dem_adj_last)*10.0f*(timeConstant()+1);
+            _lag_comp_hgt_offset = hgt_dem_lag_filter_slew*(_hgt_dem_adj - _hgt_dem_adj_last) * (_hgt_dem_lag / _DT);
             new_hgt_dem += _lag_comp_hgt_offset;
         } else {
             hgt_dem_lag_filter_slew = 0;
