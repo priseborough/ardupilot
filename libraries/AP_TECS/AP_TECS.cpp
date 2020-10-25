@@ -388,8 +388,7 @@ void AP_TECS::_update_speed(float load_factor)
     if (DT > 1.0f) {
         _TAS_state = (_EAS * EAS2TAS);
         _integDTAS_state = 0.0f;
-        DT            = 0.1f; // when first starting TECS, use a
-        // small time constant
+        DT = 0.1f; //default tie step
     }
 
     // Implement a second order complementary filter to obtain a
@@ -431,23 +430,20 @@ void AP_TECS::_update_speed_demand(void)
     const float velRateMin = 1.0f * _STEdot_min / _TAS_state;
     const float TAS_dem_previous = _TAS_dem_adj;
 
-    // assume fixed 10Hz call rate
-    const float dt = 0.1;
-
     // Apply rate limit
-    if ((_TAS_dem - TAS_dem_previous) > (velRateMax * dt))
+    if ((_TAS_dem - TAS_dem_previous) > (velRateMax * _DT))
     {
-        _TAS_dem_adj = TAS_dem_previous + velRateMax * dt;
+        _TAS_dem_adj = TAS_dem_previous + velRateMax * _DT;
         _TAS_rate_dem = velRateMax;
     }
-    else if ((_TAS_dem - TAS_dem_previous) < (velRateMin * dt))
+    else if ((_TAS_dem - TAS_dem_previous) < (velRateMin * _DT))
     {
-        _TAS_dem_adj = TAS_dem_previous + velRateMin * dt;
+        _TAS_dem_adj = TAS_dem_previous + velRateMin * _DT;
         _TAS_rate_dem = velRateMin;
     }
     else
     {
-        _TAS_rate_dem = (_TAS_dem - TAS_dem_previous) / dt;
+        _TAS_rate_dem = (_TAS_dem - TAS_dem_previous) / _DT;
         _TAS_dem_adj = _TAS_dem;
     }
     // Constrain speed demand again to protect against bad values on initialisation.
@@ -471,13 +467,13 @@ void AP_TECS::_update_height_demand(void)
     }
 
     // Limit height rate of change
-    if ((_hgt_dem - _hgt_dem_prev) > (_maxClimbRate * 0.1f))
+    if ((_hgt_dem - _hgt_dem_prev) > (_maxClimbRate * _DT))
     {
-        _hgt_dem = _hgt_dem_prev + _maxClimbRate * 0.1f;
+        _hgt_dem = _hgt_dem_prev + _maxClimbRate * _DT;
     }
-    else if ((_hgt_dem - _hgt_dem_prev) < (-max_sink_rate * 0.1f))
+    else if ((_hgt_dem - _hgt_dem_prev) < (-max_sink_rate * _DT))
     {
-        _hgt_dem = _hgt_dem_prev - max_sink_rate * 0.1f;
+        _hgt_dem = _hgt_dem_prev - max_sink_rate * _DT;
     }
     _hgt_dem_prev = _hgt_dem;
 
@@ -634,9 +630,10 @@ void AP_TECS::_update_throttle_with_airspeed(void)
     float STEdot_dem = constrain_float((_SPEdot_dem + _SKEdot_dem), _STEdot_min, _STEdot_max);
     float STEdot_error = STEdot_dem - _SPEdot - _SKEdot;
 
-    // Apply 0.5 second first order filter to STEdot_error
+    // Apply 0.5 second time constant first order filter to STEdot_error
     // This is required to remove accelerometer noise from the  measurement
-    STEdot_error = 0.2f*STEdot_error + 0.8f*_STEdotErrLast;
+    const float coef = 2.0f * _DT;
+    STEdot_error = coef * STEdot_error + (1.0f - coef) * _STEdotErrLast;
     _STEdotErrLast = STEdot_error;
 
     // Calculate throttle demand
