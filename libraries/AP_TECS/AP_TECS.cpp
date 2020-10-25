@@ -913,8 +913,8 @@ void AP_TECS::_update_pitch(void)
     bool inhibit_integrator = false;
     if (_landing.is_flaring()) {
         const float ptch_dem_predicted = (temp + _integSEB_state + integSEB_delta) / gainInv;
-        if (((ptch_dem_predicted - _PITCHmaxf) * integSEB_delta > 0.0f) || // saturating against upper limit
-            ((ptch_dem_predicted - _PITCHminf) * integSEB_delta > 0.0f)) { // saturating against lower limit
+        if ((is_positive(ptch_dem_predicted - _PITCHmaxf) && is_positive(integSEB_delta)) || // saturating against upper limit
+            (is_negative(ptch_dem_predicted - _PITCHminf) && is_negative(integSEB_delta))) { // saturating against lower limit
             inhibit_integrator = true;
         }
     }
