@@ -245,9 +245,17 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
     // @Param: OPTIONS
     // @DisplayName: Extra TECS options
     // @Description: This allows the enabling of special features in the speed/height controller
-    // @Bitmask: 0:GliderOnly
+    // @Bitmask: 0:GliderOnly,1:FlareHeightTrack
     // @User: Advanced
     AP_GROUPINFO("OPTIONS", 28, AP_TECS, _options, 0),
+
+    // @Param: FLARE_IGAIN
+    // @DisplayName: Controller integrator during flare
+    // @Description: This is the integrator gain on the height rate error during flare.
+    // @Range: 0.0 2.0
+    // @Increment: 0.1
+    // @User: Advanced
+    AP_GROUPINFO("FLARE_IGAIN", 29, AP_TECS, _flare_igain, 1.0),
 
     AP_GROUPEND
 };
@@ -486,7 +494,8 @@ void AP_TECS::_update_height_demand(void)
     if (_landing.is_flaring()) {
         if (_flare_counter == 0) {
             _land_hgt_rate = _climb_rate;
-            _land_hgt_dem = _hgt_dem_adj;
+            _land_hgt_dem = _hagl;
+
         }
         _flare_counter++;
 
@@ -494,17 +503,13 @@ void AP_TECS::_update_height_demand(void)
         float land_sink_rate_adj = _land_sink + _land_sink_rate_change*_distance_beyond_land_wp;
 
         // bring in height rate demand with a 1s time constant to prevent overshoot
-
-        // height rate command used by control loops starts at last demand value
-        // to prevent sudden changes at flare entry
-        _hgt_rate_dem = _hgt_rate_dem * (1.0f - _DT) - _DT * land_sink_rate_adj;
-
         // height rate use to calculate height demand starts flare at measured climb rate
-        _land_hgt_dem = _land_hgt_dem * (1.0f - _DT) - _DT * land_sink_rate_adj;
-        _land_hgt_dem += _DT * _land_hgt_dem;
+        _land_hgt_rate = _land_hgt_rate * (1.0f - _DT) - _DT * land_sink_rate_adj;
+        _land_hgt_dem += _DT * _land_hgt_rate;
+
+        _hgt_rate_dem = _land_hgt_rate;
         _hgt_dem_adj = _land_hgt_dem;
         _hgt_dem_adj_last = _land_hgt_dem;
-        _hgt_dem_adj += _lag_comp_hgt_offset;
 
     } else {
         _hgt_rate_dem = (_hgt_dem_adj - _hgt_dem_adj_last) / _DT;
@@ -584,7 +589,11 @@ void AP_TECS::_update_energies(void)
     _SKEdot_dem = _TAS_state * _TAS_rate_dem;
 
     // Calculate specific energy
-    _SPE_est = _height * GRAVITY_MSS;
+    if (_landing.is_flaring()) {
+        _SPE_est = _hagl * GRAVITY_MSS;
+    } else {
+        _SPE_est = _height * GRAVITY_MSS;
+    }
     _SKE_est = 0.5f * _TAS_state * _TAS_state;
 
     // Calculate specific energy rate
@@ -801,6 +810,13 @@ void AP_TECS::_update_energy_weights(void)
     // A SKE_weighting of 0 provides 100% priority to height control. This is used when no airspeed measurement is available
     // A SKE_weighting of 2 provides 100% priority to speed control. This is used when an underspeed condition is detected. In this instance, if airspeed
     // rises above the demanded value, the pitch angle will be increased by the TECS controller.
+
+    if (_landing.is_flaring()) {
+        _SKE_weighting = 0.0f;
+        _SPE_weighting = 1.0f;
+        return;
+    }
+
     _SKE_weighting = constrain_float(_spdWeight, 0.0f, 2.0f);
     if (!_ahrs.airspeed_sensor_enabled()) {
         _SKE_weighting = 0.0f;
@@ -840,14 +856,21 @@ void AP_TECS::_update_pitch(void)
     const float SEB_mea      = _SPE_est * _SPE_weighting - _SKE_est * _SKE_weighting;
     const float SEBdot_dem   = _SPEdot_dem * _SPE_weighting - _SKEdot_dem * _SKE_weighting;
     const float SEBdot_mea   = _SPEdot * _SPE_weighting - _SKEdot * _SKE_weighting;
-    const float SEB_error    = SEB_dem - SEB_mea;
+    const bool ignore_height = _landing.is_flaring() && !(_options & OPTION_TRACK_FLARE_HGT);
+    const float SEB_error    = ignore_height ? 0.0f : SEB_dem - SEB_mea;
     const float SEBdot_error = SEBdot_dem - SEBdot_mea;
 
     logging.SKE_error = _SKE_dem - _SKE_est;
     logging.SPE_error = _SPE_dem - _SPE_est;
     
     // Calculate integrator state, constraining input if pitch limits are exceeded
-    float integSEB_input = SEB_error * _get_i_gain();
+    float integSEB_input;
+    if (ignore_height) {
+        // when ignoring height errors, integrator runs on height rate error instead
+        integSEB_input = SEBdot_error * _flare_igain;
+    } else {
+        integSEB_input = SEB_error * _get_i_gain();
+    }
     if (_pitch_dem > _PITCHmaxf)
     {
         integSEB_input = MIN(integSEB_input, _PITCHmaxf - _pitch_dem);
@@ -927,12 +950,18 @@ void AP_TECS::_update_pitch(void)
     // Calculate pitch demand from specific energy balance signals
     _pitch_dem_unc = (temp + _integSEB_state) / gainInv;
 
+    // if first frame on flare entry, adjust integrator so that pitch angle matches previous demanded
+    if (_flare_counter == 1 && _landing.is_flaring()) {
+        const float pitch_delta = _pitch_dem_unc - _pitch_dem;
+        _integSEB_state -= pitch_delta * gainInv;
+    }
+
     // log flare tuning data
     if (_landing.is_flaring()) {
-        AP::logger().Write("TECF", "TimeUS,SEBdem,SEBDdem,SEBmea,SEBDmea,GI,I,Imin,Imax,temp",
-                        "s---------",
-                        "F---------",
-                        "Qfffffffff",
+        AP::logger().Write("TECF", "TimeUS,SEBdem,SEBDdem,SEBmea,SEBDmea,GI,I,Imin,Imax,temp,WP,WK",
+                        "s-----------",
+                        "F-----------",
+                        "Qfffffffffff",
                         AP_HAL::micros(),
                         (double)SEB_dem,
                         (double)SEBdot_dem,
@@ -942,7 +971,9 @@ void AP_TECS::_update_pitch(void)
                         (double)_integSEB_state,
                         (double)integSEB_min,
                         (double)integSEB_max,
-                        (double)temp);
+                        (double)temp,
+                        (double)_SPE_weighting,
+                        (double)_SKE_weighting);
     }
 
     // Constrain pitch demand
@@ -976,6 +1007,7 @@ void AP_TECS::_initialise_states(int32_t ptchMinCO_cd, float hgt_afe)
         _integSEB_state      = 0.0f;
         _last_throttle_dem = aparm.throttle_cruise * 0.01f;
         _last_pitch_dem    = _ahrs.pitch;
+        _hagl              = hgt_afe;
         _hgt_dem_adj_last  = hgt_afe;
         _hgt_dem_adj       = _hgt_dem_adj_last;
         _hgt_dem_prev      = _hgt_dem_adj_last;
@@ -995,6 +1027,7 @@ void AP_TECS::_initialise_states(int32_t ptchMinCO_cd, float hgt_afe)
     else if (_flight_stage == AP_Vehicle::FixedWing::FLIGHT_TAKEOFF || _flight_stage == AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND)
     {
         _PITCHminf          = 0.000174533f * ptchMinCO_cd;
+        _hagl              = hgt_afe;
         _hgt_dem_adj_last  = hgt_afe;
         _hgt_dem_adj       = _hgt_dem_adj_last;
         _hgt_dem_prev      = _hgt_dem_adj_last;
@@ -1041,7 +1074,7 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
     _flight_stage = flight_stage;
 
     // Convert inputs
-    logging.hgt_afe = hgt_afe;
+    _hagl = hgt_afe;
     _hgt_dem = logging.hgt_dem_raw = hgt_dem_cm * 0.01f;
     _EAS_dem = EAS_dem_cm * 0.01f;
 
@@ -1103,7 +1136,7 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
     if (_landing.is_on_approach() || _landing.is_flaring()) {
         if ((-_climb_rate) > 0.001f) {
             float p = 1.0f; // varies continuously between 1 in air and 0 when on ground
-            float time_to_touchdown = (- hgt_afe / _climb_rate);
+            float time_to_touchdown = (- _hagl / _climb_rate);
             const float height_lag = 0.5f * _climb_rate; // allow for 0.5 second pitch loop time constant
             if (time_to_touchdown < 0) {
                 // on the ground
@@ -1111,11 +1144,11 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
                 _PITCHminf = MAX(_PITCHminf, _landing.get_pitch_cd() * 0.01f);
             } else if (time_to_touchdown < timeConstant()*2 && !_flags.pitch_limit_raise_active) {
                 _flags.pitch_limit_raise_active = true;
-                _pitch_lim_raise_height = MAX(hgt_afe + height_lag, 0.001f);
+                _pitch_lim_raise_height = MAX(_hagl + height_lag, 0.001f);
             }
 
             if (_flags.pitch_limit_raise_active) {
-                p = constrain_float((hgt_afe + height_lag) / _pitch_lim_raise_height, 0.0f, 1.0f);
+                p = constrain_float((_hagl + height_lag) / _pitch_lim_raise_height, 0.0f, 1.0f);
             }
 
             float pitch_limit_cd = p * aparm.pitch_limit_min_cd + (1 - p) * _landing.get_pitch_cd();
@@ -1227,5 +1260,5 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
                        (double)logging.SEB_delta,
                        (double)load_factor,
                        (double)logging.hgt_dem_raw,
-                       (double)logging.hgt_afe);
+                       (double)_hagl);
 }

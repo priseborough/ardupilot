@@ -172,9 +172,11 @@ private:
     AP_Int8  _land_pitch_max;
     AP_Float _maxSinkRate_approach;
     AP_Int32 _options;
+    AP_Float _flare_igain;
 
     enum {
         OPTION_GLIDER_ONLY=(1<<0),
+        OPTION_TRACK_FLARE_HGT=(1<<1),
     };
 
     // lag of fist order filter applied to height demand (sec)
@@ -185,6 +187,9 @@ private:
     
     // current height above datum
     float _height;
+
+    // current height above ground
+    float _hagl;
 
     // throttle demand in the range from -1.0 to 1.0, usually positive unless reverse thrust is enabled via _THRminf < 0
     float _throttle_dem;
@@ -353,7 +358,6 @@ private:
         float SPE_error;
         float SKE_error;
         float SEB_delta;
-        float hgt_afe;
         float hgt_dem_raw;
     } logging;
 
