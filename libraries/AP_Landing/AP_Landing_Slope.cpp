@@ -105,10 +105,14 @@ bool AP_Landing::type_slope_verify_land(const Location &prev_WP_loc, Location &n
                 if (aspeed && aspeed->enabled()) {
                     ias = aspeed->get_airspeed();
                 }
+                float distance = current_loc.get_distance(next_WP_loc);
+                if (wp_proportion >= 1) {
+                    distance = -distance;
+                }
                 gcs().send_text(MAV_SEVERITY_INFO, "Flare h=%.1fm sink=%.2f spd=%.1f dist=%i IAS=%.1f",
                                   (double)height, (double)sink_rate,
                                   (double)gps.ground_speed(),
-                                  (int)current_loc.get_distance(next_WP_loc),
+                                  (int)distance,
                                   (double)ias);
             }
             
@@ -136,6 +140,12 @@ bool AP_Landing::type_slope_verify_land(const Location &prev_WP_loc, Location &n
         bool reached_pre_flare_alt = pre_flare_alt > 0 && (height <= pre_flare_alt);
         bool reached_pre_flare_sec = pre_flare_sec > 0 && (height <= sink_rate * pre_flare_sec);
         if (reached_pre_flare_alt || reached_pre_flare_sec) {
+            float distance = current_loc.get_distance(next_WP_loc);
+            if (wp_proportion >= 1) {
+                distance = -distance;
+            }
+            gcs().send_text(MAV_SEVERITY_INFO, "Pre-Flare h=%.1f sink=%.2f dist=%i",
+                            (double)height, (double)sink_rate, (int)distance);
             type_slope_stage = SLOPE_STAGE_PREFLARE;
         }
     }
