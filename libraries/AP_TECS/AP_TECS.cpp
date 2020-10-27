@@ -257,6 +257,22 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("FLARE_IGAIN", 29, AP_TECS, _flare_igain, 1.0),
 
+    // @Param: LAND_PL_ADV
+    // @DisplayName: Landing minimum pitch limit time advance scaler
+    // @Description: This is the time before ground contact, specified as a multiple of TECS_LAND_TCONST, that the minimum pitch angle limit begins to raise from the up and away flight value specified by TECS_PITCH_MIN or LIM_PITCH_MIN to the final value set by TECS_LAND_PMIN. The pitch angle minimum limit raise will commence when 'height above ground' < 'sink rate' * TECS_LAND_PMIN_ADV * TECS_LAND_TCONST. If TECS_LAND_PMIN_ADV is too large then the minimum pitch angle limit will cause the plane to pitch up too soon and it may never meet the flare entry criteria. If TECS_LAND_PMIN_ADV is too small, then there may be insufficient time to raise the nose sufficiently before ground contact.
+    // @Range: 1.0 3.0
+    // @Increment: 0.1
+    // @User: Advanced
+    AP_GROUPINFO("LAND_PL_ADV", 30, AP_TECS, _flare_pmin_adv, 2.0),
+
+    // @Param: LAND_PL_EXP
+    // @DisplayName: Landing minimum pitch limit shaping
+    // @Description: This specifies the exponent applied to the function of height above ground that is used to raise the minimum pitch angle limit from the up and away flight value specified by TECS_PITCH_MIN or LIM_PITCH_MIN to the value set by TECS_LAND_PMIN during the final part of landing. The activation of this function is controlled by TECS_LAND_PMIN_ADV. Set to 1.0 if a linear variation in the minimum pitch angle limit with height is desired. Set to a value greater than 1.0 if the pitch limit needs to raise faster initially, or to a value less than 1.0 if it needs to raise slower initially.
+    // @Range: 0.2 2.0
+    // @Increment: 0.1
+    // @User: Advanced
+    AP_GROUPINFO("LAND_PL_EXP", 31, AP_TECS, _flare_pmin_exp, 1.0),
+
     AP_GROUPEND
 };
 
@@ -1130,13 +1146,14 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
                 // on the ground
                 p = 0.0f;
                 _PITCHminf = MAX(_PITCHminf, _landing.get_pitch_cd() * 0.01f);
-            } else if (time_to_touchdown < timeConstant()*2 && !_flags.pitch_limit_raise_active) {
+            } else if (time_to_touchdown < timeConstant() * constrain_float(_flare_pmin_adv, 1.0f, 3.0f) && !_flags.pitch_limit_raise_active) {
                 _flags.pitch_limit_raise_active = true;
                 _pitch_lim_raise_height = MAX(_hagl + height_lag, 0.001f);
             }
 
             if (_flags.pitch_limit_raise_active) {
                 p = constrain_float((_hagl + height_lag) / _pitch_lim_raise_height, 0.0f, 1.0f);
+                p = powf(p, constrain_float(_flare_pmin_exp, 0.2f, 2.0f));
             }
 
             float pitch_limit_cd = p * aparm.pitch_limit_min_cd + (1 - p) * _landing.get_pitch_cd();

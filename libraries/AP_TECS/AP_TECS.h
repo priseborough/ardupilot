@@ -173,6 +173,8 @@ private:
     AP_Float _maxSinkRate_approach;
     AP_Int32 _options;
     AP_Float _flare_igain;
+    AP_Float _flare_pmin_adv;
+    AP_Float _flare_pmin_exp;
 
     enum {
         OPTION_GLIDER_ONLY=(1<<0),
