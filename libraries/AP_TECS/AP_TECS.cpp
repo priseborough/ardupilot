@@ -259,7 +259,7 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
 
     // @Param: LAND_PL_ADV
     // @DisplayName: Landing minimum pitch limit time advance scaler
-    // @Description: This is the time before ground contact, specified as a multiple of TECS_LAND_TCONST, that the minimum pitch angle limit begins to raise from the up and away flight value specified by TECS_PITCH_MIN or LIM_PITCH_MIN to the final value set by TECS_LAND_PMIN. The pitch angle minimum limit raise will commence when 'height above ground' < 'sink rate' * TECS_LAND_PMIN_ADV * TECS_LAND_TCONST. If TECS_LAND_PMIN_ADV is too large then the minimum pitch angle limit will cause the plane to pitch up too soon and it may never meet the flare entry criteria. If TECS_LAND_PMIN_ADV is too small, then there may be insufficient time to raise the nose sufficiently before ground contact.
+    // @Description: This is the time before ground contact, specified as a multiple of TECS_LAND_TCONST, that the minimum pitch angle limit begins to raise from the up and away flight value specified by TECS_PITCH_MIN or LIM_PITCH_MIN to the final value set by LAND_PITCH_CD. The pitch angle minimum limit raise will commence when 'height above ground' < 'sink rate' * TECS_LAND_PL_ADV * TECS_LAND_TCONST. If TECS_LAND_PL_ADV is too large then the minimum pitch angle limit will cause the plane to pitch up too soon and it may never meet the flare entry criteria. If TECS_LAND_PL_ADV is too small, then there may be insufficient time to raise the nose sufficiently before ground contact.
     // @Range: 1.0 3.0
     // @Increment: 0.1
     // @User: Advanced
@@ -267,7 +267,7 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
 
     // @Param: LAND_PL_EXP
     // @DisplayName: Landing minimum pitch limit shaping
-    // @Description: This specifies the exponent applied to the function of height above ground that is used to raise the minimum pitch angle limit from the up and away flight value specified by TECS_PITCH_MIN or LIM_PITCH_MIN to the value set by TECS_LAND_PMIN during the final part of landing. The activation of this function is controlled by TECS_LAND_PMIN_ADV. Set to 1.0 if a linear variation in the minimum pitch angle limit with height is desired. Set to a value greater than 1.0 if the pitch limit needs to raise faster initially, or to a value less than 1.0 if it needs to raise slower initially.
+    // @Description: This specifies the exponent applied to the function of height above ground that is used to raise the minimum pitch angle limit from the up and away flight value specified by TECS_PITCH_MIN or LIM_PITCH_MIN to the value set by LAND_PITCH_CD during the final part of landing. The activation of this function is controlled by TECS_LAND_PL_ADV. Set to 1.0 if a linear variation in the minimum pitch angle limit with height is desired. Set to a value greater than 1.0 if the pitch limit needs to raise faster initially, or to a value less than 1.0 if it needs to raise slower initially.
     // @Range: 0.2 2.0
     // @Increment: 0.1
     // @User: Advanced
