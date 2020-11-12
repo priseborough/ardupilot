@@ -641,7 +641,7 @@ const AP_Param::GroupInfo NavEKF3::var_info[] = {
 
     // @Group: SRC_
     // @Path: ../AP_NavEKF/AP_NavEKF_Source.cpp
-    AP_SUBGROUPINFO(_sources, "SRC_", 63, NavEKF3, AP_NavEKF_Source),
+    AP_SUBGROUPINFO(_sources, "SRC", 63, NavEKF3, AP_NavEKF_Source),
 
     AP_GROUPEND
 };
@@ -1610,28 +1610,28 @@ void NavEKF3::convert_parameters()
         return;
     }
 
-    // use EK3_GPS_TYPE to set EK3_SRC_POSXY, EK3_SRC_VELXY, EK3_SRC_VELZ
+    // use EK3_GPS_TYPE to set EK3_SRC1_POSXY, EK3_SRC1_VELXY, EK3_SRC1_VELZ
     const AP_Param::ConversionInfo gps_type_info = {k_param_ekf3, 1, AP_PARAM_INT8, "EK3_GPS_TYPE"};
     AP_Int8 gps_type_old;
     if (AP_Param::find_old_parameter(&gps_type_info, &gps_type_old)) {
         switch (gps_type_old.get()) {
         case 0:
-            // EK3_GPS_TYPE == 0 (GPS 3D Vel and 2D Pos) then EK3_SRC_POSXY = GPS(1), EK3_SRC_VELXY = GPS(1), EK3_SRC_VELZ = GPS(3)
-            AP_Param::set_and_save_by_name("EK3_SRC_POSXY", (int8_t)AP_NavEKF_Source::SourceXY::GPS);
-            AP_Param::set_and_save_by_name("EK3_SRC_VELXY", (int8_t)AP_NavEKF_Source::SourceXY::GPS);
-            AP_Param::set_and_save_by_name("EK3_SRC_VELZ", (int8_t)AP_NavEKF_Source::SourceZ::GPS);
+            // EK3_GPS_TYPE == 0 (GPS 3D Vel and 2D Pos) then EK3_SRC1_POSXY = GPS(1), EK3_SRC1_VELXY = GPS(1), EK3_SRC1_VELZ = GPS(3)
+            AP_Param::set_and_save_by_name("EK3_SRC1_POSXY", (int8_t)AP_NavEKF_Source::SourceXY::GPS);
+            AP_Param::set_and_save_by_name("EK3_SRC1_VELXY", (int8_t)AP_NavEKF_Source::SourceXY::GPS);
+            AP_Param::set_and_save_by_name("EK3_SRC1_VELZ", (int8_t)AP_NavEKF_Source::SourceZ::GPS);
             break;
         case 1:
-            // EK3_GPS_TYPE == 1 (GPS 2D Vel and 2D Pos) then EK3_SRC_POSXY = GPS(1), EK3_SRC_VELXY = GPS(1), EK3_SRC_VELZ = NONE(0)
-            AP_Param::set_and_save_by_name("EK3_SRC_POSXY", (int8_t)AP_NavEKF_Source::SourceXY::GPS);
-            AP_Param::set_and_save_by_name("EK3_SRC_VELXY", (int8_t)AP_NavEKF_Source::SourceXY::GPS);
-            AP_Param::set_and_save_by_name("EK3_SRC_VELZ", (int8_t)AP_NavEKF_Source::SourceZ::NONE);
+            // EK3_GPS_TYPE == 1 (GPS 2D Vel and 2D Pos) then EK3_SRC1_POSXY = GPS(1), EK3_SRC1_VELXY = GPS(1), EK3_SRC1_VELZ = NONE(0)
+            AP_Param::set_and_save_by_name("EK3_SRC1_POSXY", (int8_t)AP_NavEKF_Source::SourceXY::GPS);
+            AP_Param::set_and_save_by_name("EK3_SRC1_VELXY", (int8_t)AP_NavEKF_Source::SourceXY::GPS);
+            AP_Param::set_and_save_by_name("EK3_SRC1_VELZ", (int8_t)AP_NavEKF_Source::SourceZ::NONE);
             break;
         case 2:
-            // EK3_GPS_TYPE == 2 (GPS 2D Pos) then EK3_SRC_POSXY = GPS(1), EK3_SRC_VELXY = None(0), EK3_SRC_VELZ = NONE(0)
-            AP_Param::set_and_save_by_name("EK3_SRC_POSXY", (int8_t)AP_NavEKF_Source::SourceXY::GPS);
-            AP_Param::set_and_save_by_name("EK3_SRC_VELXY", (int8_t)AP_NavEKF_Source::SourceXY::NONE);
-            AP_Param::set_and_save_by_name("EK3_SRC_VELZ", (int8_t)AP_NavEKF_Source::SourceZ::NONE);
+            // EK3_GPS_TYPE == 2 (GPS 2D Pos) then EK3_SRC1_POSXY = GPS(1), EK3_SRC1_VELXY = None(0), EK3_SRC1_VELZ = NONE(0)
+            AP_Param::set_and_save_by_name("EK3_SRC1_POSXY", (int8_t)AP_NavEKF_Source::SourceXY::GPS);
+            AP_Param::set_and_save_by_name("EK3_SRC1_VELXY", (int8_t)AP_NavEKF_Source::SourceXY::NONE);
+            AP_Param::set_and_save_by_name("EK3_SRC1_VELZ", (int8_t)AP_NavEKF_Source::SourceZ::NONE);
             break;
         case 3:
         default:
@@ -1640,7 +1640,7 @@ void NavEKF3::convert_parameters()
         }
     }
 
-    // use EK3_ALT_SOURCE to set EK3_SRC_POSZ
+    // use EK3_ALT_SOURCE to set EK3_SRC1_POSZ
     const AP_Param::ConversionInfo alt_source_info = {k_param_ekf3, 9, AP_PARAM_INT8, "EK3_ALT_SOURCE"};
     AP_Int8 alt_source_old;
     if (AP_Param::find_old_parameter(&alt_source_info, &alt_source_old)) {
@@ -1650,19 +1650,19 @@ void NavEKF3::convert_parameters()
             break;
         case 1:
             // EK3_ALT_SOURCE == 1 (RangeFinder)
-            AP_Param::set_and_save_by_name("EK3_SRC_POSZ", (int8_t)AP_NavEKF_Source::SourceZ::RANGEFINDER);
+            AP_Param::set_and_save_by_name("EK3_SRC1_POSZ", (int8_t)AP_NavEKF_Source::SourceZ::RANGEFINDER);
             break;
         case 2:
             // EK3_ALT_SOURCE == 2 (GPS)
-            AP_Param::set_and_save_by_name("EK3_SRC_POSZ", (int8_t)AP_NavEKF_Source::SourceZ::GPS);
+            AP_Param::set_and_save_by_name("EK3_SRC1_POSZ", (int8_t)AP_NavEKF_Source::SourceZ::GPS);
             break;
         case 3:
             // EK3_ALT_SOURCE == 3 (Beacon)
-            AP_Param::set_and_save_by_name("EK3_SRC_POSZ", (int8_t)AP_NavEKF_Source::SourceZ::BEACON);
+            AP_Param::set_and_save_by_name("EK3_SRC1_POSZ", (int8_t)AP_NavEKF_Source::SourceZ::BEACON);
             break;
         case 4:
             // EK3_ALT_SOURCE == 4 (ExtNav)
-            AP_Param::set_and_save_by_name("EK3_SRC_POSZ", (int8_t)AP_NavEKF_Source::SourceZ::EXTNAV);
+            AP_Param::set_and_save_by_name("EK3_SRC1_POSZ", (int8_t)AP_NavEKF_Source::SourceZ::EXTNAV);
             break;
         default:
             // do nothing
@@ -1670,16 +1670,16 @@ void NavEKF3::convert_parameters()
         }
     }
 
-    // use EK3_MAG_CAL to set EK3_SRC_YAW
+    // use EK3_MAG_CAL to set EK3_SRC1_YAW
     switch (_magCal.get()) {
     case 5:
         // EK3_MAG_CAL = 5 (External Yaw sensor)
-        AP_Param::set_and_save_by_name("EK3_SRC_YAW", (int8_t)AP_NavEKF_Source::SourceYaw::EXTERNAL);
+        AP_Param::set_and_save_by_name("EK3_SRC1_YAW", (int8_t)AP_NavEKF_Source::SourceYaw::EXTERNAL);
         _magCal.set_and_save((int8_t)NavEKF3_core::MagCal::NEVER);
         break;
     case 6:
         // EK3_MAG_CAL = 6 (ExtYUaw with Compass fallback)
-        AP_Param::set_and_save_by_name("EK3_SRC_YAW", (int8_t)AP_NavEKF_Source::SourceYaw::EXTERNAL_COMPASS_FALLBACK);
+        AP_Param::set_and_save_by_name("EK3_SRC1_YAW", (int8_t)AP_NavEKF_Source::SourceYaw::EXTERNAL_COMPASS_FALLBACK);
         _magCal.set_and_save((int8_t)NavEKF3_core::MagCal::NEVER);
         break;
     default:
