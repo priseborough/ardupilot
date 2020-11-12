@@ -3,7 +3,7 @@
 --
 -- setup RCx_OPTION = 90 (EKF Pos Source) to select the source (low=primary, middle=secondary, high=tertiary)
 -- setup RCx_OPTION = 83 (ZigZag Auto).  When this switch is pulled high, the source will be automatically selected
--- setup EK3_SRC_ parameters so that GPS is the primary source, Non-GPS (i.e. T265) is secondary and optical flow tertiary
+-- setup EK3_SRCn_ parameters so that GPS is the primary source, Non-GPS (i.e. T265) is secondary and optical flow tertiary
 -- configure a forward or downward facing lidar with a range of more than 5m
 --
 -- When the auxiliary switch is in middle position, automatic source selection uses these thresholds:
