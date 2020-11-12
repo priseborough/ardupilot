@@ -26,35 +26,35 @@ const AP_Param::GroupInfo AP_NavEKF_Source::var_info[] = {
     // @Description: Position Horizontal Source (Primary)
     // @Values: 0:None, 3:GPS, 4:Beacon, 6:ExternalNav
     // @User: Advanced
-    AP_GROUPINFO("POSXY", 1, AP_NavEKF_Source, _source[0].posxy, (int8_t)AP_NavEKF_Source::SourceXY::GPS),
+    AP_GROUPINFO("1_POSXY", 1, AP_NavEKF_Source, _source[0].posxy, (int8_t)AP_NavEKF_Source::SourceXY::GPS),
 
     // @Param: VELXY
     // @DisplayName: Velocity Horizontal Source
     // @Description: Velocity Horizontal Source
     // @Values: 0:None, 3:GPS, 4:Beacon, 5:OpticalFlow, 6:ExternalNav, 7:WheelEncoder
     // @User: Advanced
-    AP_GROUPINFO("VELXY", 2, AP_NavEKF_Source, _source[0].velxy, (int8_t)AP_NavEKF_Source::SourceXY::GPS),
+    AP_GROUPINFO("1_VELXY", 2, AP_NavEKF_Source, _source[0].velxy, (int8_t)AP_NavEKF_Source::SourceXY::GPS),
 
     // @Param: POSZ
     // @DisplayName: Position Vertical Source
     // @Description: Position Vertical Source
     // @Values: 0:None, 1:Baro, 2:RangeFinder, 3:GPS, 4:Beacon, 6:ExternalNav
     // @User: Advanced
-    AP_GROUPINFO("POSZ", 3, AP_NavEKF_Source, _source[0].posz, (int8_t)AP_NavEKF_Source::SourceZ::BARO),
+    AP_GROUPINFO("1_POSZ", 3, AP_NavEKF_Source, _source[0].posz, (int8_t)AP_NavEKF_Source::SourceZ::BARO),
 
     // @Param: VELZ
     // @DisplayName: Velocity Vertical Source
     // @Description: Velocity Vertical Source
     // @Values: 0:None, 3:GPS, 4:Beacon, 6:ExternalNav
     // @User: Advanced
-    AP_GROUPINFO("VELZ", 4, AP_NavEKF_Source, _source[0].velz, (int8_t)AP_NavEKF_Source::SourceZ::GPS),
+    AP_GROUPINFO("1_VELZ", 4, AP_NavEKF_Source, _source[0].velz, (int8_t)AP_NavEKF_Source::SourceZ::GPS),
 
     // @Param: YAW
     // @DisplayName: Yaw Source
     // @Description: Yaw Source
     // @Values: 0:None, 1:Compass, 2:External, 3:External with Compass Fallback
     // @User: Advanced
-    AP_GROUPINFO("YAW", 5, AP_NavEKF_Source, _source[0].yaw, (int8_t)AP_NavEKF_Source::SourceYaw::COMPASS),
+    AP_GROUPINFO("1_YAW", 5, AP_NavEKF_Source, _source[0].yaw, (int8_t)AP_NavEKF_Source::SourceYaw::COMPASS),
 
 #if AP_NAKEKF_SOURCE_COUNT >= 2
     // @Param: POSXY2
@@ -62,35 +62,35 @@ const AP_Param::GroupInfo AP_NavEKF_Source::var_info[] = {
     // @Description: Position Horizontal Source (Secondary)
     // @Values: 0:None, 3:GPS, 4:Beacon, 6:ExternalNav
     // @User: Advanced
-    AP_GROUPINFO("POSXY2", 6, AP_NavEKF_Source, _source[1].posxy, (int8_t)AP_NavEKF_Source::SourceXY::NONE),
+    AP_GROUPINFO("2_POSXY", 6, AP_NavEKF_Source, _source[1].posxy, (int8_t)AP_NavEKF_Source::SourceXY::NONE),
 
     // @Param: VELXY2
     // @DisplayName: Velocity Horizontal Source (Secondary)
     // @Description: Velocity Horizontal Source (Secondary)
     // @Values: 0:None, 3:GPS, 4:Beacon, 5:OpticalFlow, 6:ExternalNav, 7:WheelEncoder
     // @User: Advanced
-    AP_GROUPINFO("VELXY2", 7, AP_NavEKF_Source, _source[1].velxy, (int8_t)AP_NavEKF_Source::SourceXY::NONE),
+    AP_GROUPINFO("2_VELXY", 7, AP_NavEKF_Source, _source[1].velxy, (int8_t)AP_NavEKF_Source::SourceXY::NONE),
 
     // @Param: POSZ2
     // @DisplayName: Position Vertical Source (Secondary)
     // @Description: Position Vertical Source (Secondary)
     // @Values: 0:None, 1:Baro, 2:RangeFinder, 3:GPS, 4:Beacon, 6:ExternalNav
     // @User: Advanced
-    AP_GROUPINFO("POSZ2", 8, AP_NavEKF_Source, _source[1].posz, (int8_t)AP_NavEKF_Source::SourceZ::BARO),
+    AP_GROUPINFO("2_POSZ", 8, AP_NavEKF_Source, _source[1].posz, (int8_t)AP_NavEKF_Source::SourceZ::BARO),
 
     // @Param: VELZ2
     // @DisplayName: Velocity Vertical Source (Secondary)
     // @Description: Velocity Vertical Source (Secondary)
     // @Values: 0:None, 3:GPS, 4:Beacon, 6:ExternalNav
     // @User: Advanced
-    AP_GROUPINFO("VELZ2", 9, AP_NavEKF_Source, _source[1].velz, (int8_t)AP_NavEKF_Source::SourceZ::NONE),
+    AP_GROUPINFO("2_VELZ", 9, AP_NavEKF_Source, _source[1].velz, (int8_t)AP_NavEKF_Source::SourceZ::NONE),
 
     // @Param: YAW2
     // @DisplayName: Yaw Source (Secondary)
     // @Description: Yaw Source (Secondary)
     // @Values: 0:None, 1:Compass, 2:External, 3:External with Compass Fallback
     // @User: Advanced
-    AP_GROUPINFO("YAW2", 10, AP_NavEKF_Source, _source[1].yaw, (int8_t)AP_NavEKF_Source::SourceYaw::COMPASS),
+    AP_GROUPINFO("2_YAW", 10, AP_NavEKF_Source, _source[1].yaw, (int8_t)AP_NavEKF_Source::SourceYaw::COMPASS),
 #endif
 
 #if AP_NAKEKF_SOURCE_COUNT >= 3
@@ -99,35 +99,35 @@ const AP_Param::GroupInfo AP_NavEKF_Source::var_info[] = {
     // @Description: Position Horizontal Source (Tertiary)
     // @Values: 0:None, 3:GPS, 4:Beacon, 6:ExternalNav
     // @User: Advanced
-    AP_GROUPINFO("POSXY3", 11, AP_NavEKF_Source, _source[2].posxy, (int8_t)AP_NavEKF_Source::SourceXY::NONE),
+    AP_GROUPINFO("3_POSXY", 11, AP_NavEKF_Source, _source[2].posxy, (int8_t)AP_NavEKF_Source::SourceXY::NONE),
 
     // @Param: VELXY3
     // @DisplayName: Velocity Horizontal Source (Tertiary)
     // @Description: Velocity Horizontal Source (Tertiary)
     // @Values: 0:None, 3:GPS, 4:Beacon, 5:OpticalFlow, 6:ExternalNav, 7:WheelEncoder
     // @User: Advanced
-    AP_GROUPINFO("VELXY3", 12, AP_NavEKF_Source, _source[2].velxy, (int8_t)AP_NavEKF_Source::SourceXY::NONE),
+    AP_GROUPINFO("3_VELXY", 12, AP_NavEKF_Source, _source[2].velxy, (int8_t)AP_NavEKF_Source::SourceXY::NONE),
 
     // @Param: POSZ3
     // @DisplayName: Position Vertical Source (Tertiary)
     // @Description: Position Vertical Source (Tertiary)
     // @Values: 0:None, 1:Baro, 2:RangeFinder, 3:GPS, 4:Beacon, 6:ExternalNav
     // @User: Advanced
-    AP_GROUPINFO("POSZ3", 13, AP_NavEKF_Source, _source[2].posz, (int8_t)AP_NavEKF_Source::SourceZ::BARO),
+    AP_GROUPINFO("3_POSZ", 13, AP_NavEKF_Source, _source[2].posz, (int8_t)AP_NavEKF_Source::SourceZ::BARO),
 
     // @Param: VELZ3
     // @DisplayName: Velocity Vertical Source (Tertiary)
     // @Description: Velocity Vertical Source (Tertiary)
     // @Values: 0:None, 3:GPS, 4:Beacon, 6:ExternalNav
     // @User: Advanced
-    AP_GROUPINFO("VELZ3", 14, AP_NavEKF_Source, _source[2].velz, (int8_t)AP_NavEKF_Source::SourceZ::NONE),
+    AP_GROUPINFO("3_VELZ", 14, AP_NavEKF_Source, _source[2].velz, (int8_t)AP_NavEKF_Source::SourceZ::NONE),
 
     // @Param: YAW3
     // @DisplayName: Yaw Source (Tertiary)
     // @Description: Yaw Source (Tertiary)
     // @Values: 0:None, 1:Compass, 2:External, 3:External with Compass Fallback
     // @User: Advanced
-    AP_GROUPINFO("YAW3", 15, AP_NavEKF_Source, _source[2].yaw, (int8_t)AP_NavEKF_Source::SourceYaw::COMPASS),
+    AP_GROUPINFO("3_YAW", 15, AP_NavEKF_Source, _source[2].yaw, (int8_t)AP_NavEKF_Source::SourceYaw::COMPASS),
 #endif
 
     AP_GROUPEND
@@ -256,7 +256,7 @@ bool AP_NavEKF_Source::pre_arm_check(char *failure_msg, uint8_t failure_msg_len)
         case SourceXY::WHEEL_ENCODER:
         default:
             // invalid posxy value
-            hal.util->snprintf(failure_msg, failure_msg_len, "Check EK3_SRC_POSXY%s", idx_str[i]);
+            hal.util->snprintf(failure_msg, failure_msg_len, "Check EK3_SRC%s_POSXY", idx_str[i]);
             return false;
         }
 
@@ -279,7 +279,7 @@ bool AP_NavEKF_Source::pre_arm_check(char *failure_msg, uint8_t failure_msg_len)
         case SourceXY::BEACON:
         default:
             // invalid velxy value
-            hal.util->snprintf(failure_msg, failure_msg_len, "Check EK3_SRC_VELXY%s", idx_str[i]);
+            hal.util->snprintf(failure_msg, failure_msg_len, "Check EK3_SRC%s_VELXY", idx_str[i]);
             return false;
         }
 
@@ -303,7 +303,7 @@ bool AP_NavEKF_Source::pre_arm_check(char *failure_msg, uint8_t failure_msg_len)
         case SourceZ::NONE:
         default:
             // invalid posz value
-            hal.util->snprintf(failure_msg, failure_msg_len, "Check EK3_SRC_POSZ%s", idx_str[i]);
+            hal.util->snprintf(failure_msg, failure_msg_len, "Check EK3_SRC%s_POSZ", idx_str[i]);
             return false;
         }
 
@@ -322,7 +322,7 @@ bool AP_NavEKF_Source::pre_arm_check(char *failure_msg, uint8_t failure_msg_len)
         case SourceZ::BEACON:
         default:
             // invalid velz value
-            hal.util->snprintf(failure_msg, failure_msg_len, "Check EK3_SRC_VELZ%s", idx_str[i]);
+            hal.util->snprintf(failure_msg, failure_msg_len, "Check EK3_SRC%s_VELZ", idx_str[i]);
             return false;
         }
 
@@ -336,7 +336,7 @@ bool AP_NavEKF_Source::pre_arm_check(char *failure_msg, uint8_t failure_msg_len)
             break;
         default:
             // invalid posz value
-            hal.util->snprintf(failure_msg, failure_msg_len, "Check EK3_SRC_YAW%s", idx_str[i]);
+            hal.util->snprintf(failure_msg, failure_msg_len, "Check EK3_SRC%s_YAW", idx_str[i]);
             return false;
         }
     }
