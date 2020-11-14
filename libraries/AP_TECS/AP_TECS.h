@@ -45,6 +45,7 @@ public:
     void update_50hz(void) override;
 
     // Update the control loop calculations
+    // Do not call slower than 10Hz or faster than 500Hz
     void update_pitch_throttle(int32_t hgt_dem_cm,
                                float hgt_rate_dem_ms, // first time derivative of 0.01*hgt_dem_cm
                                int32_t EAS_dem_cm,

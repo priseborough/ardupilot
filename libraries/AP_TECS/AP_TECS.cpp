@@ -339,8 +339,7 @@ void AP_TECS::update_50hz(void)
     if (DT > 1.0f) {
         _climb_rate = 0.0f;
         _height_filter.dd_height = 0.0f;
-        DT            = 0.02f; // when first starting TECS, use a
-        // small time constant
+        DT = 0.02f; // when first starting TECS, use the most likely value
     }
     _update_50hz_last_usec = now;
 
@@ -420,8 +419,7 @@ void AP_TECS::_update_speed(float load_factor)
     if (DT > 1.0f) {
         _TAS_state = (_EAS * EAS2TAS);
         _integDTAS_state = 0.0f;
-        DT            = 0.1f; // when first starting TECS, use a
-        // small time constant
+        DT = 0.02f; // when first starting TECS, use the most likely time constant
     }
 
     // Get airspeed or default to halfway between min and max if
@@ -471,23 +469,20 @@ void AP_TECS::_update_speed_demand(void)
     const float velRateMin = 0.5f * _STEdot_min / _TAS_state;
     const float TAS_dem_previous = _TAS_dem_adj;
 
-    // assume fixed 10Hz call rate
-    const float dt = 0.1;
-
     // Apply rate limit
-    if ((_TAS_dem - TAS_dem_previous) > (velRateMax * dt))
+    if ((_TAS_dem - TAS_dem_previous) > (velRateMax * _DT))
     {
-        _TAS_dem_adj = TAS_dem_previous + velRateMax * dt;
+        _TAS_dem_adj = TAS_dem_previous + velRateMax * _DT;
         _TAS_rate_dem = velRateMax;
     }
-    else if ((_TAS_dem - TAS_dem_previous) < (velRateMin * dt))
+    else if ((_TAS_dem - TAS_dem_previous) < (velRateMin * _DT))
     {
-        _TAS_dem_adj = TAS_dem_previous + velRateMin * dt;
+        _TAS_dem_adj = TAS_dem_previous + velRateMin * _DT;
         _TAS_rate_dem = velRateMin;
     }
     else
     {
-        _TAS_rate_dem = (_TAS_dem - TAS_dem_previous) / dt;
+        _TAS_rate_dem = (_TAS_dem - TAS_dem_previous) / _DT;
         _TAS_dem_adj = _TAS_dem;
     }
     // Constrain speed demand again to protect against bad values on initialisation.
@@ -685,7 +680,8 @@ void AP_TECS::_update_throttle_with_airspeed(void)
 
     // Apply 0.5 second first order filter to STEdot_error
     // This is required to remove accelerometer noise from the  measurement
-    STEdot_error = 0.2f*STEdot_error + 0.8f*_STEdotErrLast;
+    const float filt_coef = 2.0f * _DT;
+    STEdot_error = filt_coef * STEdot_error + (1.0f - filt_coef) * _STEdotErrLast;
     _STEdotErrLast = STEdot_error;
 
     // Calculate throttle demand
@@ -1021,8 +1017,8 @@ void AP_TECS::_update_pitch(void)
 
 void AP_TECS::_initialise_states(int32_t ptchMinCO_cd, float hgt_afe)
 {
-    // Initialise states and variables if DT > 1 second or in climbout
-    if (_DT > 1.0f || _need_reset)
+    // Initialise states and variables if DT > 0.2 second or in climbout
+    if (_DT > 0.2f || _need_reset)
     {
         _SKE_weighting        = 1.0f;
         _integTHR_state       = 0.0f;
@@ -1034,7 +1030,7 @@ void AP_TECS::_initialise_states(int32_t ptchMinCO_cd, float hgt_afe)
         _hgt_dem_lpf          = hgt_afe;
         _hgt_dem_rate_ltd = hgt_afe;
         _TAS_dem_adj          = _TAS_dem;
-        _DT                   = 0.1f; // when first starting TECS, use a small time constant
+        _DT                   = 0.02f; // when first starting TECS, use the most likely time constant
         _lag_comp_hgt_offset  = 0.0f;
         _post_TO_hgt_offset   = 0.0f;
 
@@ -1090,6 +1086,7 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
     // Calculate time in seconds since last update
     uint64_t now = AP_HAL::micros64();
     _DT = (now - _update_pitch_throttle_last_usec) * 1.0e-6f;
+    _DT = MAX(_DT, 0.001f);
     _update_pitch_throttle_last_usec = now;
 
     _flags.is_gliding = _flags.gliding_requested || _flags.propulsion_failed || aparm.throttle_max==0;
