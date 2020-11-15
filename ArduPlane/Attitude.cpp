@@ -621,6 +621,7 @@ void Plane::calc_nav_pitch()
         // calculates the pitch rate demand and modifies the roll angle demand nav_roll_cd
         plane.do_accel_vector_nav();
     } else {
+        normal_accel_error_integral = 0.0f;
         // Calculate the Pitch of the plane
         // --------------------------------
         int32_t commanded_pitch = SpdHgt_Controller->get_pitch_demand();
@@ -709,6 +710,26 @@ void Plane::do_accel_vector_nav(void)
 
         const float roll_demand_rad = atan2f(turn_accel_dem , vert_accel_dem + GRAVITY_MSS);
 
+        float pitch_rate_correction_rps = 0.0f;
+        float DT = 0.001f * (float)(millis() - last_accel_vec_update_ms);
+        if (DT > 0.04f) {
+            last_accel_vec_update_ms = millis();
+        } else if (is_positive(g.load_factor_gain)) {
+            if (vert_accel_dem > -GRAVITY_MSS) {
+                const float normal_accel_required = sqrtf(sq(vert_accel_dem + GRAVITY_MSS) + sq(turn_accel_dem));
+                const float normal_accel_measured = -ahrs.get_accel().z;
+                const float normal_accel_error = normal_accel_required - normal_accel_measured;
+                if (is_positive(normal_accel_error * (float)nav_pitch_clip)) {
+                    const float coef = DT / plane.pitchController.get_angle_error_gain();
+                    normal_accel_error_integral *= (1.0f - coef);
+                } else {
+                    normal_accel_error_integral += normal_accel_error * g.load_factor_gain * DT;
+                }
+            }
+            pitch_rate_correction_rps = normal_accel_error_integral / true_airspeed;
+        }
+        last_accel_vec_update_ms = millis();
+
         // limit roll and recalculate turn acceleration
         nav_roll_cd = constrain_int32((int32_t)(100.0f*degrees(roll_demand_rad)), -roll_limit_cd, roll_limit_cd);
         turn_accel_dem = (vert_accel_dem + GRAVITY_MSS) * tanf(radians(0.01f*(float)nav_roll_cd));
@@ -730,6 +751,7 @@ void Plane::do_accel_vector_nav(void)
             const float predicted_roll = ahrs.roll + g.load_factor_lag * ang_rate.x;
             nav_body_pitch_rate_rps =  vert_rate * cosf(predicted_roll);
             nav_body_pitch_rate_rps += turn_rate * sinf(predicted_roll);
+            nav_body_pitch_rate_rps += pitch_rate_correction_rps;
         }
 
         // get the rate limits required to observe the structural load factor limit
@@ -754,10 +776,10 @@ void Plane::do_accel_vector_nav(void)
             nav_body_pitch_rate_rps = 0.5f * (rate_limit_max + rate_limit_min);
         }
         AP::logger().Write("ACVN",
-                        "TimeUS,TAD,VAD,RLU,RLD,NPR,ALU,ALD,CRR,DRD,AY",
-                        "snnnnnnnnnn",
-                        "F0000000000",
-                        "Qffffffffff",
+                        "TimeUS,TAD,VAD,RLU,RLD,NPR,ALU,ALD,CRR,DRD,AY,PRC",
+                        "snnnnnnnnnnn",
+                        "F00000000000",
+                        "Qfffffffffff",
                         AP_HAL::micros(),
                         turn_accel_dem,
                         vert_accel_dem,
@@ -768,7 +790,8 @@ void Plane::do_accel_vector_nav(void)
                         SpdHgt_Controller->get_pitch_min(),
                         commanded_roll_rad,
                         roll_demand_rad,
-                        accel_y);
+                        accel_y,
+                        pitch_rate_correction_rps);
     }
 }
 
