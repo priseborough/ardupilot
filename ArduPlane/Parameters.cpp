@@ -69,14 +69,22 @@ const AP_Param::Info Plane::var_info[] = {
     GSCALAR(load_factor_max, "LOAD_FACTOR_MAX", 4.0f),
 
     // @Param: LOAD_FACTOR_LAG
-    // @DisplayName: Lag from pitch rate to laod factor
+    // @DisplayName: Lag from pitch rate to load factor
     // @Description: Time lag from pitch rate to load factor that the navigation loops compensate for when NAV_TYPE_ACC = 1.
     // @Range: 0.0 0.1
     // @Increment: 0.01
     // @User: Standard
     GSCALAR(load_factor_lag, "LOAD_FACTOR_LAG", 0.2f),
 
-    // @Param: NAV_TYPE_ACC
+    // @Param: LOAD_FACTOR_GAIN
+    // @DisplayName: Load factor error gain
+    // @Description: Gain from integral of normal acceleration error to demanded pitch rate when NAV_TYPE_ACC = 1.
+    // @Range: 0.0 1.0
+    // @Increment: 0.01
+    // @User: Standard
+    GSCALAR(load_factor_gain, "LOAD_FACTOR_GAIN", 0.0f),
+
+   // @Param: NAV_TYPE_ACC
     // @DisplayName: Enables acceleration vector navigation
     // @Description: If NAV_TYPE_ACC is set to 1, then when the speed and height controller is active, a vertical acceleration converted to a pitch rate rather than pitch angle will be demanded and pitch rate demand will be limited to respect the load factor limit set by LOAD_FACTOR_MAX. Pitch angle limaits will still be respected.
     // @Values: 0:Disabled,1:Enabled

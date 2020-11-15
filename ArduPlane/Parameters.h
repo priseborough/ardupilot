@@ -65,7 +65,7 @@ public:
         k_param_reset_switch_chan, // unused - moved to RC option
         k_param_lat_acc_compensation_gain,
         k_param_land_pitch_cd,  // unused - moved to AP_Landing
-        k_param_ins_old,            // *** Deprecated, remove with next eeprom number change
+        k_param_load_factor_gain,
         k_param_stick_mixing,
         k_param_reset_mission_chan, // unused - moved to RC option
         k_param_land_flare_alt, // unused - moved to AP_Landing
@@ -439,6 +439,7 @@ public:
     AP_Float load_factor_max;
     AP_Float load_factor_lag;
     AP_Float lat_acc_compensation_gain;
+    AP_Float load_factor_gain;
 
     // Misc
     //

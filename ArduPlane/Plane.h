@@ -617,6 +617,10 @@ private:
     // roll before the roll is clipped, using 1/sqrt(cos(nav_roll))
     float aerodynamic_load_factor = 1.0f;
 
+    float normal_accel_error_integral;
+
+    int32_t last_accel_vec_update_ms;
+
     // a smoothed airspeed estimate, used for limiting roll angle
     float smoothed_airspeed;
 
