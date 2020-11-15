@@ -970,33 +970,17 @@ void AP_TECS::_update_pitch(void)
     // Calculate pitch demand from specific energy balance signals
     _pitch_dem_unc = (SEBdot_dem_total + _integSEB_state) / gainInv;
 
-    AP::logger().Write("TEC3", "TimeUS,S0,S1,S2,S3,S4,S5,S6,S7,S8,S9",
-                    "s----------",
-                    "F----------",
-                    "Qffffffffff",
-                    AP_HAL::micros(),
-                    (double)SPE_weighting,              // S0
-                    (double)SEB_dem,                    // S1
-                    (double)SEB_error,                  // S2
-                    (double)SEBdot_dem,                 // S3
-                    (double)SEBdot_error,               // S4
-                    (double)(SEBdot_error * pitch_damp),// S5
-                    (double)SEBdot_dem_total,           // S6
-                    (double)integSEB_min,               // S7
-                    (double)integSEB_max,               // S8
-                    (double)_integSEB_state);           // S9
-
-    // calculate a demanded vertical velocity
-    const float energy_loop_tconst = timeConstant();
-    const float vel_dem = constrain_float((SEBdot_dem_total + _integSEB_state) / (energy_loop_tconst * GRAVITY_MSS), -_maxSinkRate, _maxClimbRate);
-
-    // calculate a demanded vertical acceleration
-    _vert_accel_dem = constrain_float((vel_dem - _climb_rate) * (_accel_gf / energy_loop_tconst) , -_vertAccLim, _vertAccLim);
-
     // Add a feedforward term from demanded airspeed to pitch
     if (_flags.is_gliding) {
         _pitch_dem_unc += (_TAS_dem_adj - _pitch_ff_v0) * _pitch_ff_k;
     }
+
+    // calculate a demanded vertical velocity
+    const float energy_loop_tconst = timeConstant();
+    const float vel_dem = constrain_float(_pitch_dem_unc * _TAS_state, -_maxSinkRate, _maxClimbRate);
+
+    // calculate a demanded vertical acceleration
+    _vert_accel_dem = constrain_float((vel_dem - _climb_rate) * (_accel_gf / energy_loop_tconst) , -_vertAccLim, _vertAccLim);
 
     // Constrain pitch demand
     _pitch_dem = constrain_float(_pitch_dem_unc, _PITCHminf, _PITCHmaxf);
@@ -1013,7 +997,25 @@ void AP_TECS::_update_pitch(void)
     {
         _pitch_dem = _last_pitch_dem - ptchRateIncr;
     }
+
     _last_pitch_dem = _pitch_dem;
+    AP::logger().Write("TEC3", "TimeUS,S0,S1,S2,S3,S4,S5,S6,S7,S8,S9,S10",
+                    "s-----------",
+                    "F-----------",
+                    "Qfffffffffff",
+                    AP_HAL::micros(),
+                    (double)SPE_weighting,              // S0
+                    (double)SEB_dem,                    // S1
+                    (double)SEB_error,                  // S2
+                    (double)SEBdot_dem,                 // S3
+                    (double)SEBdot_error,               // S4
+                    (double)(SEBdot_error * pitch_damp),// S5
+                    (double)SEBdot_dem_total,           // S6
+                    (double)integSEB_min,               // S7
+                    (double)integSEB_max,               // S8
+                    (double)_integSEB_state,            // S9
+                    (double)_vert_accel_dem);           // S10
+
 }
 
 void AP_TECS::_initialise_states(int32_t ptchMinCO_cd, float hgt_afe)
