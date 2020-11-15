@@ -539,6 +539,11 @@ void AP_TECS::_update_height_demand(void)
 
         _hgt_dem = _hgt_dem_lpf;
 
+        // during approach compensate for height filter lag
+        if (_flags.is_doing_auto_land) {
+            _hgt_dem += _hgt_dem_tconst * _hgt_rate_dem;
+        }
+
     } else {
         // when flaring force height rate demand to the
         // configured sink rate and adjust the demanded height to
@@ -1304,15 +1309,17 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
     // @Field: PErr: difference between estimated potential energy and desired potential energy
     // @Field: EDelta: current error in speed/balance weighting
     // @Field: LF: aerodynamic load factor
-    AP::logger().Write("TEC2", "TimeUS,pmax,pmin,KErr,PErr,EDelta,LF",
-                       "s------",
-                       "F------",
-                       "Qffffff",
+    // @Field: HRDI
+    AP::logger().Write("TEC2", "TimeUS,pmax,pmin,KErr,PErr,EDelta,LF,HRDI",
+                       "s-------",
+                       "F-------",
+                       "Qfffffff",
                        now,
                        (double)degrees(_PITCHmaxf),
                        (double)degrees(_PITCHminf),
                        (double)logging.SKE_error,
                        (double)logging.SPE_error,
                        (double)logging.SEB_delta,
-                       (double)load_factor);
+                       (double)load_factor,
+                       (double)_hgt_rate_dem_in);
 }
