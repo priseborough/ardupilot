@@ -233,6 +233,20 @@ void NavEKF3_core::getVelNED(Vector3f &vel) const
     vel = outputDataNew.velocity + velOffsetNED;
 }
 
+// return estimate of true airspeed vector in body frame in m/s
+// returns false if estimate is unavailable
+bool NavEKF3_core::getAirSpdVec(Vector3f &vel) const
+{
+    if (inhibitWindStates || PV_AidingMode == AID_NONE) {
+        return false;
+    }
+    vel = outputDataNew.velocity + velOffsetNED;
+    vel.x -= stateStruct.wind_vel.x;
+    vel.y -= stateStruct.wind_vel.y;
+    return true;
+}
+
+
 // Return the rate of change of vertical position in the down direction (dPosD/dt) of the body frame origin in m/s
 float NavEKF3_core::getPosDownDerivative(void) const
 {

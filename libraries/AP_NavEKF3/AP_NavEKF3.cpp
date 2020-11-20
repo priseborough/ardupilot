@@ -39,6 +39,8 @@
 #define FLOW_I_GATE_DEFAULT     300
 #define CHECK_SCALER_DEFAULT    100
 #define FLOW_USE_DEFAULT        1
+#define WIND_P_NSE_DEFAULT      0.2
+#define BCOEF_XY_DEFAULT        35.0
 
 #elif APM_BUILD_TYPE(APM_BUILD_Rover)
 // rover defaults
@@ -64,6 +66,8 @@
 #define FLOW_I_GATE_DEFAULT     300
 #define CHECK_SCALER_DEFAULT    100
 #define FLOW_USE_DEFAULT        1
+#define WIND_P_NSE_DEFAULT      0.1
+#define BCOEF_XY_DEFAULT        0.0
 
 #elif APM_BUILD_TYPE(APM_BUILD_ArduPlane)
 // plane defaults
@@ -89,6 +93,8 @@
 #define FLOW_I_GATE_DEFAULT     500
 #define CHECK_SCALER_DEFAULT    150
 #define FLOW_USE_DEFAULT        2
+#define WIND_P_NSE_DEFAULT      0.1
+#define BCOEF_XY_DEFAULT        0.0
 
 #else
 // build type not specified, use copter defaults
@@ -98,7 +104,7 @@
 #define ALT_M_NSE_DEFAULT       2.0f
 #define MAG_M_NSE_DEFAULT       0.05f
 #define GYRO_P_NSE_DEFAULT      1.5E-02f
-#define ACC_P_NSE_DEFAULT       3.5E-01f
+#define ACC_P_NSE_DEFAULT       3.5E-01ff
 #define GBIAS_P_NSE_DEFAULT     1.0E-03f
 #define ABIAS_P_NSE_DEFAULT     3.0E-03f
 #define MAGB_P_NSE_DEFAULT      1.0E-04f
@@ -114,6 +120,8 @@
 #define FLOW_I_GATE_DEFAULT     300
 #define CHECK_SCALER_DEFAULT    100
 #define FLOW_USE_DEFAULT        1
+#define WIND_P_NSE_DEFAULT      0.1
+#define BCOEF_XY_DEFAULT        0.0
 
 #endif // APM_BUILD_DIRECTORY
 
@@ -352,7 +360,14 @@ const AP_Param::GroupInfo NavEKF3::var_info[] = {
     // @Units: rad/s/s
     AP_GROUPINFO("GBIAS_P_NSE", 26, NavEKF3, _gyroBiasProcessNoise, GBIAS_P_NSE_DEFAULT),
 
-    // 27 previously used for EK2_GSCL_P_NSE parameter that has been removed
+    // @Param: DRAG_M_NSE
+    // @DisplayName: Observation noise for drag acceleration
+    // @Description: This sets the amount of noise used when fusing X and Y acceleration as an observation that enables esitmation of wind velocity for multi-rotor vehicles. This feature is enabled by the EK3_BCOEF_X and EK3_BCOEF_Y parameters
+    // @Range: 0.1 2.0
+    // @Increment: 0.1
+    // @User: Advanced
+    // @Units: m/s/s
+    AP_GROUPINFO("DRAG_M_NSE", 27, NavEKF3, _dragObsNoise, 0.5f),
 
     // @Param: ABIAS_P_NSE
     // @DisplayName: Accelerometer bias stability (m/s^3)
@@ -362,7 +377,28 @@ const AP_Param::GroupInfo NavEKF3::var_info[] = {
     // @Units: m/s/s/s
     AP_GROUPINFO("ABIAS_P_NSE", 28, NavEKF3, _accelBiasProcessNoise, ABIAS_P_NSE_DEFAULT),
 
-    // 29 previously used for EK2_MAG_P_NSE parameter that has been replaced with EK3_MAGE_P_NSE and EK3_MAGB_P_NSE
+    // @Param: BCOEF_X
+    // @DisplayName: Ballistic coefficient measured in X direction
+    // @Description: Ratio of mass to drag coefficient measured along the X body axis. Enables estimation of wind drift for vehicles with bluff bodies and without propulsion forces in the X and Y direciton (eg multicopters). Set to a postive value > 1.0 to enable.
+    // @Units: kg/m^2
+    // @Range: 0.0 100.0
+    // @Increment: 1.0
+    // @User: Advanced
+
+    // @Param: BCOEF_Y
+    // @DisplayName: Ballistic coefficient measured in Y direction
+    // @Description: Ratio of mass to drag coefficient measured along the Y body axis. Enables estimation of wind drift for vehicles with bluff bodies and without propulsion forces in the X and Y direciton (eg multicopters). Set to a postive value > 1.0 to enable.
+    // @Units: kg/m^2
+    // @Range: 0.0 100.0
+    // @Increment: 1.0
+    // @User: Advanced
+    // @Param: BCOEF_Y
+
+    // @Param: BCOEF_Z
+    // @DisplayName: unused
+    // @Description: unused
+    // @User: Advanced
+    AP_GROUPINFO("BCOEF", 29, NavEKF3, _ballisticCoef, BCOEF_XY_DEFAULT),
 
     // @Param: WIND_P_NSE
     // @DisplayName: Wind velocity process noise (m/s^2)
@@ -371,7 +407,7 @@ const AP_Param::GroupInfo NavEKF3::var_info[] = {
     // @Increment: 0.1
     // @User: Advanced
     // @Units: m/s/s
-    AP_GROUPINFO("WIND_P_NSE", 30, NavEKF3, _windVelProcessNoise, 0.1f),
+    AP_GROUPINFO("WIND_P_NSE", 30, NavEKF3, _windVelProcessNoise, WIND_P_NSE_DEFAULT),
 
     // @Param: WIND_PSCALE
     // @DisplayName: Height rate to wind process noise scaler
@@ -1106,6 +1142,18 @@ void NavEKF3::getVelNED(int8_t instance, Vector3f &vel) const
     if (core) {
         core[instance].getVelNED(vel);
     }
+}
+
+// return estimate of true airspeed vector in body frame in m/s for the specified instance
+// An out of range instance (eg -1) returns data for the primary instance
+// returns false if estimate is unavailable
+bool NavEKF3::getAirSpdVec(int8_t instance, Vector3f &vel) const
+{
+    if (instance < 0 || instance >= num_cores) instance = primary;
+    if (core) {
+        return core[instance].getAirSpdVec(vel);
+    }
+    return false;
 }
 
 // Return the rate of change of vertical position in the down direction (dPosD/dt) in m/s
