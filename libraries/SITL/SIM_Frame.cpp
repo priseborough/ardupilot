@@ -420,25 +420,23 @@ void Frame::init(const char *frame_str, Battery *_battery)
 
     terminal_rotation_rate = model.refRotRate;
 
-    float hover_thrust = mass * GRAVITY_MSS;
-    float hover_power = model.refCurrent * model.refVoltage;
-    float hover_velocity_out = 2 * hover_power / hover_thrust;
-    float effective_disc_area = hover_thrust / (0.5 * ref_air_density * sq(hover_velocity_out));
-    velocity_max = hover_velocity_out / sqrtf(model.hoverThrOut);
-    thrust_max = 0.5 * ref_air_density * effective_disc_area * sq(velocity_max);
-    effective_prop_area = effective_disc_area / num_motors;
-
-    // power_factor is ratio of power consumed per newton of thrust
-    float power_factor = hover_power / hover_thrust;
+    const float hover_thrust = mass * GRAVITY_MSS;
+    const float hover_electrical_power = model.refCurrent * model.refVoltage;
+    const float hover_momentum_power = sqrtf(powf(hover_thrust, 3.0f) / (2.0f * ref_air_density * model.disc_area));
+    prop_fom = hover_momentum_power / hover_electrical_power;
+    thrust_max = hover_thrust / (sqrtf((1.0f - model.propExpo) * model.hoverThrOut + model.propExpo * sq(model.hoverThrOut)));
+    thrust_max *= (1.225f / ref_air_density);
+    velocity_max = sqrtf(thrust_max / (2.0f * 1.225f * model.disc_area));
 
     battery->setup(model.battCapacityAh, model.refBatRes, model.maxVoltage);
 
     for (uint8_t i=0; i<num_motors; i++) {
         motors[i].setup_params(model.pwmMin, model.pwmMax, model.spin_min, model.spin_max, model.propExpo, model.slew_max,
-                               model.mass, model.diagonal_size, power_factor, model.maxVoltage);
+                               model.mass, model.diagonal_size, prop_fom, model.maxVoltage, thrust_max/(float)num_motors,
+                               model.disc_area/(float)num_motors);
     }
 
-
+    ::printf("Combined motor & prop eff is %.f pct. Normal range is between 0.5 and 0.8 \n", 100.0f * prop_fom);
 #if 0
     // useful debug code for thrust curve
     {
@@ -450,7 +448,7 @@ void Frame::init(const char *frame_str, Battery *_battery)
             Vector3f rot_accel {}, thrust {};
             Vector3f vel_air_bf {};
             motors[0].calculate_forces(input, motor_offset, rot_accel, thrust, vel_air_bf,
-                                       ref_air_density, velocity_max, effective_prop_area, battery->get_voltage());
+                                       ref_air_density, battery->get_voltage());
             ::printf("pwm[%u] cmd=%.3f thrust=%.3f hovthst=%.3f\n",
                      pwm, motors[0].pwm_to_command(pwm), -thrust.z*num_motors, hover_thrust);
         }
@@ -495,8 +493,7 @@ void Frame::calculate_forces(const Aircraft &aircraft,
     float current = 0;
     for (uint8_t i=0; i<num_motors; i++) {
         Vector3f mraccel, mthrust;
-        motors[i].calculate_forces(input, motor_offset, mraccel, mthrust, vel_air_bf, air_density, velocity_max,
-                                   effective_prop_area, battery->get_voltage());
+        motors[i].calculate_forces(input, motor_offset, mraccel, mthrust, vel_air_bf, air_density, battery->get_voltage());
         current += motors[i].get_current();
         rot_accel += mraccel;
         thrust += mthrust;

@@ -120,9 +120,9 @@ private:
         // maximum slew rate of motors
         float slew_max = 150;
 
-        // rotor disc area in m**2 for 4 x 0.35m dia rotors
-        // Note that coaxial rotors count as one rotor only when cauclating effective disc area
-        float disc_area = 0.385;
+        // rotor disc area
+        // Note that coaxial rotors count as a single disc when calculating effective disc area
+        float disc_area = 4.0 * (M_PI/4.0) * sq(0.3);
 
         // momentum drag coefficient
         float mdrag_coef = 0.2;
@@ -136,9 +136,10 @@ private:
     float mass;
     float velocity_max;
     float thrust_max;
-    float effective_prop_area;
+    float thrust_hover;
     Battery *battery;
     float last_param_voltage;
+    float prop_fom;
 
     // get air density in kg/m^3
     float get_air_density(float alt_amsl) const;

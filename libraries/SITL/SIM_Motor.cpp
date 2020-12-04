@@ -28,8 +28,6 @@ void Motor::calculate_forces(const struct sitl_input &input,
                              Vector3f &thrust,
                              const Vector3f &velocity_air_bf,
                              float air_density,
-                             float velocity_max,
-                             float effective_prop_area,
                              float voltage)
 {
     // fudge factors
@@ -61,10 +59,13 @@ void Motor::calculate_forces(const struct sitl_input &input,
     Vector3f rotor_torque(0, 0, yaw_factor * command * yaw_scale * voltage_scale);
 
     // calculate velocity into prop, clipping at zero, assumes zero roll/pitch
-    float velocity_in = MAX(0, -velocity_air_bf.z);
+    const float velocity_in = MAX(0, -velocity_air_bf.z);
 
     // get thrust for untilted motor
-    float motor_thrust = calc_thrust(command, air_density, effective_prop_area, velocity_in, velocity_max * voltage_scale);
+    const float motor_thrust = calc_thrust(command, air_density, velocity_in);
+
+    // get power for untilted motor
+    const float motor_power = calc_power(motor_thrust, air_density, velocity_in);
 
     // thrust in NED
     thrust = {0, 0, -motor_thrust};
@@ -114,8 +115,7 @@ void Motor::calculate_forces(const struct sitl_input &input,
     rot_accel.z = torque.z / moment_of_inertia.z;
 
     // calculate current
-    float power = power_factor * fabsf(motor_thrust);
-    current = power / MAX(voltage, 0.1);
+    current = motor_power / MAX(voltage, 0.1);
 }
 
 /*
@@ -153,7 +153,8 @@ float Motor::get_current(void) const
 
 // setup PWM ranges for this motor
 void Motor::setup_params(uint16_t _pwm_min, uint16_t _pwm_max, float _spin_min, float _spin_max, float _expo, float _slew_max,
-                         float _vehicle_mass, float _diagonal_size, float _power_factor, float _voltage_max)
+                         float _vehicle_mass, float _diagonal_size, float _prop_fom, float _voltage_max, float _thrust_max,
+                         float _prop_area)
 {
     mot_pwm_min = _pwm_min;
     mot_pwm_max = _pwm_max;
@@ -163,8 +164,10 @@ void Motor::setup_params(uint16_t _pwm_min, uint16_t _pwm_max, float _spin_min, 
     slew_max = _slew_max;
     vehicle_mass = _vehicle_mass;
     diagonal_size = _diagonal_size;
-    power_factor = _power_factor;
     voltage_max = _voltage_max;
+    efficiency = _prop_fom;
+    thrust_max = _thrust_max;
+    prop_area = _prop_area;
 
     // assume 50% of mass on ring around center
     moment_of_inertia.x = vehicle_mass * 0.25 * sq(diagonal_size*0.5);
@@ -186,16 +189,50 @@ float Motor::pwm_to_command(float pwm) const
 /*
   calculate thrust given a command value
 */
-float Motor::calc_thrust(float command, float air_density, float effective_prop_area, float velocity_in, float velocity_max) const
+float Motor::calc_thrust(float command, float air_density, float velocity_in) const
 {
-    float velocity_out = velocity_max * sqrtf((1-mot_expo)*command + mot_expo*sq(command));
-    float ret = 0.5 * air_density * effective_prop_area * (sq(velocity_out) - sq(velocity_in));
-#if 0
-    if (command > 0) {
-        ::printf("air_density=%f effective_prop_area=%f velocity_in=%f velocity_max=%f\n",
-                 air_density, effective_prop_area, velocity_in, velocity_max);
-        ::printf("calc_thrust %.3f %.3f\n", command, ret);
+    // a very approximate model that adjusts hover thrust for air density and airspeed
+    float thrust_fraction = sqrtf((1.0f - mot_expo) * command + mot_expo * sq(command));
+    const float hover_thrust = thrust_fraction * thrust_max * (air_density / 1.225f);
+    const float hover_inflow_velocity = sqrtf(hover_thrust / (2.0f * air_density * prop_area));
+    // Assume that for a constant throttle, thrust reduces linearly with airspeed and is zero when
+    // airspeed normal to the prop disc is twice the hover inflow value.
+    if (hover_inflow_velocity > 0.001f) {
+        thrust_fraction *= constrain_float(1.0f - velocity_in / (2.0f * hover_inflow_velocity), 0.0f, 1.1f);
     }
+    const float ret = thrust_fraction * thrust_max * (air_density / 1.225f);
+#if 0
+    static uint32_t counter=0;
+    if (command > 0 && counter > 1000) {
+        counter=0;
+        ::printf("command=%.2f density=%.3f velocity_in=%.2f\n",
+                 command, air_density, velocity_in);
+        ::printf("%.3f , %.3f , %.3f , %.3f , %.3f\n", hover_thrust, prop_area, hover_inflow_velocity, thrust_max, thrust_fraction);
+    }
+    counter++;
 #endif
     return ret;
+}
+
+/*
+  calculate motor electrical power required to generate a given thrust
+*/
+float Motor::calc_power(float thrust, float air_density, float velocity_in) const
+{
+    // a very approximate model that adjusts hover thrust for air density and airspeed
+    float momentum_power;
+    if (velocity_in < 0.001f) {
+        // use equations for prop in hover
+            momentum_power = sqrtf(powf(thrust, 3.0f) / (2.0f * air_density * prop_area));
+        } else {
+        // solve equations for prop in forward flight
+        const float A = 1.0f;
+        const float B = 1.0f;
+        const float C = - thrust / (2.0f * air_density * prop_area * sq(velocity_in));
+        const float a_coef = (-B + sqrtf(sq(B) - 4.0f * A * C)) / (2.0f * A);
+        const float momentum_efficiency = 1.0f / (1.0f + a_coef);
+        const float thrust_power = thrust * velocity_in;
+        momentum_power = thrust_power * momentum_efficiency;
+    }
+    return momentum_power / efficiency;
 }
