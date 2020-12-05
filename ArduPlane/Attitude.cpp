@@ -151,8 +151,9 @@ void Plane::stabilize_pitch(float speed_scaler)
     } else {
         elevator = 0;
     }
-    if (g.use_accel_vector_nav == 1 && control_mode->does_auto_throttle()) {
-        elevator += pitchController.get_rate_out(degrees(nav_pitch_rate_rps), speed_scaler);
+    using_accel_vector_nav = (g.use_accel_vector_nav == 1) && control_mode->does_auto_throttle() && plane.do_accel_vector_nav();
+    if (using_accel_vector_nav) {
+        elevator += pitchController.get_rate_out(degrees(nav_body_pitch_rate_rps), speed_scaler);
         SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, elevator);
     } else {
         elevator += pitchController.get_servo_out(demanded_pitch - ahrs.pitch_sensor, speed_scaler, disable_integrator);
@@ -617,10 +618,7 @@ void Plane::calc_nav_yaw_ground(void)
  */
 void Plane::calc_nav_pitch()
 {
-    if (g.use_accel_vector_nav == 1) {
-        // calculates the pitch rate demand and modifies the roll angle demand nav_roll_cd
-        plane.do_accel_vector_nav();
-    } else {
+    if (!using_accel_vector_nav) {
         normal_accel_error_integral = 0.0f;
         // Calculate the Pitch of the plane
         // --------------------------------
@@ -689,9 +687,11 @@ void Plane::calc_nav_roll()
 
 /*
   calculate a pitch rate and roll angle demand to achieve demanded vertical and horizontal acceleration
+  returns false if calculation could not be performed
  */
-void Plane::do_accel_vector_nav(void)
+bool Plane::do_accel_vector_nav(void)
 {
+    bool is_valid;
     float true_airspeed;
     if (ahrs.airspeed_estimate(true_airspeed)) {
         true_airspeed = ahrs.get_EAS2TAS() * MAX(true_airspeed, 0.8f * (float)aparm.airspeed_min);
@@ -771,9 +771,11 @@ void Plane::do_accel_vector_nav(void)
             } else {
                 nav_pitch_clip = 0;
             }
+            is_valid = true;
         } else {
-            // error condition so sit between min and max limits and wait for limits to separate
-            nav_body_pitch_rate_rps = 0.5f * (rate_limit_max + rate_limit_min);
+            // error condition
+            nav_body_pitch_rate_rps = 0.0f;
+            is_valid = false;
         }
         AP::logger().Write("ACVN",
                         "TimeUS,TAD,VAD,RLU,RLD,NPR,ALU,ALD,CRR,DRD,AY,PRC",
@@ -792,7 +794,12 @@ void Plane::do_accel_vector_nav(void)
                         roll_demand_rad,
                         accel_y,
                         pitch_rate_correction_rps);
+    } else {
+        // error condition
+        nav_body_pitch_rate_rps = 0.0f;
+        is_valid = false;
     }
+    return is_valid;
 }
 
 /*
