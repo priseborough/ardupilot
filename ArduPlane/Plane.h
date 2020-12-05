@@ -617,9 +617,14 @@ private:
     // roll before the roll is clipped, using 1/sqrt(cos(nav_roll))
     float aerodynamic_load_factor = 1.0f;
 
+    // integral used by the normal acceleration control loop
     float normal_accel_error_integral;
 
+    // last time the normal acceleration vector demand was updated
     int32_t last_accel_vec_update_ms;
+
+    // true when normal acceleration vector nav is being used
+    bool using_accel_vector_nav;
 
     // a smoothed airspeed estimate, used for limiting roll angle
     float smoothed_airspeed;
@@ -828,7 +833,7 @@ private:
     // Attitude.cpp
     void adjust_nav_pitch_throttle(void);
     void update_load_factor(void);
-    void do_accel_vector_nav(void);
+    bool do_accel_vector_nav(void);
     void adjust_altitude_target();
     void setup_glide_slope(void);
     int32_t get_RTL_altitude() const;
