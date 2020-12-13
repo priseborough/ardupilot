@@ -777,12 +777,8 @@ bool Plane::do_accel_vector_nav(void)
             nav_body_pitch_rate_rps = 0.0f;
             is_valid = false;
         }
-        AP::logger().Write("ACVN",
-                        "TimeUS,TAD,VAD,RLU,RLD,NPR,ALU,ALD,CRR,DRD,AY,PRC",
-                        "snnnnnnnnnnn",
-                        "F00000000000",
-                        "Qfffffffffff",
-                        AP_HAL::micros(),
+        AP::logger().Write("ACVN","TimeUS,TAD,VAD,RLU,RLD,NPR,ALU,ALD,CRR,RDR,AY,PRC","Qfffffffffff",
+                        AP_HAL::micros64(),
                         turn_accel_dem,
                         vert_accel_dem,
                         rate_limit_max,
