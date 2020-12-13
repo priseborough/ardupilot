@@ -1003,23 +1003,18 @@ void AP_TECS::_update_pitch(void)
     }
 
     _last_pitch_dem = _pitch_dem;
-    AP::logger().Write("TEC3", "TimeUS,S0,S1,S2,S3,S4,S5,S6,S7,S8,S9,S10",
-                    "s-----------",
-                    "F-----------",
-                    "Qfffffffffff",
-                    AP_HAL::micros(),
-                    (double)SPE_weighting,              // S0
-                    (double)SEB_dem,                    // S1
-                    (double)SEB_error,                  // S2
-                    (double)SEBdot_dem,                 // S3
-                    (double)SEBdot_error,               // S4
-                    (double)(SEBdot_error * pitch_damp),// S5
-                    (double)SEBdot_dem_total,           // S6
-                    (double)integSEB_min,               // S7
-                    (double)integSEB_max,               // S8
-                    (double)_integSEB_state,            // S9
-                    (double)_vert_accel_dem);           // S10
-
+    AP::logger().Write("TEC3","TimeUS,PEW,EBD,EBE,EBDD,EBDE,EBDDT,Imin,Imax,I,VAD","Qffffffffff",
+                    AP_HAL::micros64(),
+                    (double)SPE_weighting,
+                    (double)SEB_dem,
+                    (double)SEB_error,
+                    (double)SEBdot_dem,
+                    (double)SEBdot_error,
+                    (double)SEBdot_dem_total,
+                    (double)integSEB_min,
+                    (double)integSEB_max,
+                    (double)_integSEB_state,
+                    (double)_vert_accel_dem);
 }
 
 void AP_TECS::_initialise_states(int32_t ptchMinCO_cd, float hgt_afe)
