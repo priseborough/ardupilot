@@ -14,6 +14,7 @@
 #include <SITL/SIM_Helicopter.h>
 #include <SITL/SIM_SingleCopter.h>
 #include <SITL/SIM_Plane.h>
+#include <SITL/SIM_PlaneJSON.h>
 #include <SITL/SIM_QuadPlane.h>
 #include <SITL/SIM_Rover.h>
 #include <SITL/SIM_BalanceBot.h>
@@ -146,6 +147,7 @@ static const struct {
     { "last_letter",        last_letter::create },
     { "tracker",            Tracker::create },
     { "balloon",            Balloon::create },
+    { "planeJSON",          PlaneJSON::create },
     { "plane",              Plane::create },
     { "calibration",        Calibration::create },
     { "vectored",           Submarine::create },
