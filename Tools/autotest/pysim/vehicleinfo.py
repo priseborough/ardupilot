@@ -230,6 +230,10 @@ class VehicleInfo(object):
                 "waf_target": "bin/arduplane",
                 "default_params_filename": ["default_params/plane.parm", "default_params/plane-jet.parm"],
             },
+            "planeJSON": {
+                "waf_target": "bin/arduplane",
+                "default_params_filename": "default_params/plane.parm",
+            },
             "plane": {
                 "waf_target": "bin/arduplane",
                 "default_params_filename": "default_params/plane.parm",
