@@ -39,7 +39,7 @@ public:
 
 protected:
     const float hover_throttle = 0.7f;
-    const float air_density = 1.225; // kg/m^3 at sea level, ISA conditions
+    const float air_density = SSL_AIR_DENSITY; // kg/m^3 at sea level, ISA conditions
     float alpharad;
     float betarad;
 
@@ -100,21 +100,21 @@ protected:
         // p, q, r are gyro rates
         float Cmq = -6.1866;
 
-        float Clp2= -0.156;
-        float Clp1= 0.0129;
-        float Clp0= -0.315;
+        float Clp2 = 0.156;
+        float Clp1 = 0.0129;
+        float Clp0 = -0.315;
 
-        float Clr2= -0.0284;
-        float Clr1= 0.2641;
-        float Clr0= 0.0343;
+        float Clr2 = -0.0284;
+        float Clr1 = 0.2641;
+        float Clr0 = 0.0343;
 
-        float Cnp2= 0.0199;
-        float Cnp1= -0.315;
-        float Cnp0= -0.013;
+        float Cnp2 = 0.0199;
+        float Cnp1 = -0.315;
+        float Cnp0 = -0.013;
 
-        float Cnr2= 0.1297;
-        float Cnr1= 0.0343;
-        float Cnr0= -0.264;
+        float Cnr2 = 0.1297;
+        float Cnr1 = 0.0343;
+        float Cnr0 = -0.264;
 
         // elevator
         float elevatorDeflectionLimitDeg = 20.0;
@@ -159,6 +159,10 @@ protected:
         // Moments about the Z axis are +Cn * q * Sref * RefSpan
 
         float hoverThrottle = 2.0;
+
+        // low altitude
+        float alphaRadMax = 0.209;
+        float betaRadMax = 0.209;
     } default_model;
 
     struct Model model;

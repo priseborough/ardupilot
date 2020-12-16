@@ -17,6 +17,8 @@
 
 #include <stdio.h>
 #include "picojson.h"
+#include <AP_Logger/AP_Logger.h>
+#include <AP_AHRS/AP_AHRS.h>
 
 using namespace SITL;
 
@@ -33,7 +35,7 @@ Vector3f PlaneJSON::getTorque(float inputAileron, float inputElevator, float inp
     // Calculate dynamic pressure
     const auto &m = model;
     float rho = air_density;
-    double qbar = 0.5*rho*sq(airspeed);
+    double qPa = 0.5*rho*sq(airspeed);
     const float aileron_rad = inputAileron * radians(m.aileronDeflectionLimitDeg);
     const float elevator_rad = inputElevator * radians(m.elevatorDeflectionLimitDeg);
     const float rudder_rad = inputRudder * radians(m.rudderDeflectionLimitDeg);
@@ -67,10 +69,17 @@ Vector3f PlaneJSON::getTorque(float inputAileron, float inputElevator, float inp
 
     Cm += gyro.y * m.Cmq;
 
-    float Mx = Cl * qbar * m.Sref * m.refSpan;
-    float My = Cm * qbar * m.Sref * m.refChord;
-    float Mz = Cn * qbar * m.Sref * m.refSpan;
-    
+    float Mx = Cl * qPa * m.Sref * m.refSpan;
+    float My = Cm * qPa * m.Sref * m.refChord;
+    float Mz = Cn * qPa * m.Sref * m.refSpan;
+
+
+    AP::logger().Write("GLT", "TimeUS,Alpha,Beta,Cl,Cm,Cn", "Qfffff",
+                       AP_HAL::micros64(),
+                       degrees(alpharad),
+                       degrees(betarad),
+                       Cl, Cm, Cn);
+
     return Vector3f(Mx/m.IXX, My/m.IYY, Mz/m.IZZ);
 }
 
@@ -84,7 +93,7 @@ Vector3f PlaneJSON::getForce(float inputAileron, float inputElevator, float inpu
 
     // dynamic pressure
     float rho = air_density;
-    double qbar = 0.5*rho*sq(airspeed);
+    double qPa = 0.5*rho*sq(airspeed);
 
     float CA = m.CA2 * sq(alpharad) + m.CA1 * alpharad + m.CA0;
     float CY = (m.CY2 * sq(alpharad) + m.CY1 * alpharad + m.CY0) * betarad;
@@ -102,10 +111,16 @@ Vector3f PlaneJSON::getForce(float inputAileron, float inputElevator, float inpu
     CA += m.deltaCAperRadianAil * aileron_rad;
     CY += m.deltaCYperRadianAil * aileron_rad;
     
-    float Fx = -CA * qbar * m.Sref;
-    float Fy =  CY * qbar * m.Sref;
-    float Fz = -CN * qbar * m.Sref;
+    float Fx = -CA * qPa * m.Sref;
+    float Fy =  CY * qPa * m.Sref;
+    float Fz = -CN * qPa * m.Sref;
 
+    AP::logger().Write("GLF", "TimeUS,Alpha,Beta,CA,CY,CN", "Qfffff",
+                       AP_HAL::micros64(),
+                       degrees(alpharad),
+                       degrees(betarad),
+                       CA, CY, CN);
+    
     return Vector3f(Fx, Fy, Fz);
 }
 
@@ -120,6 +135,9 @@ void PlaneJSON::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     // calculate angle of attack
     alpharad = atan2f(velocity_air_bf.z, velocity_air_bf.x);
     betarad = atan2f(velocity_air_bf.y,velocity_air_bf.x);
+
+    alpharad = constrain_float(alpharad, -model.alphaRadMax, model.alphaRadMax);
+    betarad = constrain_float(betarad, -model.betaRadMax, model.betaRadMax);
 
     Vector3f force = getForce(aileron, elevator, rudder);
     rot_accel = getTorque(aileron, elevator, rudder, force);
@@ -143,6 +161,8 @@ void PlaneJSON::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
         float balloon_accel = GRAVITY_MSS * balloon * balloon_max;
         accel_body = dcm.transposed() * Vector3f(0,0,-balloon_accel);
         rot_accel.zero();
+        dcm.from_euler(0, radians(-5), 0);
+        velocity_ef.x = 20;
     }
 }
     
