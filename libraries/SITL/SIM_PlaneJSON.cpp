@@ -115,6 +115,7 @@ void PlaneJSON::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     float elevator = filtered_servo_angle(input, 1);
     float rudder   = filtered_servo_angle(input, 3);
     float throttle = filtered_servo_range(input, 2);
+    float balloon  = filtered_servo_range(input, 5);
 
     // calculate angle of attack
     alpharad = atan2f(velocity_air_bf.z, velocity_air_bf.x);
@@ -134,6 +135,14 @@ void PlaneJSON::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
         // add some ground friction
         Vector3f vel_body = dcm.transposed() * velocity_ef;
         accel_body.x -= vel_body.x * 0.3f;
+    }
+
+    if (balloon > 0.01) {
+        // use balloon force from channel 6
+        const float balloon_max = 10;
+        float balloon_accel = GRAVITY_MSS * balloon * balloon_max;
+        accel_body = dcm.transposed() * Vector3f(0,0,-balloon_accel);
+        rot_accel.zero();
     }
 }
     
