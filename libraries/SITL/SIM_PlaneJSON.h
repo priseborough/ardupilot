@@ -87,8 +87,7 @@ protected:
         // Cm is the coefficients for moments on Y axis
         // quadratic in alpharad
         float Cm2 = 0.099;
-        //float Cm1 = 9.6506; // ???? or 0.96506?
-        float Cm1 = 0.96506;
+        float Cm1 = -0.6506;
         float Cm0 = -0.0005;
 
         // Cn is the coefficients for moments on Z axis
