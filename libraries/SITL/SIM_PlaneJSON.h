@@ -92,9 +92,9 @@ protected:
 
         // Cn is the coefficients for moments on Z axis
         // quadratic in alpharad, with betarad factor
-        float Cn2 = 0.2888;
-        float Cn1 = -0.8518;
-        float Cn0 = -0.0491;
+        float Cn2 = 0.0057;
+        float Cn1 = -0.0101;
+        float Cn0 = 0.1744;
 
         // controls neutral dynamic derivatives
         // p, q, r are gyro rates

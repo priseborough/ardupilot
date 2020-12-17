@@ -39,35 +39,44 @@ Vector3f PlaneJSON::getTorque(float inputAileron, float inputElevator, float inp
     const float aileron_rad = inputAileron * radians(m.aileronDeflectionLimitDeg);
     const float elevator_rad = inputElevator * radians(m.elevatorDeflectionLimitDeg);
     const float rudder_rad = inputRudder * radians(m.rudderDeflectionLimitDeg);
+    const float tas = MAX(airspeed * AP::ahrs().get_EAS2TAS(), 1);
 
     float Cl = (m.Cl2 * sq(alpharad) + m.Cl1 * alpharad + m.Cl0) * betarad;
     float Cm = m.Cm2 * sq(alpharad) + m.Cm1 * alpharad + m.Cm0;
     float Cn = (m.Cn2 * sq(alpharad) + m.Cn1 * alpharad + m.Cn0) * betarad;
 
+    const float fudge = degrees(1);
+
     Cl += m.deltaClperRadianElev * elevator_rad;
     Cm += m.deltaCmperRadianElev * elevator_rad;
     Cn += m.deltaCnperRadianElev * elevator_rad;
 
-    Cl += m.deltaClperRadianRud * rudder_rad;
-    Cm += m.deltaCmperRadianRud * rudder_rad;
-    Cn += m.deltaCnperRadianRud * rudder_rad;
+    Cl += m.deltaClperRadianRud * rudder_rad / fudge;
+    Cm += m.deltaCmperRadianRud * rudder_rad / fudge;
+    Cn += m.deltaCnperRadianRud * rudder_rad / fudge;
 
-    Cl += (m.deltaClperRadianAil2 * sq(alpharad) + m.deltaClperRadianAil1 * alpharad + m.deltaClperRadianAil0) * aileron_rad;
-    Cm += m.deltaCmperRadianAil * aileron_rad;
-    Cn += (m.deltaCnperRadianAil2 * sq(alpharad) + m.deltaCnperRadianAil1 * alpharad + m.deltaCnperRadianAil0) * aileron_rad;
+    Cl += (m.deltaClperRadianAil2 * sq(alpharad) + m.deltaClperRadianAil1 * alpharad + m.deltaClperRadianAil0) * aileron_rad / fudge;
+    Cm += m.deltaCmperRadianAil * aileron_rad / fudge;
+    Cn += (m.deltaCnperRadianAil2 * sq(alpharad) + m.deltaCnperRadianAil1 * alpharad + m.deltaCnperRadianAil0) * aileron_rad / fudge;
 
-    // derivitives
+    // derivatives
     float Clp = m.Clp2 * sq(alpharad) + m.Clp1 * alpharad + m.Clp0;
     float Clr = m.Clr2 * sq(alpharad) + m.Clr1 * alpharad + m.Clr0;
     float Cnp = m.Cnp2 * sq(alpharad) + m.Cnp1 * alpharad + m.Cnp0;
     float Cnr = m.Cnr2 * sq(alpharad) + m.Cnr1 * alpharad + m.Cnr0;
 
-    Cl += gyro.x * Clp;
-    Cl += gyro.z * Clr;
-    Cn += gyro.x * Cnp;
-    Cn += gyro.z * Cnr;
+    // normalise gyro rates
+    Vector3f pqr_norm = gyro;
+    pqr_norm.x *= 0.5 * m.refSpan / tas;
+    pqr_norm.y *= 0.5 * m.refChord / tas;
+    pqr_norm.z *= 0.5 * m.refSpan / tas;
 
-    Cm += gyro.y * m.Cmq;
+    Cl += pqr_norm.x * Clp;
+    Cl += pqr_norm.z * Clr;
+    Cn += pqr_norm.x * Cnp;
+    Cn += pqr_norm.z * Cnr;
+
+    Cm += pqr_norm.y * m.Cmq;
 
     float Mx = Cl * qPa * m.Sref * m.refSpan;
     float My = Cm * qPa * m.Sref * m.refChord;
@@ -99,17 +108,19 @@ Vector3f PlaneJSON::getForce(float inputAileron, float inputElevator, float inpu
     float CY = (m.CY2 * sq(alpharad) + m.CY1 * alpharad + m.CY0) * betarad;
     float CN = m.CN2 * sq(alpharad) + m.CN1 * alpharad + m.CN0;
 
+    const float fudge = degrees(1);
+
     CN += m.deltaCNperRadianElev * elevator_rad;
     CA += m.deltaCAperRadianElev * elevator_rad;
     CY += m.deltaCYperRadianElev * elevator_rad;
 
-    CN += m.deltaCNperRadianRud * rudder_rad;
-    CA += m.deltaCAperRadianRud * rudder_rad;
-    CY += m.deltaCYperRadianRud * rudder_rad;
+    CN += m.deltaCNperRadianRud * rudder_rad / fudge;
+    CA += m.deltaCAperRadianRud * rudder_rad / fudge;
+    CY += m.deltaCYperRadianRud * rudder_rad / fudge;
 
-    CN += m.deltaCNperRadianAil * aileron_rad;
-    CA += m.deltaCAperRadianAil * aileron_rad;
-    CY += m.deltaCYperRadianAil * aileron_rad;
+    CN += m.deltaCNperRadianAil * aileron_rad / fudge;
+    CA += m.deltaCAperRadianAil * aileron_rad / fudge;
+    CY += m.deltaCYperRadianAil * aileron_rad / fudge;
     
     float Fx = -CA * qPa * m.Sref;
     float Fy =  CY * qPa * m.Sref;
@@ -162,7 +173,7 @@ void PlaneJSON::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
         accel_body = dcm.transposed() * Vector3f(0,0,-balloon_accel);
         rot_accel.zero();
         dcm.from_euler(0, radians(-5), 0);
-        velocity_ef.x = 20;
+        velocity_ef.x = 30;
     }
 }
     
