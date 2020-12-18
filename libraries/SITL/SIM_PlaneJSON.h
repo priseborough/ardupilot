@@ -163,11 +163,16 @@ protected:
         // low altitude
         float alphaRadMax = 0.209;
         float betaRadMax = 0.209;
+
+        // balloon launch parameters
+        float tetherLength = 50.0f;       // length of tether from balloon to aircraft (m)
+        float tetherPogoFreq = 2.0f;      // measured vertical frequency of on tether (Hz)
+        float balloonBurstHeight = 30000; // height AMSL that the balloon will burst (m)
+        float balloonAscentRate = 10.0f;  // maximum balloon ascent rate
+
     } default_model;
 
     struct Model model;
-
-    bool balloon_released;
 
     Vector3f getForce(float inputAileron, float inputElevator, float inputRudder) const;
     Vector3f getTorque(float inputAileron, float inputElevator, float inputRudder, const Vector3f &force) const;

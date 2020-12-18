@@ -122,7 +122,11 @@ float Aircraft::hagl() const
 */
 bool Aircraft::on_ground() const
 {
-    return hagl() <= 0.001f;  // prevent bouncing around ground
+    // prevent bouncing around ground
+    // don't do ground interaction if being carried
+    return (hagl() <= 0.001f &&
+            carriage_state != carriageState::WAItiNG_FOR_PICKUP &&
+            carriage_state != carriageState::WAITING_FOR_RELEASE);
 }
 
 /*
@@ -519,37 +523,52 @@ void Aircraft::update_model(const struct sitl_input &input)
 void Aircraft::update_dynamics(const Vector3f &rot_accel)
 {
     const float delta_time = frame_time_us * 1.0e-6f;
-
-    // update rotational rates in body frame
-    gyro += rot_accel * delta_time;
-
-    gyro.x = constrain_float(gyro.x, -radians(2000.0f), radians(2000.0f));
-    gyro.y = constrain_float(gyro.y, -radians(2000.0f), radians(2000.0f));
-    gyro.z = constrain_float(gyro.z, -radians(2000.0f), radians(2000.0f));
-
-    // update attitude
-    dcm.rotate(gyro * delta_time);
-    dcm.normalize();
-
-    Vector3f accel_earth = dcm * accel_body;
-    accel_earth += Vector3f(0.0f, 0.0f, GRAVITY_MSS);
-
-    // if we're on the ground, then our vertical acceleration is limited
-    // to zero. This effectively adds the force of the ground on the aircraft
-    if (on_ground() && accel_earth.z > 0) {
-        accel_earth.z = 0;
-    }
-
-    // work out acceleration as seen by the accelerometers. It sees the kinematic
-    // acceleration (ie. real movement), plus gravity
-    accel_body = dcm.transposed() * (accel_earth + Vector3f(0.0f, 0.0f, -GRAVITY_MSS));
-
-    // new velocity vector
-    velocity_ef += accel_earth * delta_time;
-
     const bool was_on_ground = on_ground();
-    // new position vector
-    position += velocity_ef * delta_time;
+    Vector3f accel_earth;
+
+    if (carriage_state == carriageState::WAItiNG_FOR_PICKUP) {
+        // Handle special case where plane is being held nose down waiting to be lifted
+        accel_earth.zero();
+        accel_body = dcm.transposed() * Vector3f(0.0f, 0.0f, -GRAVITY_MSS);
+        velocity_ef.zero();
+        gyro.zero();
+        dcm.from_euler(0.0f, radians(-80.0f), radians(home_yaw));
+        use_smoothing = true;
+        adjust_frame_time(constrain_float(sitl->loop_rate_hz, rate_hz-1, rate_hz+1));
+        return;
+
+    } else {
+        // update rotational rates in body frame
+        gyro += rot_accel * delta_time;
+
+        gyro.x = constrain_float(gyro.x, -radians(2000.0f), radians(2000.0f));
+        gyro.y = constrain_float(gyro.y, -radians(2000.0f), radians(2000.0f));
+        gyro.z = constrain_float(gyro.z, -radians(2000.0f), radians(2000.0f));
+
+        // update attitude
+        dcm.rotate(gyro * delta_time);
+        dcm.normalize();
+
+        accel_earth = dcm * accel_body;
+        accel_earth += Vector3f(0.0f, 0.0f, GRAVITY_MSS);
+
+        // if we're on the ground, then our vertical acceleration is limited
+        // to zero. This effectively adds the force of the ground on the aircraft
+        if ((on_ground() && accel_earth.z > 0)) {
+            accel_earth.z = 0;
+        }
+
+        // work out acceleration as seen by the accelerometers. It sees the kinematic
+        // acceleration (ie. real movement), plus gravity
+        accel_body = dcm.transposed() * (accel_earth + Vector3f(0.0f, 0.0f, -GRAVITY_MSS));
+
+        // new velocity vector
+        velocity_ef += accel_earth * delta_time;
+
+        // new position vector
+        position += velocity_ef * delta_time;
+
+    }
 
     // velocity relative to air mass, in earth frame
     velocity_air_ef = velocity_ef + wind_ef;
@@ -564,7 +583,7 @@ void Aircraft::update_dynamics(const Vector3f &rot_accel)
     airspeed_pitot = constrain_float(velocity_air_bf * Vector3f(1.0f, 0.0f, 0.0f), 0.0f, 120.0f);
 
     // constrain height to the ground
-    if (on_ground()) {
+    if (carriage_state != carriageState::WAItiNG_FOR_PICKUP && on_ground()) {
         if (!was_on_ground && AP_HAL::millis() - last_ground_contact_ms > 1000) {
             GCS_SEND_TEXT(MAV_SEVERITY_INFO, "SIM Hit ground at %f m/s", velocity_ef.z);
             last_ground_contact_ms = AP_HAL::millis();
@@ -642,23 +661,6 @@ void Aircraft::update_dynamics(const Vector3f &rot_accel)
             dcm.to_euler(&r, &p, &y);
             y = y + yaw_rate * delta_time;
             dcm.from_euler(0.0f, radians(90), y);
-            // no movement
-            if (accel_earth.z > -1.1*GRAVITY_MSS) {
-                velocity_ef.zero();
-            }
-            // X, Y movement tracks ground movement
-            velocity_ef.x = gnd_movement.x;
-            velocity_ef.y = gnd_movement.y;
-            gyro.zero();
-            use_smoothing = true;
-            break;
-        }
-        case GROUND_BEHAVIOUR_NOSESITTER: {
-            // point straight up
-            float r, p, y;
-            dcm.to_euler(&r, &p, &y);
-            y = y + yaw_rate * delta_time;
-            dcm.from_euler(0.0f, radians(-90), y);
             // no movement
             if (accel_earth.z > -1.1*GRAVITY_MSS) {
                 velocity_ef.zero();

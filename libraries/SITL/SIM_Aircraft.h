@@ -172,8 +172,17 @@ protected:
     float airspeed_pitot;                // m/s, apparent airspeed, as seen by fwd pitot tube
     float battery_voltage = -1.0f;
     float battery_current;
+
     Vector3f balloon_velocity;           // balloon velocity NED
-    Vector3f balloon_position{0.0f, 0.0f, -49.0f};           // ballon position NED from origin
+    Vector3f balloon_position{0.0f, 0.0f, -45.0f}; // balloon position NED from origin
+
+    enum class carriageState {
+        NONE = 0, // no carriage option available
+        WAItiNG_FOR_PICKUP = 1, // in launch cradle waiting to be picked up by launch vehicle
+        WAITING_FOR_RELEASE = 2, // being carried by luanch vehicle waitng to be released
+        RELEASED = 3 // had been released by launch vehicle
+    } carriage_state;
+    bool plane_air_release;    // true when plane has separated from the airborne launching platform
 
     // battery model
     Battery battery;
@@ -237,7 +246,6 @@ protected:
         GROUND_BEHAVIOR_NO_MOVEMENT,
         GROUND_BEHAVIOR_FWD_ONLY,
         GROUND_BEHAVIOR_TAILSITTER,
-        GROUND_BEHAVIOUR_NOSESITTER,
     } ground_behavior;
 
     bool use_smoothing;
