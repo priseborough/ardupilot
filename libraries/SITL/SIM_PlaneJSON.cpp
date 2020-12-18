@@ -171,9 +171,19 @@ void PlaneJSON::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
         const float balloon_max = 10;
         float balloon_accel = GRAVITY_MSS * balloon * balloon_max;
         accel_body = dcm.transposed() * Vector3f(0,0,-balloon_accel);
-        rot_accel.zero();
-        dcm.from_euler(0, radians(-5), 0);
-        velocity_ef.x = 30;
+        balloon_released = false;
+    }
+
+    if (!balloon_released) {
+        if (velocity_ef.z < 0.1) {
+            // wait for low vertical velocity after release
+            rot_accel.zero();
+            dcm.from_euler(0, radians(-5), 0);
+            velocity_ef.x = 30;
+        } else {
+            // start normal flight
+            balloon_released = true;
+        }
     }
 }
     
