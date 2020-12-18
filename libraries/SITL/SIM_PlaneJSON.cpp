@@ -149,6 +149,56 @@ void PlaneJSON::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     Vector3f force = getForce(aileron, elevator, rudder);
     rot_accel = getTorque(aileron, elevator, rudder, force);
 
+    // add forces and moments due to balloon tether
+
+    // move balloon upwards using balloon velocity from channel 6
+    const float ballon_release_hgt = 1000.0f;
+    if (balloon > 0.01 && !balloon_released) {
+       const float balloon_climb_rate = 10.0f;
+       balloon_velocity = Vector3f(wind_ef.x, wind_ef.y, -balloon_climb_rate * balloon);
+       if (balloon_position.z < -ballon_release_hgt) {
+           balloon_released = true;
+       }
+       balloon_position += balloon_velocity * (1.0e-6f * (float)frame_time_us);
+    }
+
+    if (!balloon_released) {
+        // assume a 50m tether with a 5Hz pogo frequency and damping ratio of 0.1
+        Vector3f tether_pos_bf = Vector3f(-1.0f,0.0f,0.0f); // tether attaches to vehicle tail approx 1m behind c.g.
+        const float tether_length = 50.0f;
+        const float omega = 5.0*M_2PI; // rad/sec
+        const  float zeta = 0.1f;
+        float tether_stiffness = model.mass * sq(omega); // N/m
+        float tether_damping = 2.0f * zeta *omega / model.mass; // N/(m/s)
+        // NED relative position vector from tether attachment on plane to balloon attachment
+        Vector3f relative_position = balloon_position - (position + dcm * tether_pos_bf);
+        const float separation_distance = relative_position.length();
+        if (separation_distance > tether_length) {
+            // NED unit vector pointing from tether attachment on plane to attachment on balloon
+            Vector3f tether_unit_vec_ef = relative_position.normalized();
+
+            // NED velocity of attahment point on plane
+            Vector3f attachment_velocity_ef = velocity_ef + dcm * (gyro % tether_pos_bf);
+
+            // NED velocity of atachment point on balloon as seen by observer on attachemnt point on plane
+            Vector3f relative_velocity = balloon_velocity - attachment_velocity_ef;
+
+            // rate increase in separation between attachment point on plane and balloon
+            float separation_speed = relative_velocity * tether_unit_vec_ef;
+
+            // tension force in tether due to stiffness and damping
+            float tension_force = MAX(0.0f, (separation_distance - tether_length) * tether_stiffness + separation_speed * tether_damping);
+
+            Vector3f tension_force_vector_ef = tether_unit_vec_ef * tension_force;
+            Vector3f tension_force_vector_bf = dcm.transposed() * tension_force_vector_ef;
+            force += tension_force_vector_bf;
+
+            Vector3f tension_moment_vector_bf = tether_pos_bf % tension_force_vector_bf;
+            Vector3f tension_rot_accel = Vector3f(tension_moment_vector_bf.x/model.IXX, tension_moment_vector_bf.y/model.IYY, tension_moment_vector_bf.z/model.IZZ);
+            rot_accel += tension_rot_accel;
+        }
+    }
+
     // scale thrust to match nose up hover throttle
     float thrust_scale = (model.mass * GRAVITY_MSS) / model.hoverThrottle;
     float thrust   = throttle * thrust_scale;
@@ -162,25 +212,6 @@ void PlaneJSON::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
         accel_body.x -= vel_body.x * 0.3f;
     }
 
-    if (balloon > 0.01) {
-        // use balloon force from channel 6
-        const float balloon_max = 10;
-        float balloon_accel = GRAVITY_MSS * balloon * balloon_max;
-        accel_body = dcm.transposed() * Vector3f(0,0,-balloon_accel);
-        balloon_released = false;
-    }
-
-    if (!balloon_released) {
-        if (velocity_ef.z < 0.1) {
-            // wait for low vertical velocity after release
-            rot_accel.zero();
-            dcm.from_euler(0, radians(-5), 0);
-            velocity_ef.x = 30;
-        } else {
-            // start normal flight
-            balloon_released = true;
-        }
-    }
 }
     
 /*

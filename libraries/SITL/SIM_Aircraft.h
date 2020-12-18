@@ -172,6 +172,8 @@ protected:
     float airspeed_pitot;                // m/s, apparent airspeed, as seen by fwd pitot tube
     float battery_voltage = -1.0f;
     float battery_current;
+    Vector3f balloon_velocity;           // balloon velocity NED
+    Vector3f balloon_position;           // ballon position NED from origin
 
     // battery model
     Battery battery;
