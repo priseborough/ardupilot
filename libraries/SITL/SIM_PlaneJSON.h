@@ -131,8 +131,8 @@ protected:
         float deltaCAperRadianRud = 0.058;
         float deltaCmperRadianRud = 0;
         float deltaCYperRadianRud = 0.31;
-        float deltaClperRadianRud = 0.76;
-        float deltaCnperRadianRud = -3.48;
+        float deltaClperRadianRud = 0.038;
+        float deltaCnperRadianRud = -0.174;
 
         // aileron
         float aileronDeflectionLimitDeg = 20.0;
@@ -142,14 +142,14 @@ protected:
         float deltaCYperRadianAil = -0.015;
 
         // quadratic in alpharad
-        float deltaClperRadianAil0 = 1.84;
-        float deltaClperRadianAil1 = 0.0021;
-        float deltaClperRadianAil2 = -1.720;
+        float deltaClperRadianAil0 = 0.09191;
+        float deltaClperRadianAil1 = 0.0001;
+        float deltaClperRadianAil2 = -0.08645;
 
         // quadratic in alpharad
-        float deltaCnperRadianAil0 = 0.1579;
-        float deltaCnperRadianAil1 = 0.1545;
-        float deltaCnperRadianAil2 = -0.2324;
+        float deltaCnperRadianAil0 = 0.00789;
+        float deltaCnperRadianAil1 = 0.00773;
+        float deltaCnperRadianAil2 = -0.01162;
 
         // Forces in the +X direction are –CA * q * Sref
         // Forces in the +Y direction are  +CY * q * Sref

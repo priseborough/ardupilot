@@ -45,19 +45,17 @@ Vector3f PlaneJSON::getTorque(float inputAileron, float inputElevator, float inp
     float Cm = m.Cm2 * sq(alpharad) + m.Cm1 * alpharad + m.Cm0;
     float Cn = (m.Cn2 * sq(alpharad) + m.Cn1 * alpharad + m.Cn0) * betarad;
 
-    const float fudge = degrees(1);
-
     Cl += m.deltaClperRadianElev * elevator_rad;
     Cm += m.deltaCmperRadianElev * elevator_rad;
     Cn += m.deltaCnperRadianElev * elevator_rad;
 
-    Cl += m.deltaClperRadianRud * rudder_rad / fudge;
-    Cm += m.deltaCmperRadianRud * rudder_rad / fudge;
-    Cn += m.deltaCnperRadianRud * rudder_rad / fudge;
+    Cl += m.deltaClperRadianRud * rudder_rad;
+    Cm += m.deltaCmperRadianRud * rudder_rad;
+    Cn += m.deltaCnperRadianRud * rudder_rad;
 
-    Cl += (m.deltaClperRadianAil2 * sq(alpharad) + m.deltaClperRadianAil1 * alpharad + m.deltaClperRadianAil0) * aileron_rad / fudge;
-    Cm += m.deltaCmperRadianAil * aileron_rad / fudge;
-    Cn += (m.deltaCnperRadianAil2 * sq(alpharad) + m.deltaCnperRadianAil1 * alpharad + m.deltaCnperRadianAil0) * aileron_rad / fudge;
+    Cl += (m.deltaClperRadianAil2 * sq(alpharad) + m.deltaClperRadianAil1 * alpharad + m.deltaClperRadianAil0) * aileron_rad;
+    Cm += m.deltaCmperRadianAil * aileron_rad;
+    Cn += (m.deltaCnperRadianAil2 * sq(alpharad) + m.deltaCnperRadianAil1 * alpharad + m.deltaCnperRadianAil0) * aileron_rad;
 
     // derivatives
     float Clp = m.Clp2 * sq(alpharad) + m.Clp1 * alpharad + m.Clp0;
@@ -108,19 +106,17 @@ Vector3f PlaneJSON::getForce(float inputAileron, float inputElevator, float inpu
     float CY = (m.CY2 * sq(alpharad) + m.CY1 * alpharad + m.CY0) * betarad;
     float CN = m.CN2 * sq(alpharad) + m.CN1 * alpharad + m.CN0;
 
-    const float fudge = degrees(1);
-
     CN += m.deltaCNperRadianElev * elevator_rad;
     CA += m.deltaCAperRadianElev * elevator_rad;
     CY += m.deltaCYperRadianElev * elevator_rad;
 
-    CN += m.deltaCNperRadianRud * rudder_rad / fudge;
-    CA += m.deltaCAperRadianRud * rudder_rad / fudge;
-    CY += m.deltaCYperRadianRud * rudder_rad / fudge;
+    CN += m.deltaCNperRadianRud * rudder_rad;
+    CA += m.deltaCAperRadianRud * rudder_rad;
+    CY += m.deltaCYperRadianRud * rudder_rad;
 
-    CN += m.deltaCNperRadianAil * aileron_rad / fudge;
-    CA += m.deltaCAperRadianAil * aileron_rad / fudge;
-    CY += m.deltaCYperRadianAil * aileron_rad / fudge;
+    CN += m.deltaCNperRadianAil * aileron_rad;
+    CA += m.deltaCAperRadianAil * aileron_rad;
+    CY += m.deltaCYperRadianAil * aileron_rad;
     
     float Fx = -CA * qPa * m.Sref;
     float Fy =  CY * qPa * m.Sref;
