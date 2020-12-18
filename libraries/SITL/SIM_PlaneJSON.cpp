@@ -25,7 +25,7 @@ using namespace SITL;
 PlaneJSON::PlaneJSON(const char *frame_str) :
     Aircraft(frame_str)
 {
-    ground_behavior = GROUND_BEHAVIOR_FWD_ONLY;
+    ground_behavior = GROUND_BEHAVIOUR_NOSESITTER;
     model = default_model;
 }
 
@@ -146,8 +146,15 @@ void PlaneJSON::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
     alpharad = constrain_float(alpharad, -model.alphaRadMax, model.alphaRadMax);
     betarad = constrain_float(betarad, -model.betaRadMax, model.betaRadMax);
 
-    Vector3f force = getForce(aileron, elevator, rudder);
-    rot_accel = getTorque(aileron, elevator, rudder, force);
+    Vector3f force;
+    if (!balloon_released) {
+        force = getForce(aileron, elevator, rudder);
+        rot_accel = getTorque(aileron, elevator, rudder, force);
+    } else {
+        // forces during balloon ascent are modelled later
+        force.zero();
+        rot_accel.zero();
+    }
 
     // add forces and moments due to balloon tether
 
@@ -166,10 +173,10 @@ void PlaneJSON::calculate_forces(const struct sitl_input &input, Vector3f &rot_a
         // assume a 50m tether with a 5Hz pogo frequency and damping ratio of 0.1
         Vector3f tether_pos_bf = Vector3f(-1.0f,0.0f,0.0f); // tether attaches to vehicle tail approx 1m behind c.g.
         const float tether_length = 50.0f;
-        const float omega = 5.0*M_2PI; // rad/sec
+        const float omega = 5.0f * M_2PI; // rad/sec
         const  float zeta = 0.1f;
         float tether_stiffness = model.mass * sq(omega); // N/m
-        float tether_damping = 2.0f * zeta *omega / model.mass; // N/(m/s)
+        float tether_damping = 2.0f * zeta * omega / model.mass; // N/(m/s)
         // NED relative position vector from tether attachment on plane to balloon attachment
         Vector3f relative_position = balloon_position - (position + dcm * tether_pos_bf);
         const float separation_distance = relative_position.length();
