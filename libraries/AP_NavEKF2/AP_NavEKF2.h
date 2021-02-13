@@ -305,6 +305,13 @@ public:
     // Writes the default equivalent airspeed in m/s to be used in forward flight if a measured airspeed is required and not available.
     void writeDefaultAirSpeed(float airspeed);
 
+    // log debug data for yaw estimator
+    // return false if data not available
+    bool getDataEKFGSF(int8_t instance, float &yaw_composite, float &yaw_composite_variance, float yaw[N_MODELS_EKFGSF], float innov_VN[N_MODELS_EKFGSF], float innov_VE[N_MODELS_EKFGSF], float weight[N_MODELS_EKFGSF]) const;
+
+    // return error score for currently active lane
+    float errorScore(void) const;
+
 private:
     uint8_t num_cores; // number of allocated cores
     uint8_t primary;   // current primary core
@@ -477,4 +484,14 @@ private:
     // return true if a new core has a better score than an existing core, including
     // checks for alignment
     bool coreBetterScore(uint8_t new_core, uint8_t current_core) const;
+
+    // logging functions shared by cores:
+    void Log_Write_NKF1(uint8_t core, uint64_t time_us) const;
+    void Log_Write_NKF2(uint8_t core, uint64_t time_us) const;
+    void Log_Write_NKF3(uint8_t core, uint64_t time_us) const;
+    void Log_Write_NKF4(uint8_t core, uint64_t time_us) const;
+    void Log_Write_NKF5(uint64_t time_us) const;
+    void Log_Write_Quaternion(uint8_t core, uint64_t time_us) const;
+    void Log_Write_Beacon(uint64_t time_us) const;
+    void Log_Write_GSF(uint8_t core, uint64_t time_us) const;
 };
