@@ -110,6 +110,7 @@ class RollModel:
 class FWState(object):
     '''object containing roll state of aircraft'''
     def __init__(self, ATT, PIDR, AETR):
+        self.timestamp = ATT.TimeUS*1.0e-6
         # demanded rate
         self.dem_rate_dps = PIDR.Tar
         # actual rate
@@ -160,4 +161,12 @@ def process_log(filename):
     for d in data:
         model.update(d.aileron, d.speed_scalar)
 
+    # graph all the fields we've output
+    import matplotlib.pyplot as plt
+    t = [ d.timestamp for d in data ]
+    y = [ d.roll for d in data ]
+    plt.plot(t, y, label='Roll')
+    plt.legend(loc='upper left')
+    plt.show()
+        
 process_log(args.log)
