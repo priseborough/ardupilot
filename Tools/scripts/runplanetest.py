@@ -35,18 +35,21 @@ def wait_time(mav, simtime):
         if t2 - t1 > simtime:
             break
 
-cmd = '../Tools/autotest/sim_vehicle.py -D -f quadplane'
+cmd = '../../Tools/autotest/sim_vehicle.py -D'
 mavproxy = pexpect.spawn(cmd, logfile=sys.stdout, timeout=30)
 mavproxy.expect("ArduPilot Ready")
 
 mav = mavutil.mavlink_connection('127.0.0.1:14550')
 
-mavproxy.send('speedup 40\n')
-mavproxy.expect('using GPS')
-mavproxy.expect('using GPS')
+mavproxy.send('speedup 20\n')
 mavproxy.expect('using GPS')
 mavproxy.expect('using GPS')
 mavproxy.send('auto\n')
 mavproxy.send('arm throttle\n')
 wait_mode(mav, ['AUTO'])
-mavproxy.expect("Mission: 5 WP")
+mavproxy.send('module load console\n')
+mavproxy.send('module load map\n')
+mavproxy.send('wp list\n')
+mavproxy.logfile = None
+mavproxy.interact()
+
