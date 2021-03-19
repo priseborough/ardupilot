@@ -71,7 +71,7 @@ const AP_Param::Info Plane::var_info[] = {
     // @Param: LOAD_FACTOR_LAG
     // @DisplayName: Lag from pitch rate to load factor
     // @Description: Time lag from pitch rate to load factor that the navigation loops compensate for when LOAD_FACTOR_CTL = 1.
-    // @Range: 0.0 0.1
+    // @Range: 0.0 0.5
     // @Increment: 0.01
     // @User: Standard
     GSCALAR(load_factor_lag, "LOAD_FACTOR_LAG", 0.2f),
