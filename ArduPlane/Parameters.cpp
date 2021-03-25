@@ -1238,6 +1238,10 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     AP_SUBGROUPINFO(guidedHeading, "GUIDED_", 28, ParametersG2, AC_PID),
 #endif // OFFBOARD_GUIDED == ENABLED
 
+    AP_GROUPINFO("SID_PERIOD",   29, ParametersG2, sysid.period, 0.5),
+    AP_GROUPINFO("SID_AMP_AIL",  30, ParametersG2, sysid.aileron_amplitude, 0.1),
+    AP_GROUPINFO("SID_AMP_ELEV", 31, ParametersG2, sysid.elevator_amplitude, 0.1),
+
     AP_GROUPEND
 };
 
