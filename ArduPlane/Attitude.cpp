@@ -109,9 +109,14 @@ void Plane::stabilize_roll(float speed_scaler)
     if (control_mode == &mode_stabilize && channel_roll->get_control_in() != 0) {
         disable_integrator = true;
     }
-    SRV_Channels::set_output_scaled(SRV_Channel::k_aileron, rollController.get_servo_out(nav_roll_cd - ahrs.roll_sensor, 
-                                                                                         speed_scaler, 
-                                                                                         disable_integrator));
+    int32_t aileron = rollController.get_servo_out(nav_roll_cd - ahrs.roll_sensor,
+                                                   speed_scaler,
+                                                   disable_integrator);
+    if (g2.sysid.injection_mode == 1 && !rc_failsafe_active()) {
+        float t = AP_HAL::millis() * 0.001;
+        aileron += sinf(t * 2 * M_PI / MAX(g2.sysid.period,0.05)) * g2.sysid.aileron_amplitude * 4500 * speed_scaler;
+    }
+    SRV_Channels::set_output_scaled(SRV_Channel::k_aileron, aileron);
 }
 
 /*
@@ -139,9 +144,14 @@ void Plane::stabilize_pitch(float speed_scaler)
        demanded_pitch = landing.get_pitch_cd();
    }
 
-    SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, pitchController.get_servo_out(demanded_pitch - ahrs.pitch_sensor, 
-                                                                                           speed_scaler, 
-                                                                                           disable_integrator));
+    int32_t elevator = pitchController.get_servo_out(demanded_pitch - ahrs.pitch_sensor,
+                                                     speed_scaler,
+                                                     disable_integrator);
+    if (g2.sysid.injection_mode == 2 && !rc_failsafe_active()) {
+        float t = AP_HAL::millis() * 0.001;
+        elevator += sinf(t * 2 * M_PI / MAX(g2.sysid.period,0.05)) * g2.sysid.elevator_amplitude * 4500 * speed_scaler;
+    }
+    SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, elevator);
 }
 
 /*

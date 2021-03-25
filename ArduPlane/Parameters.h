@@ -575,6 +575,13 @@ public:
 
     // min initial climb in RTL
     AP_Int16        rtl_climb_min;
+
+    struct {
+        uint8_t injection_mode;
+        AP_Float period;
+        AP_Float aileron_amplitude;
+        AP_Float elevator_amplitude;
+    } sysid;
 };
 
 extern const AP_Param::Info var_info[];
