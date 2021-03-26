@@ -79,10 +79,10 @@ const AP_Param::Info Plane::var_info[] = {
     // @Param: LOAD_FACTOR_GAIN
     // @DisplayName: Load factor error gain
     // @Description: Gain from integral of normal acceleration error to demanded pitch rate when LOAD_FACTOR_CTL = 1.
-    // @Range: 0.0 1.0
+    // @Range: 0.0 2.0
     // @Increment: 0.01
     // @User: Standard
-    GSCALAR(load_factor_gain, "LOAD_FACTOR_GAIN", 0.0f),
+    GSCALAR(load_factor_gain, "LOAD_FACTOR_GAIN", 0.5f),
 
    // @Param: LOAD_FACTOR_CTL
     // @DisplayName: Enables navigaton load factor and bank control
