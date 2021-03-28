@@ -290,7 +290,12 @@ void Plane::stabilize_yaw(float speed_scaler)
 void Plane::stabilize_training(float speed_scaler)
 {
     if (training_manual_roll) {
-        SRV_Channels::set_output_scaled(SRV_Channel::k_aileron, channel_roll->get_control_in());
+        int32_t aileron = channel_roll->get_control_in();
+        if (g2.sysid.injection_mode == 1 && !rc_failsafe_active()) {
+            float t = AP_HAL::millis() * 0.001;
+            aileron += sinf(t * 2 * M_PI / MAX(g2.sysid.period,0.05)) * g2.sysid.aileron_amplitude * 4500 * speed_scaler;
+        }
+        SRV_Channels::set_output_scaled(SRV_Channel::k_aileron, aileron);
     } else {
         // calculate what is needed to hold
         stabilize_roll(speed_scaler);
@@ -302,7 +307,12 @@ void Plane::stabilize_training(float speed_scaler)
     }
 
     if (training_manual_pitch) {
-        SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, channel_pitch->get_control_in());
+        int32_t elevator = channel_pitch->get_control_in();
+        if (g2.sysid.injection_mode == 2 && !rc_failsafe_active()) {
+            float t = AP_HAL::millis() * 0.001;
+            elevator += sinf(t * 2 * M_PI / MAX(g2.sysid.period,0.05)) * g2.sysid.elevator_amplitude * 4500 * speed_scaler;
+        }
+        SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, elevator);
     } else {
         stabilize_pitch(speed_scaler);
         if ((nav_pitch_cd > 0 && channel_pitch->get_control_in() < SRV_Channels::get_output_scaled(SRV_Channel::k_elevator)) ||
