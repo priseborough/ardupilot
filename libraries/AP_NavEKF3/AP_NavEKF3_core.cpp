@@ -126,7 +126,7 @@ bool NavEKF3_core::setup_core(uint8_t _imu_index, uint8_t _core_index)
         return false;
     }
 #endif // EK3_FEATURE_BODY_ODOM
-    if(frontend->sources.gps_yaw_enabled() && !storedYawAng.init(obs_buffer_length)) {
+    if(!storedYawAng.init(obs_buffer_length)) {
         return false;
     }
     // Note: the use of dual range finders potentially doubles the amount of data to be stored
@@ -2222,4 +2222,26 @@ void NavEKF3_core::moveEKFOrigin(void)
     for (unsigned index=0; index < imu_buffer_length; index++) {
         storedOutput[index].position.xy() += diffNE;
     }
+}
+
+/*
+  lock current position for inertial takeoff
+ */
+bool NavEKF3_core::lockPosition(bool enable)
+{
+    if (!enable) {
+        locked_position.locked = LockedState::UNLOCKED;
+        return true;
+    }
+    if (!onGroundNotMoving) {
+        return false;
+    }
+    if (!getLLH(locked_position.loc)) {
+        return false;
+    }
+    Vector3f euler;
+    getEulerAngles(euler);
+    locked_position.yaw = euler.z;
+    locked_position.locked = LockedState::LOCKED;
+    return true;
 }

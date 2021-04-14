@@ -2002,3 +2002,20 @@ bool NavEKF3::isVibrationAffected(int8_t instance) const
     }
     return false;
 }
+
+// lock position for inertial takeoff
+bool NavEKF3::lockPosition(bool enable)
+{
+    AP::dal().log_event3(enable?AP_DAL::Event::lockPosition:AP_DAL::Event::unlockPosition);
+    if (!core || num_cores == 0) {
+        return false;
+    }
+    bool ret = true;
+    if (core) {
+        for (uint8_t i=0; i<num_cores; i++) {
+            ret &= core[i].lockPosition(enable);
+        }
+    }
+    // return true if all cores are locked
+    return ret;
+}

@@ -355,6 +355,9 @@ public:
     // if instance < 0, the primary instance will be used
     bool isVibrationAffected(int8_t instance) const;
 
+    // lock position for inertial takeoff
+    bool lockPosition(bool enable);
+
 private:
     uint8_t num_cores; // number of allocated cores
     uint8_t primary;   // current primary core

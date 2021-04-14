@@ -566,6 +566,10 @@ bool NavEKF3_core::use_compass(void) const
         // not using compass as a yaw source
         return false;
     }
+    if (locked_position.locked != LockedState::UNLOCKED) {
+        // don't use compass while locked
+        return false;
+    }
 
     const auto &compass = dal.compass();
     return compass.use_for_yaw(magSelectIndex) &&
@@ -576,6 +580,9 @@ bool NavEKF3_core::use_compass(void) const
 bool NavEKF3_core::using_external_yaw(void) const
 {
     const AP_NavEKF_Source::SourceYaw yaw_source = frontend->sources.getYawSource();
+    if (locked_position.locked != LockedState::UNLOCKED) {
+        return true;
+    }
 #if EK3_FEATURE_EXTERNAL_NAV
     if (yaw_source == AP_NavEKF_Source::SourceYaw::EXTNAV) {
         return ((imuSampleTime_ms - last_extnav_yaw_fusion_ms < 5000) || (imuSampleTime_ms - lastSynthYawTime_ms < 5000));
