@@ -769,7 +769,19 @@ bool AP_Logger::WriteReplayBlock(uint8_t msg_id, const void *pBuffer, uint16_t s
     // logging while disarmed then the EKF can be started and trying
     // to log things even 'though the backends might be saying "no".
     if (!ret && log_while_disarmed()) {
-        AP_HAL::panic("Failed to log replay block");
+        ::printf("Failed to log replay block");
+    if (log_replay()) {
+        uint8_t buf[3+size];
+        buf[0] = HEAD_BYTE1;
+        buf[1] = HEAD_BYTE2;
+        buf[2] = msg_id;
+        memcpy(&buf[3], pBuffer, size);
+        for (uint8_t i=0; i<_next_backend; i++) {
+            if (!backends[i]->WritePrioritisedBlock(buf, sizeof(buf), true)) {
+                ret = false;
+            }
+        }
+    }
     }
 #endif
     return ret;
