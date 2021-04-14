@@ -3051,6 +3051,15 @@ void AP_AHRS::set_alt_measurement_noise(float noise)
 #endif
 }
 
+// lock position for inertial takeoff
+bool AP_AHRS_NavEKF::lock_position(bool enable)
+{
+#if HAL_NAVEKF3_AVAILABLE
+    return EKF3.lockPosition(enable);
+#else
+    return false;
+#endif
+}
 
 // singleton instance
 AP_AHRS *AP_AHRS::_singleton;

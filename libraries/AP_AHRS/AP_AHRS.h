@@ -344,6 +344,9 @@ public:
         return _ekf_type;
     }
 
+    // lock position for inertial takeoff
+    bool lock_position(bool enable);
+
     // these are only out here so vehicles can reference them for parameters
 #if HAL_NAVEKF2_AVAILABLE
     NavEKF2 EKF2;
