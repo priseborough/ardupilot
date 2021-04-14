@@ -328,6 +328,7 @@ const AP_Param::GroupInfo SIM::var_gps[] = {
     AP_GROUPINFO("GPS_HDG",       13, SIM,  gps_hdg_enabled[0], SIM::GPS_HEADING_NONE),
     AP_GROUPINFO("GPS_ACC",       14, SIM,  gps_accuracy[0], 0.3),
     AP_GROUPINFO("GPS_VERR",      15, SIM,  gps_vel_err[0], 0),
+    AP_GROUPINFO("GPS_DRIFTPOS",  16, SIM,  gps_drift_pos[0], 0),
 
     AP_GROUPINFO("GPS2_DISABLE",  30, SIM,  gps_disable[1], 1),
     AP_GROUPINFO("GPS2_DELAY",    31, SIM,  gps_delay[1],   1),
@@ -344,10 +345,12 @@ const AP_Param::GroupInfo SIM::var_gps[] = {
     AP_GROUPINFO("GPS2_HDG",      42, SIM,  gps_hdg_enabled[1], SIM::GPS_HEADING_NONE),
     AP_GROUPINFO("GPS2_ACC",      43, SIM,  gps_accuracy[1], 0.3),
     AP_GROUPINFO("GPS2_VERR",     44, SIM,  gps_vel_err[1], 0),
+    AP_GROUPINFO("GPS_DRIFTPOS",  48, SIM, gps_drift_pos[0], 0),
 
     AP_GROUPINFO("INIT_LAT_OFS",  45, SIM,  gps_init_lat_ofs, 0),
     AP_GROUPINFO("INIT_LON_OFS",  46, SIM,  gps_init_lon_ofs, 0),
     AP_GROUPINFO("INIT_ALT_OFS",  47, SIM,  gps_init_alt_ofs, 0),
+
 
     AP_GROUPEND
 };
