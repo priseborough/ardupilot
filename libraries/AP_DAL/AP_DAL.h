@@ -47,6 +47,8 @@ public:
         unsetTerrainHgtStable     = 10,
         requestYawReset           = 11,
         checkLaneSwitch           = 12,
+        lockPosition              = 13,
+        unlockPosition            = 14,
     };
 
     // must remain the same as AP_AHRS_VehicleClass numbers-wise
