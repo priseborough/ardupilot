@@ -90,6 +90,7 @@ void RC_Channel_Copter::init_aux_function(const aux_func_t ch_option, const AuxS
     case AUX_FUNC::ACRO:
     case AUX_FUNC::AUTO_RTL:
     case AUX_FUNC::TURTLE:
+    case AUX_FUNC::LOCK_POSITION:
         break;
     case AUX_FUNC::ACRO_TRAINER:
     case AUX_FUNC::ATTCON_ACCEL_LIM:
@@ -575,6 +576,14 @@ bool RC_Channel_Copter::do_aux_function(const aux_func_t ch_option, const AuxSwi
 #endif
             break;
 
+        case AUX_FUNC::LOCK_POSITION:
+            if (!copter.ahrs.lock_position(ch_flag == AuxSwitchPos::HIGH)) {
+                gcs().send_text(MAV_SEVERITY_INFO, "LockedPos failed");
+            } else {
+                gcs().send_text(MAV_SEVERITY_INFO, "LockedPos: %s", ch_flag == AuxSwitchPos::HIGH?"ON":"OFF");
+            }
+            break;
+            
     default:
         return RC_Channel::do_aux_function(ch_option, ch_flag);
     }
