@@ -71,6 +71,10 @@ void LR_MsgHandler_REV2::process_message(uint8_t *msgbytes)
     case AP_DAL::Event::checkLaneSwitch:
         ekf2.checkLaneSwitch();
         break;
+    case AP_DAL::Event::lockPosition:
+    case AP_DAL::Event::unlockPosition:
+        // not in EKF2 yet
+        break;
     }
     if (replay_force_ekf3) {
         LR_MsgHandler_REV3 h{f, ekf2, ekf3};
@@ -130,6 +134,7 @@ void LR_MsgHandler_REV3::process_message(uint8_t *msgbytes)
         break;
     case AP_DAL::Event::lockPosition:
         ekf3.lockPosition(true);
+        break;
     case AP_DAL::Event::unlockPosition:
         ekf3.lockPosition(false);
         break;
