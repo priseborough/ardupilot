@@ -223,6 +223,12 @@ void NavEKF3_core::setAidingMode()
     // Check that the gyro bias variance has converged
     checkGyroCalStatus();
 
+    if (locked_position.locked == LockedState::TAKEOFF &&
+        imuSampleTime_ms - lastPosPassTime_ms > frontend->posRetryTimeUseVel_ms-250U) {
+        locked_position.locked = LockedState::UNLOCKED;
+        GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "EKF3 IMU%u unlocked",(unsigned)imu_index);
+    }
+
     // Handle the special case where we are on ground and disarmed without a yaw measurement
     // and navigating. This can occur if not using a magnetometer and yaw was aligned using GPS
     // during the previous flight.
