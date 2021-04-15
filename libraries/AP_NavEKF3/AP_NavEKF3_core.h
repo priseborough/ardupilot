@@ -1536,5 +1536,14 @@ private:
         LockedState locked;
         Location loc;
         float yaw;
+        Vector3f pos;
+        Vector3f vel;
+        Matrix3f rot;
+        uint32_t last_print_ms;
+        Vector3f gyro_bias;
+        LowPassFilterVector3f gyro_bias_filter;
     } locked_position;
+
+    void locked_update(const Vector3f &dv, float dv_dt,
+                       const Vector3f &da, float da_dt);
 };

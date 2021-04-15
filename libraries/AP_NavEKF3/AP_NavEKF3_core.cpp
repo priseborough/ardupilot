@@ -2243,5 +2243,52 @@ bool NavEKF3_core::lockPosition(bool enable)
     getEulerAngles(euler);
     locked_position.yaw = euler.z;
     locked_position.locked = LockedState::LOCKED;
+    locked_position.pos.zero();
+    locked_position.vel.zero();
+    stateStruct.quat.rotation_matrix(locked_position.rot);
+    locked_position.gyro_bias_filter.set_cutoff_frequency(dal.ins().get_loop_rate_hz(), 0.1);
+    locked_position.gyro_bias_filter.reset(inactiveBias[gyro_index_active].gyro_bias);
+
     return true;
+}
+
+void NavEKF3_core::locked_update(const Vector3f &dv, float dv_dt,
+                                 const Vector3f &da, float da_dt)
+{
+    if (locked_position.locked == LockedState::LOCKED) {
+        // update IMU filters, assuming no movement
+        locked_position.gyro_bias = locked_position.gyro_bias_filter.apply(da * (dtEkfAvg / da_dt));
+    }
+
+    if (locked_position.locked != LockedState::TAKEOFF) {
+        return;
+    }
+    Vector3f abias = inactiveBias[accel_index_active].accel_bias / dtEkfAvg;
+    Vector3f dv_corr = dv - inactiveBias[accel_index_active].accel_bias * (dv_dt / dtEkfAvg);
+    Vector3f dv_rot = locked_position.rot * dv_corr;
+    dv_rot.z += GRAVITY_MSS*dv_dt;
+    Vector3f accel = dv_rot / dv_dt;
+    locked_position.vel += dv_rot;
+    locked_position.pos += locked_position.vel * dv_dt;
+    Vector3f da_corr =  da - locked_position.gyro_bias * (da_dt / dtEkfAvg);
+    locked_position.rot.rotate(da_corr);
+    locked_position.rot.normalize();
+    const uint32_t now = dal.millis();
+    if (now - locked_position.last_print_ms > 250 && accel_index_active == 0) {
+        locked_position.last_print_ms = now;
+        float r, p, y;
+        locked_position.rot.to_euler(&r, &p, &y);
+        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "a (%.4f,%.4f,%.4f) pos (%.3f,%.3f,%.3f) eul (%.3f,%.3f,%.3f) dv_dt=%.4f ab=(%.6f,%.6f) dv=(%.4f,%.4f)",
+                      accel.x, accel.y, accel.z,
+                      locked_position.pos.x,
+                      locked_position.pos.y,
+                      locked_position.pos.z,
+                      degrees(r),
+                      degrees(p),
+                      degrees(y),
+                      dv_dt,
+                      abias.x, abias.y,
+                      dv.x/dv_dt, dv.y/dv_dt);
+
+    }
 }
