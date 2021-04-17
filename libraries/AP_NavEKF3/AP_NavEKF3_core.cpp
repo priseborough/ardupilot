@@ -2318,7 +2318,7 @@ void NavEKF3_core::locked_update(const Vector3f &dv, float dv_dt,
     locked_position.rot.rotate(da_corr);
     locked_position.rot.normalize();
     const uint32_t now = dal.millis();
-    if (now - locked_position.last_print_ms > 250 && accel_index_active == 0) {
+    if (now - locked_position.last_print_ms > 1000 && accel_index_active == 0) {
         locked_position.last_print_ms = now;
         float r, p, y;
         locked_position.rot.to_euler(&r, &p, &y);
