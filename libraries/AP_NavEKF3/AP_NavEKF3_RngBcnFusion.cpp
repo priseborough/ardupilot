@@ -249,6 +249,10 @@ void NavEKF3_core::FuseRngBcn()
                 ForceSymmetry();
                 ConstrainVariances();
 
+                if (locked_position.locked == LockedState::TAKEOFF) {
+                    zeroNonVertStateKalmanGains();
+                }
+
                 // correct the state vector
                 for (uint8_t j= 0; j<=stateIndexLim; j++) {
                     statesArray[j] = statesArray[j] - Kfusion[j] * innovRngBcn;

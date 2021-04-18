@@ -989,6 +989,10 @@ void NavEKF3_core::FuseVelPosNED()
                     ForceSymmetry();
                     ConstrainVariances();
 
+                    if (locked_position.locked == LockedState::TAKEOFF) {
+                        zeroNonVertStateKalmanGains();
+                    }
+
                     // update states and renormalise the quaternions
                     for (uint8_t i = 0; i<=stateIndexLim; i++) {
                         statesArray[i] = statesArray[i] - Kfusion[i] * innovVelPos[obsIndex];
@@ -1861,6 +1865,10 @@ void NavEKF3_core::FuseBodyVel()
                 // force the covariance matrix to be symmetrical and limit the variances to prevent ill-conditioning.
                 ForceSymmetry();
                 ConstrainVariances();
+
+                if (locked_position.locked == LockedState::TAKEOFF) {
+                    zeroNonVertStateKalmanGains();
+                }
 
                 // correct the state vector
                 for (uint8_t j= 0; j<=stateIndexLim; j++) {

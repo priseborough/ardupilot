@@ -144,6 +144,10 @@ void NavEKF3_core::FuseAirspeed()
             // restart the counter
             lastTasPassTime_ms = imuSampleTime_ms;
 
+            if (locked_position.locked == LockedState::TAKEOFF) {
+                zeroNonVertStateKalmanGains();
+            }
+
             // correct the state vector
             for (uint8_t j= 0; j<=stateIndexLim; j++) {
                 statesArray[j] = statesArray[j] - Kfusion[j] * innovVtas;
@@ -430,6 +434,10 @@ void NavEKF3_core::FuseSideslip()
         // calculate predicted sideslip angle and innovation using small angle approximation
         innovBeta = constrain_ftype(vel_rel_wind.y / vel_rel_wind.x, -0.5f, 0.5f);
 
+        if (locked_position.locked == LockedState::TAKEOFF) {
+            zeroNonVertStateKalmanGains();
+        }
+
         // correct the state vector
         for (uint8_t j= 0; j<=stateIndexLim; j++) {
             statesArray[j] = statesArray[j] - Kfusion[j] * innovBeta;
@@ -703,6 +711,10 @@ void NavEKF3_core::FuseDragForces()
         // if the innovation consistency check fails then don't fuse the sample
         if (dragTestRatio[axis_index] > 1.0f) {
             return;
+        }
+
+        if (locked_position.locked == LockedState::TAKEOFF) {
+            zeroNonVertStateKalmanGains();
         }
 
         // correct the state vector

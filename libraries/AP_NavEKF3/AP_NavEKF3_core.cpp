@@ -2292,3 +2292,12 @@ void NavEKF3_core::locked_update(const Vector3f &dv, float dv_dt,
 
     }
 }
+
+void NavEKF3_core::zeroNonVertStateKalmanGains()
+{
+    const float K6 = Kfusion[6];
+    const float K9 = Kfusion[9];
+    memset(&Kfusion,0,sizeof(Kfusion));
+    Kfusion[6] = K6;
+    Kfusion[9] = K9;
+}
