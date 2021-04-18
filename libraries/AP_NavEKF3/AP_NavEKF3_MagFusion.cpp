@@ -867,10 +867,6 @@ void NavEKF3_core::FuseMagnetometer()
             ForceSymmetry();
             ConstrainVariances();
 
-            if (locked_position.locked == LockedState::TAKEOFF) {
-                zeroNonVertStateKalmanGains();
-            }
-
             // correct the state vector
             for (uint8_t j= 0; j<=stateIndexLim; j++) {
                 statesArray[j] = statesArray[j] - Kfusion[j] * innovMag[obsIndex];
@@ -1219,10 +1215,6 @@ bool NavEKF3_core::fuseEulerYaw(yawFusionMethod method)
         ForceSymmetry();
         ConstrainVariances();
 
-        if (locked_position.locked == LockedState::TAKEOFF) {
-            zeroNonVertStateKalmanGains();
-        }
-
         // correct the state vector
         for (uint8_t i=0; i<=stateIndexLim; i++) {
             statesArray[i] -= Kfusion[i] * constrain_ftype(innovYaw, -0.5f, 0.5f);
@@ -1406,10 +1398,6 @@ void NavEKF3_core::FuseDeclination(ftype declErr)
         // force the covariance matrix to be symmetrical and limit the variances to prevent ill-conditioning.
         ForceSymmetry();
         ConstrainVariances();
-
-        if (locked_position.locked == LockedState::TAKEOFF) {
-            zeroNonVertStateKalmanGains();
-        }
 
         // correct the state vector
         for (uint8_t j= 0; j<=stateIndexLim; j++) {

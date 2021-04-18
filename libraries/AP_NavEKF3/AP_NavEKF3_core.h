@@ -1546,5 +1546,4 @@ private:
 
     void locked_update(const Vector3f &dv, float dv_dt,
                        const Vector3f &da, float da_dt);
-    void zeroNonVertStateKalmanGains();
 };
