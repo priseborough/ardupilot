@@ -2267,14 +2267,46 @@ bool NavEKF3_core::lockPosition(bool enable)
 void NavEKF3_core::locked_update(const Vector3f &dv, float dv_dt,
                                  const Vector3f &da, float da_dt)
 {
+    if (locked_position.locked == LockedState::UNLOCKED) {
+        locked_position.dVelSum.zero();
+        locked_position.takeoff_alignment_complete = false;
+    }
+
     if (locked_position.locked == LockedState::LOCKED) {
         // update IMU filters, assuming no movement
         locked_position.gyro_bias = locked_position.gyro_bias_filter.apply(da * (dtEkfAvg / da_dt));
+        locked_position.dVelSum += dv;
+        locked_position.takeoff_alignment_complete = false;
     }
 
     if (locked_position.locked != LockedState::TAKEOFF) {
         return;
     }
+
+    if (!locked_position.takeoff_alignment_complete) {
+        // calculate initial roll and pitch orientation to be consistent with averaged accel vector
+        float pitch, roll, yaw;
+        stateStruct.quat.to_euler(roll, pitch, yaw);
+        const float roll_old = roll;
+        const float pitch_old = pitch;
+        if (locked_position.dVelSum.length() > 0.001f) {
+            locked_position.dVelSum.normalize();
+
+            // calculate initial pitch angle
+            pitch = asinf(locked_position.dVelSum.x);
+
+            // calculate initial roll angle
+            roll = atan2f(-locked_position.dVelSum.y , -locked_position.dVelSum.z);
+
+            stateStruct.quat.from_euler(roll, pitch, yaw);
+            predictedStateStruct.quat = stateStruct.quat;
+            GCS_SEND_TEXT(MAV_SEVERITY_INFO, "roll old,new=%.2f,%.2f pitch old,new=%.2f,%.2f",
+                          (double)degrees(roll_old), (double)degrees(roll),
+                          (double)degrees(pitch_old), (double)degrees(pitch));
+        }
+        locked_position.takeoff_alignment_complete = true;
+    }
+
     Vector3f abias = inactiveBias[accel_index_active].accel_bias / dtEkfAvg;
     Vector3f dv_corr = dv - inactiveBias[accel_index_active].accel_bias * (dv_dt / dtEkfAvg);
     Vector3f dv_rot = locked_position.rot * dv_corr;
