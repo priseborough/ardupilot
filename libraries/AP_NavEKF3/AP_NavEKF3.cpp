@@ -711,6 +711,14 @@ const AP_Param::GroupInfo NavEKF3::var_info2[] = {
     // @User: Advanced
     AP_GROUPINFO("PRIMARY", 8, NavEKF3, _primary_core, 0),
     
+    // @Param: FITM_MASK
+    // @DisplayName: Bitmask of active states during Free Inertial Takeoff Mode
+    // @Description: 1 byte bitmap of active states during Free Inertial Takeoff Mode. During this mode only the selected states will be corrected by non IMU sensor data.
+    // @Bitmask: 0:q0,1:q1,2:q2,3:q3,4:vn,5:ve,6:vd,7:pn,8:pe,9:pd,10:gbx,11:gby,12:gbz,13:abx,14:aby,15:abz,16:mn,17:me,18:md,19:mx,20:my,21:mz,22:vwn,23:vwe
+    // @User: Advanced
+    // @RebootRequired: False
+    AP_GROUPINFO("FITM_MASK", 9, NavEKF3, _fitmStateMask, 576),
+
     AP_GROUPEND
 };
 
