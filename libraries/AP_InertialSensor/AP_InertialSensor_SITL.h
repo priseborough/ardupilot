@@ -46,5 +46,8 @@ private:
     uint32_t temp_start_ms;
 
     static uint8_t bus_id;
+
+    // quantise a vector via int16_t
+    void quantise_vector(Vector3f &vec, float range);
 };
 #endif // CONFIG_HAL_BOARD
