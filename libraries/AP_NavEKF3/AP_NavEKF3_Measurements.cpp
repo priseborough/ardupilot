@@ -426,6 +426,8 @@ void NavEKF3_core::readIMUData()
         GCS_SEND_TEXT(MAV_SEVERITY_INFO, "EKF3 IMU%u lockpos takeoff", (unsigned)imu_index);
     }
 
+    imuDataNewPrev = imuDataNew;
+
     readDeltaVelocity(accel_index_active, imuDataNew.delVel, imuDataNew.delVelDT);
     accelPosOffset = ins.get_imu_pos_offset(accel_index_active).toftype();
     imuDataNew.accel_index = accel_index_active;

@@ -1008,6 +1008,107 @@ void NavEKF3_core::calcOutputStates()
     }
 }
 
+void NavEKF3_core::RunTakeoffInertialNav()
+{
+    if (locked_position.locked == LockedState::LOCKED) {
+        if (takeoff_ins.imuSampleCount == 0) {
+            takeoff_ins.dAngSum.zero();
+            takeoff_ins.dVelSum.zero();
+        }
+        if (onGroundNotMoving) {
+            takeoff_ins.imuSampleCount++;
+            takeoff_ins.dAngSum += (imuDataNew.delAng - prevTnb * earthRateNED*imuDataNew.delAngDT);
+            takeoff_ins.dVelSum += imuDataNew.delVel;
+        }
+        return;
+    } else if (locked_position.locked == LockedState::UNLOCKED) {
+        takeoff_ins.imuSampleCount = 0;
+        return;
+    } else if (!takeoff_ins.alignment_complete) {
+        // calculate initial roll and pitch orientation to be consistent with LOCKED state average
+        if (takeoff_ins.dVelSum.length() < 0.001f) {
+            return;
+        }
+        takeoff_ins.dVelSum.normalize();
+
+        float pitch, roll, yaw;
+        stateStruct.quat.to_euler(roll, pitch, yaw);
+        const float roll_old = roll;
+        const float pitch_old = pitch;
+
+        // calculate initial tilt assuming IMU is static and measuring gravity
+        // use previous yaw
+        pitch = asinf(takeoff_ins.dVelSum.x);
+        roll = atan2f(-takeoff_ins.dVelSum.y , -takeoff_ins.dVelSum.z);
+        takeoffStateStruct.quat.from_euler(roll, pitch, yaw);
+        takeoffStateStruct.quat.inverse().rotation_matrix(takeoff_ins.Tnb);
+
+        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "roll old,new=%.2f,%.2f pitch old,new=%.2f,%.2f",
+                        (double)degrees(roll_old), (double)degrees(roll),
+                        (double)degrees(pitch_old), (double)degrees(pitch));
+
+        // start at zero to make drift analysis easier
+        takeoffStateStruct.velocity.zero();
+        takeoffStateStruct.position.zero();
+
+        // gyro bias estimate assumes vehicle does not move and prevTnb was correct during LOCKED state
+        // for correct earth rottion rate compensation
+        takeoff_ins.dAngBias = takeoff_ins.dAngSum / (float)takeoff_ins.imuSampleCount;
+        takeoff_ins.imuSampleCount = 0;
+
+        takeoff_ins.alignment_complete = true;
+
+        return;
+    }
+
+
+    Vector3f deltaAngNow = imuDataNew.delAng - takeoff_ins.dAngBias;
+    Vector3f deltaAngPrev = imuDataNewPrev.delAng - takeoff_ins.dAngBias;
+
+    // // Coning corrections to be applied if they are not done inside IMU or driver
+    // Vector3f coning_correction = (deltaAngPrev % deltaAngNow) * (1.0f / 12.0f);
+    // takeoffStateStruct.quat.rotate(imuDataNew.delAng + coning_correction - takeoff_ins.Tnb * earthRateNED*imuDataNew.delAngDT);
+
+    // update the quaternion states by rotating from the previous attitude through
+    // the delta angle rotation quaternion and normalise
+    // apply correction for earth's rotation rate
+    // % * - and + operators have been overloaded
+    takeoffStateStruct.quat.rotate(imuDataNew.delAng - takeoff_ins.Tnb * earthRateNED*imuDataNew.delAngDT);
+    stateStruct.quat.normalize();
+    Matrix3f newTnb;
+    takeoffStateStruct.quat.inverse().rotation_matrix(newTnb);
+
+    // transform body delta velocities to delta velocities in the nav frame
+    // apply sculling corrections
+    // * and + operators have been overloaded
+    Vector3f sculling_correction = (deltaAngPrev % imuDataNew.delVel) + (imuDataNewPrev.delVel % deltaAngNow);
+    sculling_correction *= (1.0f / 12.0f);
+    Vector3f delVelNav;  // delta velocity vector in earth axes
+    delVelNav  = takeoff_ins.Tnb.mul_transpose(imuDataNew.delVel + sculling_correction);
+    delVelNav.z += GRAVITY_MSS*imuDataNew.delVelDT;
+
+    takeoff_ins.Tnb = newTnb;
+
+    // save velocity for use in trapezoidal integration for position calcuation
+    Vector3f lastVelocity = stateStruct.velocity;
+
+    // sum delta velocities to get velocity
+    takeoffStateStruct.velocity += delVelNav;
+
+    // apply a trapezoidal integration to velocities to calculate position
+    takeoffStateStruct.position += (takeoffStateStruct.velocity + lastVelocity) * (imuDataNew.delVelDT*0.5f);
+
+    const uint32_t now = dal.millis();
+    static uint32_t time_ms=0;
+    if (now - time_ms > 1000) {
+        time_ms = now;
+            GCS_SEND_TEXT(MAV_SEVERITY_INFO, "TAKEOFF vx,vy = %.2f,%.2f px,py = %.2f,%.2f dt = %.3f",
+                          (double)takeoffStateStruct.velocity.x, (double)takeoffStateStruct.velocity.y,
+                          (double)takeoffStateStruct.position.x, (double)takeoffStateStruct.position.y,
+                          (double)imuDataNew.delVelDT);
+    }
+}
+
 /*
  * Calculate the predicted state covariance matrix using algebraic equations generated using SymPy
  * See AP_NavEKF3/derivation/main.py for derivation
