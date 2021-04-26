@@ -246,6 +246,7 @@ protected:
         GROUND_BEHAVIOR_NO_MOVEMENT,
         GROUND_BEHAVIOR_FWD_ONLY,
         GROUND_BEHAVIOR_TAILSITTER,
+        GROUND_BEHAVIOR_ROLL_PITCH,
     } ground_behavior;
 
     bool use_smoothing;
