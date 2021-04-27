@@ -1014,11 +1014,13 @@ void NavEKF3_core::RunTakeoffInertialNav()
         if (takeoff_ins.imuSampleCount == 0) {
             takeoff_ins.dAngSum.zero();
             takeoff_ins.dVelSum.zero();
+            takeoff_ins.dAngDelTimeSum = 0.0f;
         }
         if (onGroundNotMoving) {
             takeoff_ins.imuSampleCount++;
             takeoff_ins.dAngSum += (imuDataNew.delAng - prevTnb * earthRateNED*imuDataNew.delAngDT);
             takeoff_ins.dVelSum += imuDataNew.delVel;
+            takeoff_ins.dAngDelTimeSum += imuDataNew.delAngDT;
         }
         return;
     } else if (locked_position.locked == LockedState::UNLOCKED) {
@@ -1043,26 +1045,30 @@ void NavEKF3_core::RunTakeoffInertialNav()
         takeoffStateStruct.quat.from_euler(roll, pitch, yaw);
         takeoffStateStruct.quat.inverse().rotation_matrix(takeoff_ins.Tnb);
 
-        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "roll old,new=%.2f,%.2f pitch old,new=%.2f,%.2f",
-                        (double)degrees(roll_old), (double)degrees(roll),
-                        (double)degrees(pitch_old), (double)degrees(pitch));
-
         // start at zero to make drift analysis easier
         takeoffStateStruct.velocity.zero();
         takeoffStateStruct.position.zero();
 
         // gyro bias estimate assumes vehicle does not move and prevTnb was correct during LOCKED state
-        // for correct earth rottion rate compensation
-        takeoff_ins.dAngBias = takeoff_ins.dAngSum / (float)takeoff_ins.imuSampleCount;
+        // for correct earth rotation rate compensation
+        takeoff_ins.gyroBias = takeoff_ins.dAngSum / takeoff_ins.dAngDelTimeSum;
         takeoff_ins.imuSampleCount = 0;
 
         takeoff_ins.alignment_complete = true;
 
+        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "roll old,new=%.2f,%.2f pitch old,new=%.2f,%.2f",
+                        (double)degrees(roll_old), (double)degrees(roll),
+                        (double)degrees(pitch_old), (double)degrees(pitch));
+        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "gyro bias = %.5f,%.5f,%.5f",
+                        (double)degrees(takeoff_ins.gyroBias.x),
+                        (double)degrees(takeoff_ins.gyroBias.y),
+                        (double)degrees(takeoff_ins.gyroBias.z));
+
         return;
     }
 
-    Vector3f deltaAngNow = imuDataNew.delAng - takeoff_ins.dAngBias;
-    Vector3f deltaAngPrev = imuDataNewPrev.delAng - takeoff_ins.dAngBias;
+    Vector3f deltaAngNow = imuDataNew.delAng - takeoff_ins.gyroBias * imuDataNew.delAngDT;
+    Vector3f deltaAngPrev = imuDataNewPrev.delAng - takeoff_ins.gyroBias * imuDataNew.delAngDT;
 
     // // Coning corrections to be applied if they are not done inside IMU or driver
     // Vector3f coning_correction = (deltaAngPrev % deltaAngNow) * (1.0f / 12.0f);
@@ -1127,10 +1133,9 @@ void NavEKF3_core::RunTakeoffInertialNav()
     static uint32_t time_ms=0;
     if (now - time_ms > 1000) {
         time_ms = now;
-            GCS_SEND_TEXT(MAV_SEVERITY_INFO, "TAKEOFF vx,vy = %.2f,%.2f px,py = %.2f,%.2f dt = %.3f",
+            GCS_SEND_TEXT(MAV_SEVERITY_INFO, "TAKEOFF vx,vy = %.2f,%.2f px,py = %.2f,%.2f",
                           (double)takeoffStateStruct.velocity.x, (double)takeoffStateStruct.velocity.y,
-                          (double)takeoffStateStruct.position.x, (double)takeoffStateStruct.position.y,
-                          (double)imuDataNew.delVelDT);
+                          (double)takeoffStateStruct.position.x, (double)takeoffStateStruct.position.y);
     }
 }
 

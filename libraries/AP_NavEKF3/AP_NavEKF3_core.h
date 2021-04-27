@@ -1553,5 +1553,18 @@ private:
         Vector24 predictedStatesArray;
         struct state_elements predictedStateStruct;
     };
+    union {
+        Vector24 takeoffStatesArray;
+        struct state_elements takeoffStateStruct;
+    };
+    struct {
+        Matrix3f Tnb;
+        Vector3f dVelSum;
+        float dAngDelTimeSum;
+        Vector3f dAngSum;
+        uint32_t imuSampleCount;
+        Vector3f gyroBias;
+        bool alignment_complete;
+    } takeoff_ins;
 
 };
