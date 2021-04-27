@@ -1061,7 +1061,6 @@ void NavEKF3_core::RunTakeoffInertialNav()
         return;
     }
 
-
     Vector3f deltaAngNow = imuDataNew.delAng - takeoff_ins.dAngBias;
     Vector3f deltaAngPrev = imuDataNewPrev.delAng - takeoff_ins.dAngBias;
 
@@ -1098,6 +1097,32 @@ void NavEKF3_core::RunTakeoffInertialNav()
     // apply a trapezoidal integration to velocities to calculate position
     takeoffStateStruct.position += (takeoffStateStruct.velocity + lastVelocity) * (imuDataNew.delVelDT*0.5f);
 
+    if (core_index == 0) {
+        float roll_rad, pitch_rad, yaw_rad;
+        takeoffStateStruct.quat.to_euler(roll_rad, pitch_rad, yaw_rad);
+        // @LoggerMessage: XKIT
+        // @Description: Inertial takeoff calculation
+        // @Field: TimeUS: Time since system startup
+        // @Field: Ax: Acceleration North (m/s/s)
+        // @Field: Ay: Acceleration East (m/s/s)
+        // @Field: Az: Acceleration Down (m/s/s)
+        // @Field: Vx: Velocity North (m/s/s)
+        // @Field: Vy: Velocity East (m/s/s)
+        // @Field: Vz: Velocity Down (m/s/s)
+        // @Field: Px: Position North (m/s/s)
+        // @Field: Py: Position East (m/s/s)
+        // @Field: Pz: Position Down (m/s/s)
+        // @Field: R: Roll (deg)
+        // @Field: P: Pitch (deg)
+        // @Field: Y: Yaw (deg)
+        AP::logger().Write("XKIT", "TimeUS,Ax,Ay,Az,Vx,Vy,Vz,Px,Py,Pz,R,P,Y",
+                            "Qffffffffffff",
+                            AP_HAL::micros64(),
+                            delVelNav.x / imuDataNew.delVelDT, delVelNav.y / imuDataNew.delVelDT, delVelNav.z / imuDataNew.delVelDT,
+                            takeoffStateStruct.velocity.x, takeoffStateStruct.velocity.y, takeoffStateStruct.velocity.z,
+                            takeoffStateStruct.position.x, takeoffStateStruct.position.y, takeoffStateStruct.position.z,
+                            degrees(roll_rad), degrees(pitch_rad), degrees(yaw_rad));
+    }
     const uint32_t now = dal.millis();
     static uint32_t time_ms=0;
     if (now - time_ms > 1000) {
