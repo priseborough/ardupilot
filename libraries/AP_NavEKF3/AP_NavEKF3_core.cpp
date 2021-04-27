@@ -1054,6 +1054,11 @@ void NavEKF3_core::RunTakeoffInertialNav()
         takeoff_ins.gyroBias = takeoff_ins.dAngSum / takeoff_ins.dAngDelTimeSum;
         takeoff_ins.imuSampleCount = 0;
 
+        // transfer alignment data to main filter
+        stateStruct.quat = takeoffStateStruct.quat;
+        stateStruct.gyro_bias = takeoff_ins.gyroBias * dtEkfAvg;
+        stateStruct.velocity.zero();
+
         takeoff_ins.alignment_complete = true;
 
         GCS_SEND_TEXT(MAV_SEVERITY_INFO, "roll old,new=%.2f,%.2f pitch old,new=%.2f,%.2f",
