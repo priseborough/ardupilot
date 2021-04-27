@@ -98,7 +98,7 @@ void AP_InertialSensor_SITL::generate_accel()
         if (!is_zero(accel_scale.z)) {
             accel.z /= accel_scale.z;
         }
-
+#if 0
         // apply bias
         const Vector3f &accel_bias = sitl->accel_bias[accel_instance].get();
         accel += accel_bias;
@@ -150,7 +150,7 @@ void AP_InertialSensor_SITL::generate_accel()
                 accel.z += sinf(phase) * calculate_noise(accel_noise * sitl->vibe_motor_scale, noise_variation);
             }
         }
-
+#endif
         // correct for the acceleration due to the IMU position offset and angular acceleration
         // correct for the centripetal acceleration
         // only apply corrections to first accelerometer
@@ -201,7 +201,7 @@ void AP_InertialSensor_SITL::generate_gyro()
         float p = radians(sitl->state.rollRate) + gyro_drift();
         float q = radians(sitl->state.pitchRate) + gyro_drift();
         float r = radians(sitl->state.yawRate) + gyro_drift();
-
+#if 0
         // minimum gyro noise is less than 1 bit
         float gyro_noise = ToRad(0.04f);
         float noise_variation = 0.05f;
@@ -255,7 +255,7 @@ void AP_InertialSensor_SITL::generate_gyro()
                 r += sinf(phase) * calculate_noise(gyro_noise * sitl->vibe_motor_scale, noise_variation);
             }
         }
-
+#endif
         Vector3f gyro = Vector3f(p, q, r);
 
         sitl->imu_tcal[gyro_instance].sitl_apply_gyro(get_temperature(), gyro);
