@@ -98,7 +98,7 @@ void AP_InertialSensor_SITL::generate_accel()
         if (!is_zero(accel_scale.z)) {
             accel.z /= accel_scale.z;
         }
-#if 0
+#if 0 // turn off most accelerometer errors to help with INS error debug
         // apply bias
         const Vector3f &accel_bias = sitl->accel_bias[accel_instance].get();
         accel += accel_bias;
@@ -198,10 +198,13 @@ void AP_InertialSensor_SITL::generate_gyro()
     uint8_t nsamples = enable_fast_sampling(gyro_instance) ? 8 : 1;
 
     for (uint8_t j = 0; j < nsamples; j++) {
-        float p = radians(sitl->state.rollRate) + gyro_drift();
-        float q = radians(sitl->state.pitchRate) + gyro_drift();
-        float r = radians(sitl->state.yawRate) + gyro_drift();
-#if 0
+        float p = radians(sitl->state.rollRate);
+        float q = radians(sitl->state.pitchRate);
+        float r = radians(sitl->state.yawRate);
+#if 0 // turn off most gyro errors to help with INS error debug
+        p += gyro_drift();
+        q += gyro_drift();
+        r += gyro_drift();
         // minimum gyro noise is less than 1 bit
         float gyro_noise = ToRad(0.04f);
         float noise_variation = 0.05f;
