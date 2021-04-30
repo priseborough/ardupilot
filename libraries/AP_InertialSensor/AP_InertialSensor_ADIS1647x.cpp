@@ -238,7 +238,6 @@ void AP_InertialSensor_ADIS1647x::read_sensor(void)
         uint8_t  checksum;
     } data {};
 
-    uint64_t sample_start_us = AP_HAL::micros64();
     do {
         WITH_SEMAPHORE(dev->get_semaphore());
         data.cmd[0] = REG_GLOB_CMD;
@@ -285,10 +284,10 @@ void AP_InertialSensor_ADIS1647x::read_sensor(void)
     gyro *= gyro_scale;
 
     _rotate_and_correct_accel(accel_instance, accel);
-    _notify_new_accel_raw_sample(accel_instance, accel, sample_start_us);
+    _notify_new_accel_raw_sample(accel_instance, accel);
 
     _rotate_and_correct_gyro(gyro_instance, gyro);
-    _notify_new_gyro_raw_sample(gyro_instance, gyro, sample_start_us);
+    _notify_new_gyro_raw_sample(gyro_instance, gyro);
 
     /*
       publish average temperature at 20Hz
