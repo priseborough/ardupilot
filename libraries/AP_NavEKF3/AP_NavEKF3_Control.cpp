@@ -236,8 +236,8 @@ void NavEKF3_core::setAidingMode()
             FILE *ff = fopen("randlog.txt", "a");
             fprintf(ff, "%u %ld %.12f %.12f\n", core_index, long(dal_random_seed), pos.x, pos.y);
         }
-    }
 #endif
+    }
 
     // Handle the special case where we are on ground and disarmed without a yaw measurement
     // and navigating. This can occur if not using a magnetometer and yaw was aligned using GPS
