@@ -45,6 +45,8 @@ float AP_DAL_InertialSensor::rand_ndist() {
     for (uint8_t i=0; i<5; i++) {
         ret = ret + rand_float();
     }
+    ret /= (sqrtf(5.0f));
+    return ret;
 }
 
 void AP_DAL_InertialSensor::start_frame()
