@@ -54,11 +54,7 @@ public:
     void handle_message(const log_RISH &msg) {
         _RISH = msg;
     }
-    void handle_message(const log_RISI &msg) {
-        _RISI[msg.instance] = msg;
-        pos[msg.instance] = AP::ins().get_imu_pos_offset(msg.instance);
-        update_filtered(msg.instance);
-    }
+    void handle_message(const log_RISI &msg);
 
 private:
     struct log_RISH _RISH;

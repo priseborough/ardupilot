@@ -3,12 +3,27 @@
 #include <AP_Logger/AP_Logger.h>
 #include "AP_DAL.h"
 
+bool dal_enable_random;
+float dal_random_scale;
+int32_t dal_random_seed;
+
 AP_DAL_InertialSensor::AP_DAL_InertialSensor()
 {
     for (uint8_t i=0; i<ARRAY_SIZE(_RISI); i++) {
         _RISI[i].instance = i;
     }
-
+    const char *seed_env = getenv("DAL_SEED");
+    if (seed_env) {
+        dal_random_seed = int32_t(atol(seed_env));
+        srandom(unsigned(dal_random_seed));
+        dal_enable_random = true;
+    }
+    if (dal_enable_random) {
+        const char *seed_scale = getenv("DAL_RANDOM_SCALE");
+        if (seed_scale) {
+            dal_random_scale = atof(seed_scale);
+        }
+    }
 }
 
 void AP_DAL_InertialSensor::start_frame()
@@ -65,4 +80,16 @@ void AP_DAL_InertialSensor::update_filtered(uint8_t i)
     if (is_positive(_RISI[i].delta_velocity_dt)) {
         accel_filtered[i] += ((_RISI[i].delta_velocity/_RISI[i].delta_velocity_dt) - accel_filtered[i]) * alpha;
     }
+}
+
+void AP_DAL_InertialSensor::handle_message(const log_RISI &msg)
+{
+    _RISI[msg.instance] = msg;
+    if (dal_enable_random) {
+        auto &r = _RISI[msg.instance];
+        r.delta_velocity += rand_vec3f() * dal_random_scale;
+        r.delta_angle += rand_vec3f() * dal_random_scale;
+    }
+    pos[msg.instance] = AP::ins().get_imu_pos_offset(msg.instance);
+    update_filtered(msg.instance);
 }
