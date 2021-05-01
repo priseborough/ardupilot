@@ -119,14 +119,20 @@ void AP_DAL_InertialSensor::handle_message(const log_RISI &msg)
     _RISI[msg.instance] = msg;
     if (dal_enable_random) {
         auto &r = _RISI[msg.instance];
-        const Vector3f delta_angle_from_accel = sensor_error_params.AccelToRateMatrix * (r.delta_velocity / r.delta_velocity_dt) * r.delta_angle_dt;
-        // adjust rate noise 1-STD for integration interval before converting to a delta angle
-        Vector3f delta_angle_from_noise = sensor_error_params.RateNoise * sqrtf(r.delta_angle_dt) * r.delta_angle_dt;
+        // adjust rate noise 1-STD for integration interval as well as converting to a delta angle
+        // hence the use of dt^(3/2)
+        Vector3f delta_angle_from_noise = sensor_error_params.RateNoise * powf(r.delta_angle_dt, 1.5f);
         delta_angle_from_noise.x *= rand_ndist();
         delta_angle_from_noise.y *= rand_ndist();
         delta_angle_from_noise.z *= rand_ndist();
         // apply misalignment and scale factor to 'truth data' before adding accel and noise effects
-        r.delta_angle = sensor_error_params.TransferMatrix * r.delta_angle + delta_angle_from_accel + delta_angle_from_noise;
+        r.delta_angle = sensor_error_params.TransferMatrix * r.delta_angle + delta_angle_from_noise;
+        if (r.delta_velocity_dt > 0.0f) {
+            const Vector3f accel = r.delta_velocity / r.delta_velocity_dt;
+            const Vector3f angle_rate_from_accel = sensor_error_params.AccelToRateMatrix * accel;
+            const Vector3f delta_angle_from_accel = angle_rate_from_accel * r.delta_angle_dt;
+            r.delta_angle  += delta_angle_from_accel;
+        }
     }
     pos[msg.instance] = AP::ins().get_imu_pos_offset(msg.instance);
     update_filtered(msg.instance);
