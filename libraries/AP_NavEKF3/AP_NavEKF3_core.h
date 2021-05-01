@@ -1541,5 +1541,5 @@ private:
         bool alignment_complete;
     } takeoff_ins;
 
-//    void RunTakeoffInertialNav();
+    void RunTakeoffInertialNav();
 };
