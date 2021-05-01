@@ -19,24 +19,33 @@ AP_DAL_InertialSensor::AP_DAL_InertialSensor()
     }
     if (dal_enable_random) {
          // spec is for axis to axis misalignment so halve individual axis variance
-        const float ang_offset = radians(0.25f) / (sqrtf(2.0f));
+        const float ang_offset = radians(0.25f) / sqrtf(2.0f);
+
         // Spec says +-0.2% nonlinearity, but is vague about how it is measured.
-         const float scale_error = 0.2E-2F;
+         const float scale_error = 0.2E-2f;
         sensor_error_params.TransferMatrix = Matrix3f(Vector3f(1.0f + scale_error*rand_float(), ang_offset*rand_ndist(), ang_offset*rand_ndist()),
                                                       Vector3f(ang_offset*rand_ndist(), 1.0f + scale_error*rand_float(), ang_offset*rand_ndist()),
                                                       Vector3f(ang_offset*rand_ndist(), ang_offset*rand_ndist(), 1.0f + scale_error*rand_float()));
+printf("Tmat = [[%e,%e,%e]\n",(double)sensor_error_params.TransferMatrix.a.x,(double)sensor_error_params.TransferMatrix.a.y,(double)sensor_error_params.TransferMatrix.a.z);
+printf("        [%e,%e,%e]\n",(double)sensor_error_params.TransferMatrix.b.x,(double)sensor_error_params.TransferMatrix.b.y,(double)sensor_error_params.TransferMatrix.b.z);
+printf("        [%e,%e,%e]]\n",(double)sensor_error_params.TransferMatrix.c.x,(double)sensor_error_params.TransferMatrix.c.y,(double)sensor_error_params.TransferMatrix.c.z);
 
         // Noise values taken from Allan deviation plot for 1 second integration interval
         // This will be adjsuted for IMU integration period when it is applied
         sensor_error_params.RateNoise = Vector3f(radians(8.0f), radians(8.0f), radians(11.0f)); // rad/hour
         sensor_error_params.RateNoise /= 3600.0f; // rad/sec
+printf("Rnoise = [%e,%e,%e]\n",(double)sensor_error_params.RateNoise.x,(double)sensor_error_params.RateNoise.y,(double)sensor_error_params.RateNoise.z);
 
         // assume sensitivity of each gyro to acceleration as specified is the total accel, not per axis, diveide by sqrt(3)
-        Vector3f Kacc = Vector3f(radians(0.572E-3), radians(1.02E-3), radians(0.408E-3));
+        Vector3f Kacc = Vector3f(radians(0.572E-3f), radians(1.02E-3f), radians(0.408E-3f));
         Kacc /= sqrtf(3.0f);
         sensor_error_params.AccelToRateMatrix = Matrix3f(Vector3f( Kacc.x*rand_ndist(), Kacc.y*rand_ndist(), Kacc.z*rand_ndist()),
                                                          Vector3f( Kacc.x*rand_ndist(), Kacc.y*rand_ndist(), Kacc.z*rand_ndist()),
                                                          Vector3f( Kacc.x*rand_ndist(), Kacc.y*rand_ndist(), Kacc.z*rand_ndist()));
+printf("AtoRmat = [[%e,%e,%e]\n",(double)sensor_error_params.AccelToRateMatrix.a.x,(double)sensor_error_params.AccelToRateMatrix.a.y,(double)sensor_error_params.AccelToRateMatrix.a.z);
+printf("           [%e,%e,%e]\n",(double)sensor_error_params.AccelToRateMatrix.b.x,(double)sensor_error_params.AccelToRateMatrix.b.y,(double)sensor_error_params.AccelToRateMatrix.b.z);
+printf("           [%e,%e,%e]]\n",(double)sensor_error_params.AccelToRateMatrix.c.x,(double)sensor_error_params.AccelToRateMatrix.c.y,(double)sensor_error_params.AccelToRateMatrix.c.z);
+
     }
 }
 
@@ -45,7 +54,7 @@ float AP_DAL_InertialSensor::rand_ndist() {
     for (uint8_t i=0; i<5; i++) {
         ret = ret + rand_float();
     }
-    ret /= (sqrtf(5.0f));
+    ret /= sqrtf(5.0f);
     return ret;
 }
 
