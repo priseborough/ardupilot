@@ -717,7 +717,7 @@ void NavEKF3_core::UpdateFilter(bool predict)
     // Wind output forward from the fusion to output time horizon
     calcOutputStates();
 
-    // RunTakeoffInertialNav();
+    RunTakeoffInertialNav();
 
     /*
       this is a check to cope with a vehicle sitting idle on the
@@ -1010,7 +1010,6 @@ void NavEKF3_core::calcOutputStates()
     }
 }
 
-#if 0
 void NavEKF3_core::RunTakeoffInertialNav()
 {
     if (locked_position.locked == LockedState::LOCKED) {
@@ -1141,12 +1140,12 @@ void NavEKF3_core::RunTakeoffInertialNav()
     static uint32_t time_ms=0;
     if (now - time_ms > 1000) {
         time_ms = now;
-            GCS_SEND_TEXT(MAV_SEVERITY_INFO, "TAKEOFF vx,vy = %.2f,%.2f px,py = %.2f,%.2f",
+            GCS_SEND_TEXT(MAV_SEVERITY_INFO, "TAKEOFF vx,vy=%.2f,%.2f px,py=%.2f,%.2f spx,spy=%.2f,%.2f",
                           (double)takeoffStateStruct.velocity.x, (double)takeoffStateStruct.velocity.y,
-                          (double)takeoffStateStruct.position.x, (double)takeoffStateStruct.position.y);
+                          (double)takeoffStateStruct.position.x, (double)takeoffStateStruct.position.y,
+                          (double)stateStruct.position.x, (double)stateStruct.position.y);
     }
 }
-#endif
 
 /*
  * Calculate the predicted state covariance matrix using algebraic equations generated using SymPy

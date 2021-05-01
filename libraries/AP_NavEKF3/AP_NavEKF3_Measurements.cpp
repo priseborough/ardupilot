@@ -435,7 +435,7 @@ void NavEKF3_core::readIMUData()
     // Get delta angle data from primary gyro or primary if not available
     readDeltaAngle(gyro_index_active, imuDataNew.delAng, imuDataNew.delAngDT);
 
-    locked_update(imuDataNew.delVel, imuDataNew.delVelDT, imuDataNew.delAng, imuDataNew.delAngDT);
+    //locked_update(imuDataNew.delVel, imuDataNew.delVelDT, imuDataNew.delAng, imuDataNew.delAngDT);
 
     imuDataNew.delAngDT = MAX(imuDataNew.delAngDT, 1.0e-4f);
     imuDataNew.gyro_index = gyro_index_active;

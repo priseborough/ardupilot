@@ -232,7 +232,7 @@ void NavEKF3_core::setAidingMode()
         if (dal_enable_random) {
             extern int32_t dal_random_seed;
             FILE *ff = fopen("randlog.txt", "a");
-            fprintf(ff, "%u,%ld,%.12f,%.12f,%.12f,%.12f\n", core_index, long(dal_random_seed), stateStruct.velocity.x, stateStruct.velocity.y, stateStruct.position.x, stateStruct.position.y);
+            fprintf(ff, "%u,%ld,%.12f,%.12f,%.12f,%.12f\n", core_index, long(dal_random_seed), takeoffStateStruct.velocity.x, takeoffStateStruct.velocity.y, takeoffStateStruct.position.x, takeoffStateStruct.position.y);
         }
 #endif
     }
