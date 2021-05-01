@@ -227,7 +227,18 @@ void NavEKF3_core::setAidingMode()
         imuSampleTime_ms - lastPosPassTime_ms > frontend->posRetryTimeUseVel_ms-250U) {
         locked_position.locked = LockedState::UNLOCKED;
         GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "EKF3 IMU%u unlocked",(unsigned)imu_index);
+#if APM_BUILD_TYPE(APM_BUILD_Replay)
+        extern bool dal_enable_random;
+        if (dal_enable_random) {
+            extern float dal_random_scale;
+            extern int32_t dal_random_seed;
+            Vector2f pos;
+            getPosNE(pos);
+            FILE *ff = fopen("randlog.txt", "a");
+            fprintf(ff, "%u %ld %.12f %.12f %.12f\n", core_index, long(dal_random_seed), dal_random_scale, pos.x, pos.y);
+        }
     }
+#endif
 
     // Handle the special case where we are on ground and disarmed without a yaw measurement
     // and navigating. This can occur if not using a magnetometer and yaw was aligned using GPS
