@@ -69,5 +69,15 @@ private:
 
     uint8_t _primary_gyro;
 
+    struct Sensor_Error_Param_Struct {
+        Matrix3f TransferMatrix; // scale factor and misalignment
+        Matrix3f AccelToRateMatrix; // (rad/sec) / (m/s/s)
+        Vector3f RateNoise; // rad/sec
+    } sensor_error_params;
+
+
     void update_filtered(uint8_t i);
+
+    float rand_ndist();
+
 };
