@@ -717,6 +717,8 @@ void NavEKF3_core::UpdateFilter(bool predict)
     // Wind output forward from the fusion to output time horizon
     calcOutputStates();
 
+    // RunTakeoffInertialNav();
+
     /*
       this is a check to cope with a vehicle sitting idle on the
       ground and getting over-confident of the state. The symptoms
@@ -1008,6 +1010,7 @@ void NavEKF3_core::calcOutputStates()
     }
 }
 
+#if 0
 void NavEKF3_core::RunTakeoffInertialNav()
 {
     if (locked_position.locked == LockedState::LOCKED) {
@@ -1143,6 +1146,7 @@ void NavEKF3_core::RunTakeoffInertialNav()
                           (double)takeoffStateStruct.position.x, (double)takeoffStateStruct.position.y);
     }
 }
+#endif
 
 /*
  * Calculate the predicted state covariance matrix using algebraic equations generated using SymPy
