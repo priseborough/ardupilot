@@ -838,6 +838,9 @@ void Aircraft::smooth_sensors(void)
     predicted_delta_q.to_axis_angle(predicted_gyro);
     predicted_gyro /= delta_time;
 
+    // turn off predicted rate to prevent step changes in gyro
+    predicted_gyro.zero();
+
     // Calculate a gyro correction drives the tracking error to zero with a time constant
     // of 1/omega
     Quaternion error_q = desired_q / smoothing.quat;
