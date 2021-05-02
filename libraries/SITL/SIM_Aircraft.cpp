@@ -666,13 +666,14 @@ void Aircraft::update_dynamics(const Vector3f &rot_accel, const struct sitl_inpu
                 if (gnd_move_start_time_us == 0) {
                     gnd_move_start_time_us = time_now_us + 1000000;
                 }
-                const float movement_time = fmaxf((float)(1E-6 * ((double)time_now_us - (double)gnd_move_start_time_us)), 0.0f);
-                const float max_amplitude = radians(30.0f);
-                const float frequency_hz = 0.1f;
+                const double movement_time = fmaxf64((1E-6 * ((double)time_now_us - (double)gnd_move_start_time_us)), 0.0);
+                const double max_amplitude = (double)radians(30.0);
+                const double frequency_hz = 0.1;
                 // build up to max amplitude over 2 cycles
-                const float amplitude = fminf((movement_time * frequency_hz * 0.5f) * max_amplitude, max_amplitude);
-                r = amplitude * cosf(movement_time * M_2PI * frequency_hz);
-                p = amplitude * sinf(movement_time * M_2PI * frequency_hz);
+                const double amplitude = fminf64((movement_time * frequency_hz * 0.5) * max_amplitude, max_amplitude);
+                const double phase_angle = wrap_PI(movement_time * M_2PI * frequency_hz);
+                r = (float)(amplitude * cosf64(phase_angle));
+                p = (float)(amplitude * sinf64(phase_angle));
             } else {
                 gnd_move_start_time_us = 0;
                 r = 0.0f;
