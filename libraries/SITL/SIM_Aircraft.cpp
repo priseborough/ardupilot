@@ -740,6 +740,7 @@ void Aircraft::smooth_sensors(void)
         smoothing.accel_body = accel_body;
         smoothing.velocity_ef = velocity_ef;
         smoothing.gyro = gyro;
+        smoothing.gyro_prev = gyro;
         smoothing.last_update_us = now;
         smoothing.location = location;
         smoothing.accel_ef.zero();
@@ -747,7 +748,7 @@ void Aircraft::smooth_sensors(void)
         printf("Smoothing reset at %.3f\n", now * 1.0e-6f);
         return;
     }
-    const float delta_time = (now - smoothing.last_update_us) * 1.0e-6f;
+    const double delta_time = (now - smoothing.last_update_us) * 1.0e-6f;
     if (delta_time <= 0 || delta_time > 0.1) {
         return;
     }
@@ -762,12 +763,48 @@ void Aircraft::smooth_sensors(void)
 
     // wind states forward to current time horizon
 
-    // wind attitude forward to current time using forward euler integration
+    // wind attitude forward to current time using trapezoidal integration
+    // using double precision becasue errors at this step accumulate
     Quaternion delta_quat;
-    const Vector3f delta_angle = smoothing.gyro * delta_time;
-    delta_quat.from_axis_angle(delta_angle);
-    smoothing.quat *= delta_quat;
-    smoothing.quat.normalize();
+    Vector3d delta_angle;
+    delta_angle.x = ((double)smoothing.gyro.x + (double)smoothing.gyro_prev.x) * delta_time * 0.5;
+    delta_angle.y = ((double)smoothing.gyro.y + (double)smoothing.gyro_prev.y) * delta_time * 0.5;
+    delta_angle.z = ((double)smoothing.gyro.z + (double)smoothing.gyro_prev.z) * delta_time * 0.5;
+    smoothing.gyro_prev = smoothing.gyro;
+    const double theta = sqrtf64(delta_angle.x*delta_angle.x+delta_angle.y*delta_angle.y+delta_angle.z*delta_angle.z);
+    double w2,x2,y2,z2;
+    if (is_zero(theta)) {
+        w2 = 1.0;
+        x2=y2=z2=0.0;
+    } else {
+        Vector3d axis = delta_angle / theta;
+        const float st2 = sinf64(theta*0.5);
+        w2 = cosf64(theta*0.5);
+        x2 = axis.x * st2;
+        y2 = axis.y * st2;
+        z2 = axis.z * st2;
+    }
+
+    const double w1 = (double)smoothing.quat[0];
+    const double x1 = (double)smoothing.quat[1];
+    const double y1 = (double)smoothing.quat[2];
+    const double z1 = (double)smoothing.quat[3];
+
+    double q1 = w1*w2 - x1*x2 - y1*y2 - z1*z2;
+    double q2 = w1*x2 + x1*w2 + y1*z2 - z1*y2;
+    double q3 = w1*y2 - x1*z2 + y1*w2 + z1*x2;
+    double q4 = w1*z2 + x1*y2 - y1*x2 + z1*w2;
+
+    const double q_norm = sqrtf64(q1*q1+q2*q2+q3*q3+q4*q4);
+    q1/=q_norm;
+    q2/=q_norm;
+    q3/=q_norm;
+    q4/=q_norm;
+
+    smoothing.quat[0] = (float)q1;
+    smoothing.quat[1] = (float)q2;
+    smoothing.quat[2] = (float)q3;
+    smoothing.quat[3] = (float)q4;
 
     // body to earth rotation matrix at current time step
     Matrix3f rotation_b2e;

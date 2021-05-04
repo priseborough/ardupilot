@@ -313,6 +313,7 @@ private:
         Matrix3f dcm_prev; // previous simulatotr dcm matrix
         Vector3f accel_body; // body frame acceleration measured by accelerometers (m/s/s)
         Vector3f gyro; // body frame angular rate measured by gyros (rad/sec)
+        Vector3f gyro_prev;
         Quaternion quat; // rotation from body to earth frame that should track the simulator dcm matrix
         Vector3f position_ef; // NED position that should track the simulator position state (m)
         Vector3f position_demand_prev; // previous simulator NED position state (m)
