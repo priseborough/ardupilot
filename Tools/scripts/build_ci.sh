@@ -248,6 +248,10 @@ for t in $CI_BUILD_TARGET; do
         $waf configure --board Durandal
         $waf clean
         $waf copter
+        # and with double precision maths
+        $waf configure --board Durandal --ekf-double
+        $waf clean
+        $waf copter
         continue
     fi
 
