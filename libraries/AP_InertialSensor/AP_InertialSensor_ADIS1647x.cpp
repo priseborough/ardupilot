@@ -19,6 +19,7 @@
 #include <AP_HAL/utility/sparse-endian.h>
 
 #include "AP_InertialSensor_ADIS1647x.h"
+#include <stdio.h>
 
 #define BACKEND_SAMPLE_RATE 2000
 
@@ -28,6 +29,7 @@
 #define REG_PROD_ID  0x72
 #define  PROD_ID_16470     0x4056
 #define  PROD_ID_16477     0x405d
+#define  PROD_ID_16507     0x407b
 
 #define REG_GLOB_CMD 0x68
 #define  GLOB_CMD_SW_RESET 0x80
@@ -116,6 +118,7 @@ void AP_InertialSensor_ADIS1647x::start()
 bool AP_InertialSensor_ADIS1647x::check_product_id(void)
 {
     uint16_t prod_id = read_reg16(REG_PROD_ID);
+    ::printf("ADIS prod_id=0x%x\n", prod_id);
     switch (prod_id) {
     case PROD_ID_16470:
         // can do up to 40G
@@ -124,6 +127,7 @@ bool AP_InertialSensor_ADIS1647x::check_product_id(void)
         gyro_scale = radians(0.1);
         return true;
 
+    case PROD_ID_16507:
     case PROD_ID_16477:
         // can do up to 40G
         accel_scale = 1.25 * GRAVITY_MSS * 0.001;
@@ -158,7 +162,7 @@ bool AP_InertialSensor_ADIS1647x::init()
 
     // perform software reset
     write_reg16(REG_GLOB_CMD, GLOB_CMD_SW_RESET);
-    hal.scheduler->delay(T_RESET_MS);
+    hal.scheduler->delay(T_RESET_MS*5);
 
     // re-check after reset
     if (!check_product_id()) {
