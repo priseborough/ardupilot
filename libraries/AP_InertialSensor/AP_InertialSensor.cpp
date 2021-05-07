@@ -1514,6 +1514,7 @@ void AP_InertialSensor::update(void)
             _delta_velocity_acc[i].zero();
             _delta_velocity_acc_dt[i] = 0;
             _delta_angle_acc[i].zero();
+            _delta_coning_acc[i].zero();
             _delta_angle_acc_dt[i] = 0;
         }
 

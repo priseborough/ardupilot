@@ -167,8 +167,8 @@ void AP_InertialSensor_Backend::_publish_gyro(uint8_t instance, const Vector3f &
     _imu._gyro[instance] = gyro;
     _imu._gyro_healthy[instance] = true;
 
-    // publish delta angle
-    _imu._delta_angle[instance] = _imu._delta_angle_acc[instance];
+    // publish delta angle including coning correction
+    _imu._delta_angle[instance] = _imu._delta_angle_acc[instance] + _imu._delta_coning_acc[instance];
     _imu._delta_angle_dt[instance] = _imu._delta_angle_acc_dt[instance];
     _imu._delta_angle_valid[instance] = true;
 }
@@ -223,9 +223,10 @@ void AP_InertialSensor_Backend::_notify_new_gyro_raw_sample(uint8_t instance,
     Vector3f delta_angle = (gyro + _imu._last_raw_gyro[instance]) * 0.5f * dt;
 
     // compute coning correction
-    // see page 26 of:
-    // Tian et al (2010) Three-loop Integration of GPS and Strapdown INS with Coning and Sculling Compensation
-    // Available: http://www.sage.unsw.edu.au/snap/publications/tian_etal2010b.pdf
+    // see eqns 2.62 -> 2.66:
+    // Greenheck, Daniel R., "Design and Characterization of a Low Cost MEMS IMU Cluster for Precision Navigation" (2015). Master's
+    // Theses (2009 -). Paper 325.
+    // http://epublications.marquette.edu/theses_open/325
     // see also examples/coning.py
     Vector3f delta_coning = (_imu._delta_angle_acc[instance] +
                              _imu._last_delta_angle[instance] * (1.0f / 6.0f));
@@ -245,11 +246,9 @@ void AP_InertialSensor_Backend::_notify_new_gyro_raw_sample(uint8_t instance,
         }
 
         // integrate delta angle accumulator
-        // the angles and coning corrections are accumulated separately in the
-        // referenced paper, but in simulation little difference was found between
-        // integrating together and integrating separately (see examples/coning.py)
-        _imu._delta_angle_acc[instance] += delta_angle + delta_coning;
+        _imu._delta_angle_acc[instance] += delta_angle;
         _imu._delta_angle_acc_dt[instance] += dt;
+        _imu._delta_coning_acc[instance] += delta_coning;
 
         // save previous delta angle for coning correction
         _imu._last_delta_angle[instance] = delta_angle;
