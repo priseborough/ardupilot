@@ -284,6 +284,9 @@ void NavEKF3_core::setAidingMode()
             // Check if airspeed data is being used
             bool airSpdUsed = (imuSampleTime_ms - lastTasPassTime_ms <= minTestTime_ms);
 
+            // Check if body frame drag accel data is being used
+            bool dragAccelUsed = (imuSampleTime_ms - lastDragPassTime_ms <= minTestTime_ms);
+
             // Check if range beacon data is being used
             bool rngBcnUsed = (imuSampleTime_ms - lastRngBcnPassTime_ms <= minTestTime_ms);
 
@@ -295,7 +298,7 @@ void NavEKF3_core::setAidingMode()
             bool attAiding = posUsed || gpsVelUsed || optFlowUsed || airSpdUsed || rngBcnUsed || bodyOdmUsed;
 
             // check if velocity drift has been constrained by a measurement source
-            bool velAiding = gpsVelUsed || airSpdUsed || optFlowUsed || bodyOdmUsed;
+            bool velAiding = gpsVelUsed || airSpdUsed || dragAccelUsed || optFlowUsed || bodyOdmUsed;
 
             // check if position drift has been constrained by a measurement source
             bool posAiding = posUsed || rngBcnUsed;
@@ -330,6 +333,7 @@ void NavEKF3_core::setAidingMode()
                 velTimeout = true;
                 rngBcnTimeout = true;
                 tasTimeout = true;
+                dragTimeout = true;
                 gpsNotAvailable = true;
              } else if (posAidLossCritical) {
                 // if the loss of position is critical, declare all sources of position aiding as being timed out

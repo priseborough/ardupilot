@@ -959,6 +959,7 @@ private:
     bool magTimeout;                // boolean true if magnetometer measurements have failed for too long and have timed out
     bool tasTimeout;                // boolean true if true airspeed measurements have failed for too long and have timed out
     bool badIMUdata;                // boolean true if the bad IMU data is detected
+    bool dragTimeout;                // boolean true if body frame drag accel measurements have failed for too long and have timed out
 
     float gpsNoiseScaler;           // Used to scale the  GPS measurement noise and consistency gates to compensate for operation with small satellite counts
     Matrix24 P;                     // covariance matrix
@@ -1285,6 +1286,7 @@ private:
 	Vector2f dragTestRatio;		        // drag innovation consistency check ratio
 #endif
     bool dragFusionEnabled;
+    uint32_t lastDragPassTime_ms;       // time stamp when drag accel measurement last passed innovation consistency check (msec)
 
     // height source selection logic
     AP_NavEKF_Source::SourceZ activeHgtSource;  // active height source
