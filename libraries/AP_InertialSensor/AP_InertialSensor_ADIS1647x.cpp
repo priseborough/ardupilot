@@ -212,7 +212,7 @@ bool AP_InertialSensor_ADIS1647x::init()
     }
 
     // choose burst type and compensation
-    uint16_t msc_ctrl = REG_MSC_CTRL_GCOMP | REG_MSC_CTRL_PCOMP | REG_MSC_CTRL_SENSBW | REG_MSC_CTRL_DRPOL;
+    uint16_t msc_ctrl = REG_MSC_CTRL_GCOMP | REG_MSC_CTRL_PCOMP | REG_MSC_CTRL_DRPOL;
     if (use_burst32) {
         msc_ctrl |= REG_MSC_CTRL_BURST32 | REG_MSC_CTRL_BURSTSEL;
     }
