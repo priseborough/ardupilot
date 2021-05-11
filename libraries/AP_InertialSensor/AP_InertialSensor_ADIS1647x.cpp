@@ -21,8 +21,6 @@
 #include "AP_InertialSensor_ADIS1647x.h"
 #include <stdio.h>
 
-#define BACKEND_SAMPLE_RATE 400
-
 /*
   device registers
  */
@@ -169,7 +167,7 @@ bool AP_InertialSensor_ADIS1647x::check_product_id(void)
         use_burst32 = true;
         dvel_scale = 400.0 / 0x7FFFFFFF;
         _clip_limit = 39.5f * GRAVITY_MSS;
-        expected_sample_rate_hz = 400;
+        expected_sample_rate_hz = 1000;
         // RANG_MDL register used for gyro range
         uint16_t rang_mdl = read_reg16(REG_RANG_MDL);
         ::printf("rang_mdl=%u\n", rang_mdl);
@@ -209,7 +207,7 @@ bool AP_InertialSensor_ADIS1647x::init()
 
     // bring rate down
     if (use_burst32 &&
-        !write_reg16(REG_DEC_RATE, REG_DEC_RATE_400Hz, true)) {
+        !write_reg16(REG_DEC_RATE, REG_DEC_RATE_1000Hz, true)) {
         return false;
     }
 
