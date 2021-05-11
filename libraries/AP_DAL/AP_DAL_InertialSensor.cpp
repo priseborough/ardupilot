@@ -3,14 +3,17 @@
 #include <AP_Logger/AP_Logger.h>
 #include "AP_DAL.h"
 
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
 bool dal_enable_random;
 int32_t dal_random_seed;
+#endif
 
 AP_DAL_InertialSensor::AP_DAL_InertialSensor()
 {
     for (uint8_t i=0; i<ARRAY_SIZE(_RISI); i++) {
         _RISI[i].instance = i;
     }
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
     const char *seed_env = getenv("DAL_SEED");
     if (seed_env) {
         dal_random_seed = int32_t(atol(seed_env));
@@ -47,6 +50,7 @@ printf("           [%e,%e,%e]\n",(double)sensor_error_params.AccelToRateMatrix.b
 printf("           [%e,%e,%e]]\n",(double)sensor_error_params.AccelToRateMatrix.c.x,(double)sensor_error_params.AccelToRateMatrix.c.y,(double)sensor_error_params.AccelToRateMatrix.c.z);
 
     }
+#endif // HAL_BOARD_SITL
 }
 
 float AP_DAL_InertialSensor::rand_ndist() {
@@ -117,6 +121,7 @@ void AP_DAL_InertialSensor::update_filtered(uint8_t i)
 void AP_DAL_InertialSensor::handle_message(const log_RISI &msg)
 {
     _RISI[msg.instance] = msg;
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
     if (dal_enable_random) {
         auto &r = _RISI[msg.instance];
         // adjust rate noise 1-STD for integration interval as well as converting to a delta angle
@@ -134,6 +139,7 @@ void AP_DAL_InertialSensor::handle_message(const log_RISI &msg)
             r.delta_angle  += delta_angle_from_accel;
         }
     }
+#endif // HAL_BOARD_SITL
     pos[msg.instance] = AP::ins().get_imu_pos_offset(msg.instance);
     update_filtered(msg.instance);
 }
