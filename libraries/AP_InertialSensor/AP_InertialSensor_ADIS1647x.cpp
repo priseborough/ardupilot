@@ -127,13 +127,13 @@ void AP_InertialSensor_ADIS1647x::start()
 /*
   check product ID
  */
-bool AP_InertialSensor_ADIS1647x::check_product_id(void)
+bool AP_InertialSensor_ADIS1647x::check_product_id(uint16_t &prod_id)
 {
-    uint16_t prod_id = read_reg16(REG_PROD_ID);
-    ::printf("ADIS prod_id=0x%x\n", prod_id);
+    prod_id = read_reg16(REG_PROD_ID);
     switch (prod_id) {
     case PROD_ID_16470:
         // can do up to 40G
+        opmode = OpMode::Basic;
         accel_scale = 1.25 * GRAVITY_MSS * 0.001;
         _clip_limit = 39.5f * GRAVITY_MSS;
         gyro_scale = radians(0.1);
@@ -142,6 +142,7 @@ bool AP_InertialSensor_ADIS1647x::check_product_id(void)
 
     case PROD_ID_16477: {
         // can do up to 40G
+        opmode = OpMode::Basic;
         accel_scale = 1.25 * GRAVITY_MSS * 0.001;
         _clip_limit = 39.5f * GRAVITY_MSS;
         expected_sample_rate_hz = 2000;
@@ -164,25 +165,32 @@ bool AP_InertialSensor_ADIS1647x::check_product_id(void)
     }
         
     case PROD_ID_16507: {
-        use_burst32 = true;
+        opmode = OpMode::Delta32;
+        expected_sample_rate_hz = 2000;
+        accel_scale = 392.0 / 2097152000.0;
         dvel_scale = 400.0 / 0x7FFFFFFF;
         _clip_limit = 39.5f * GRAVITY_MSS;
-        expected_sample_rate_hz = 1000;
         // RANG_MDL register used for gyro range
         uint16_t rang_mdl = read_reg16(REG_RANG_MDL);
-        ::printf("rang_mdl=%u\n", rang_mdl);
         switch ((rang_mdl >> 2) & 3) {
         case 0:
+            gyro_scale = radians(125) / 0x4E200000;
             dangle_scale = radians(360.0 / 0x7FFFFFFF);
             break;
         case 1:
+            gyro_scale = radians(500) / 0x4E200000;
             dangle_scale = radians(720.0 / 0x7FFFFFFF);
             break;
         case 3:
+            gyro_scale = radians(2000) / 0x4E200000;
             dangle_scale = radians(2160.0 / 0x7FFFFFFF);
             break;
         default:
             return false;
+        }
+        if (opmode == OpMode::Basic) {
+            accel_scale *= 0x10000;
+            gyro_scale *= 0x10000;
         }
         return true;
     }
@@ -198,23 +206,30 @@ bool AP_InertialSensor_ADIS1647x::init()
 
     // perform software reset
     write_reg16(REG_GLOB_CMD, GLOB_CMD_SW_RESET);
-    hal.scheduler->delay(T_RESET_MS);
 
-    // check ID after reset
-    if (!check_product_id()) {
+    uint8_t tries = 10;
+    uint16_t prod_id = 0;
+    do {
+        hal.scheduler->delay(100);
+    } while (!check_product_id(prod_id) && --tries);
+    if (tries == 0) {
+        ::printf("ADIS probe failed - id 0x%04x\n", prod_id);
         return false;
     }
+    ::printf("ADIS ID 0x%04x\n", prod_id);
 
     // bring rate down
-    if (use_burst32 &&
+    if (expected_sample_rate_hz < 1500 &&
         !write_reg16(REG_DEC_RATE, REG_DEC_RATE_1000Hz, true)) {
         return false;
     }
 
     // choose burst type and compensation
     uint16_t msc_ctrl = REG_MSC_CTRL_GCOMP | REG_MSC_CTRL_PCOMP | REG_MSC_CTRL_DRPOL;
-    if (use_burst32) {
+    if (opmode == OpMode::Delta32) {
         msc_ctrl |= REG_MSC_CTRL_BURST32 | REG_MSC_CTRL_BURSTSEL;
+    } else if (opmode == OpMode::AG32) {
+        msc_ctrl |= REG_MSC_CTRL_BURST32;
     }
     if (!write_reg16(REG_MSC_CTRL, msc_ctrl, true)) {
         return true;
@@ -363,9 +378,104 @@ void AP_InertialSensor_ADIS1647x::read_sensor16(void)
 
 
 /*
-  read the sensor using 32 bit burst transfer of delta-angle/delta-velocity
+  read the sensor using 32 bit burst transfer of accel/gyro
  */
 void AP_InertialSensor_ADIS1647x::read_sensor32(void)
+{
+    struct adis_data {
+        uint8_t cmd[2];
+        uint16_t diag_stat;
+        uint16_t  gx_low;
+        uint16_t  gx_high;
+        uint16_t  gy_low;
+        uint16_t  gy_high;
+        uint16_t  gz_low;
+        uint16_t  gz_high;
+        uint16_t  ax_low;
+        uint16_t  ax_high;
+        uint16_t  ay_low;
+        uint16_t  ay_high;
+        uint16_t  az_low;
+        uint16_t  az_high;
+        uint16_t  temp;
+        uint16_t counter;
+        uint8_t  pad;
+        uint8_t  checksum;
+    } data {};
+
+    do {
+        WITH_SEMAPHORE(dev->get_semaphore());
+        data.cmd[0] = REG_GLOB_CMD;
+        DEBUG_SET_PIN(2, 1);
+        if (!dev->transfer((const uint8_t *)&data, sizeof(data), (uint8_t *)&data, sizeof(data))) {
+            break;
+        }
+        DEBUG_SET_PIN(2, 0);
+    } while (be16toh(data.counter) == last_counter);
+
+    DEBUG_SET_PIN(1, 1);
+
+    /*
+      check the 8 bit checksum of the packet
+     */
+    uint8_t sum = 0;
+    const uint8_t *b = (const uint8_t *)&data.diag_stat;
+    for (uint8_t i=0; i<offsetof(adis_data, pad) - offsetof(adis_data, diag_stat); i++) {
+        sum += b[i];
+    }
+    if (sum != data.checksum) {
+        DEBUG_TOGGLE_PIN(3);
+        DEBUG_TOGGLE_PIN(3);
+        DEBUG_TOGGLE_PIN(3);
+        DEBUG_TOGGLE_PIN(3);
+        // corrupt data
+        ::printf("err %u\n", __LINE__);
+        return;
+    }
+
+    /*
+      check if we have lost a sample
+     */
+    uint16_t counter = be16toh(data.counter);
+    if (done_first_read && uint16_t(last_counter+1) != counter) {
+        uint16_t dcounter = counter - last_counter;
+        ::printf("counter=%u last_counter=%u dc=%u\n", counter, last_counter, dcounter);
+        DEBUG_TOGGLE_PIN(3);
+    }
+    done_first_read = true;
+    last_counter = counter;
+    
+    Vector3f accel{float(accel_scale*int32_t(be16toh(data.ax_low) | (be16toh(data.ax_high)<<16))),
+                  -float(accel_scale*int32_t(be16toh(data.ay_low) | (be16toh(data.ay_high)<<16))),
+                  -float(accel_scale*int32_t(be16toh(data.az_low) | (be16toh(data.az_high)<<16)))};
+    Vector3f gyro{float(gyro_scale*int32_t(be16toh(data.gx_low) | (be16toh(data.gx_high)<<16))),
+                    -float(gyro_scale*int32_t(be16toh(data.gy_low) | (be16toh(data.gy_high)<<16))),
+                    -float(gyro_scale*int32_t(be16toh(data.gz_low) | (be16toh(data.gz_high)<<16)))};
+
+    _rotate_and_correct_accel(accel_instance, accel);
+    _notify_new_accel_raw_sample(accel_instance, accel);
+
+    _rotate_and_correct_gyro(gyro_instance, gyro);
+    _notify_new_gyro_raw_sample(gyro_instance, gyro);
+
+    /*
+      publish average temperature at 20Hz
+     */
+    temp_sum += float(int16_t(be16toh(data.temp))*0.1);
+    temp_count++;
+
+    if (temp_count == 100) {
+        _publish_temperature(accel_instance, temp_sum/temp_count);
+        temp_sum = 0;
+        temp_count = 0;
+    }
+    DEBUG_SET_PIN(1, 0);
+}
+
+/*
+  read the sensor using 32 bit burst transfer of delta-angle/delta-velocity
+ */
+void AP_InertialSensor_ADIS1647x::read_sensor32_delta(void)
 {
     struct adis_data {
         uint8_t cmd[2];
@@ -414,6 +524,7 @@ void AP_InertialSensor_ADIS1647x::read_sensor32(void)
         DEBUG_TOGGLE_PIN(3);
         DEBUG_TOGGLE_PIN(3);
         // corrupt data
+        ::printf("err %u\n", __LINE__);
         return;
     }
 
@@ -435,6 +546,10 @@ void AP_InertialSensor_ADIS1647x::read_sensor32(void)
     Vector3f dangle{float(dangle_scale*int32_t(be16toh(data.dax_low) | (be16toh(data.dax_high)<<16))),
                     -float(dangle_scale*int32_t(be16toh(data.day_low) | (be16toh(data.day_high)<<16))),
                     -float(dangle_scale*int32_t(be16toh(data.daz_low) | (be16toh(data.daz_high)<<16)))};
+
+    // compensate for clock errors, see "DELTA ANGLES" in datasheet
+    dangle *= expected_sample_rate_hz / _gyro_raw_sample_rate(gyro_instance);
+    dvel *= expected_sample_rate_hz / _accel_raw_sample_rate(gyro_instance);
 
     _notify_new_delta_velocity(accel_instance, dvel);
     _notify_new_delta_angle(gyro_instance, dangle);
@@ -470,7 +585,9 @@ void AP_InertialSensor_ADIS1647x::loop(void)
             wait_ok = hal.gpio->wait_pin(drdy_pin, AP_HAL::GPIO::INTERRUPT_RISING, 1000);
             DEBUG_SET_PIN(0, 0);
         }
-        if (use_burst32) {
+        if (opmode == OpMode::Delta32) {
+            read_sensor32_delta();
+        } else if (opmode == OpMode::AG32) {
             read_sensor32();
         } else {
             read_sensor16();
