@@ -1137,13 +1137,14 @@ void NavEKF3_core::RunTakeoffInertialNav()
                             degrees(roll_rad), degrees(pitch_rad), degrees(yaw_rad));
     }
     const uint32_t now = dal.millis();
-    static uint32_t time_ms=0;
-    if (now - time_ms > 1000) {
-        time_ms = now;
-            GCS_SEND_TEXT(MAV_SEVERITY_INFO, "TAKEOFF vx,vy=%.2f,%.2f px,py=%.2f,%.2f spx,spy=%.2f,%.2f",
-                          (double)takeoffStateStruct.velocity.x, (double)takeoffStateStruct.velocity.y,
-                          (double)takeoffStateStruct.position.x, (double)takeoffStateStruct.position.y,
-                          (double)stateStruct.position.x, (double)stateStruct.position.y);
+    static uint32_t time_ms[3];
+    if (now - time_ms[core_index] > 1000+core_index*100) {
+        time_ms[core_index] = now;
+        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "TAKEOFF[%u] vx,vy=%.2f,%.2f px,py=%.2f,%.2f spx,spy=%.2f,%.2f",
+                      core_index,
+                      (double)takeoffStateStruct.velocity.x, (double)takeoffStateStruct.velocity.y,
+                      (double)takeoffStateStruct.position.x, (double)takeoffStateStruct.position.y,
+                      (double)stateStruct.position.x, (double)stateStruct.position.y);
     }
 }
 
