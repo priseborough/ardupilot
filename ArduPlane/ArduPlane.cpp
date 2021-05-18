@@ -46,7 +46,7 @@ const AP_Scheduler::Task Plane::scheduler_tasks[] = {
     SCHED_TASK(navigate,               10,    150),
     SCHED_TASK(update_compass,         10,    200),
     SCHED_TASK(read_airspeed,          10,    100),
-    SCHED_TASK(update_alt,             10,    200),
+    SCHED_TASK(update_alt,             50,    200),
     SCHED_TASK(adjust_altitude_target, 10,    200),
 #if ADVANCED_FAILSAFE == ENABLED
     SCHED_TASK(afs_fs_check,           10,    100),
@@ -487,7 +487,7 @@ void Plane::update_alt()
     }
 
     // low pass the sink rate to take some of the noise out
-    auto_state.sink_rate = 0.8f * auto_state.sink_rate + 0.2f*sink_rate;
+    auto_state.sink_rate = 0.96f * auto_state.sink_rate + 0.04f*sink_rate;
 #if PARACHUTE == ENABLED
     parachute.set_sink_rate(auto_state.sink_rate);
 #endif
