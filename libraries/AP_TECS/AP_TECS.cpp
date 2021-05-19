@@ -549,7 +549,7 @@ void AP_TECS::_update_height_demand(void)
         // configured sink rate and adjust the demanded height to
         // be kinematically consistent with the height rate.
 
-        // set all height filter states to current height to prevent large pith transients if flare is aborted
+        // set all height filter states to current height to prevent large pitch transients if flare is aborted
         _hgt_dem_lpf      = _height;
         _hgt_dem_rate_ltd = _height;
         _hgt_dem_in_prev  = _height;
@@ -559,11 +559,6 @@ void AP_TECS::_update_height_demand(void)
             _flare_hgt_dem_ideal = _hgt_afe; 
             _hgt_at_start_of_flare = _hgt_afe;
             _hgt_rate_at_flare_entry = _climb_rate;
-
-            // adjust flare height controller integrator so that at flare entry the pitch
-            const float K_P = 1.0f / _landTimeConst;
-            const float hgt_offset = _flare_hgt_dem_adj - _flare_hgt_dem_ideal;
-            _hgt_rate_err_integ += hgt_offset * K_P;
         }
 
         // adjust the flare sink rate to increase/decrease as your travel further beyond the land wp
@@ -965,7 +960,7 @@ void AP_TECS::_update_pitch(void)
                                     ((_pitch_dem_unc < _PITCHminf || _vert_accel_clip < 0) && integSEB_delta < 0.0f);
     if (!inhibit_integrator) {
         _integSEB_state += integSEB_delta;
-    } else if (is_positive(integSEB_delta * _hgt_rate_err_integ)) {
+    } else {
         // fade out integrator if saturating
         _integSEB_state *= (1.0f - _DT / timeConstant());
     }
@@ -1044,7 +1039,6 @@ void AP_TECS::_initialise_states(int32_t ptchMinCO_cd, float hgt_afe)
         _need_reset                  = false;
 
         // misc variables used for alternative precision landing pitch control
-        _hgt_rate_err_integ       = 0.0f;
         _hgt_at_start_of_flare    = 0.0f;
         _hgt_rate_at_flare_entry  = 0.0f;
         _hgt_afe                  = 0.0f;
