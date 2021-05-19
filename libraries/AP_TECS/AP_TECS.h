@@ -367,7 +367,6 @@ private:
     float _SKEdot;
 
     // misc variables used for alternative precision landing pitch control
-    float _hgt_rate_err_integ;
     float _hgt_at_start_of_flare;
     float _hgt_rate_at_flare_entry;
     float _hgt_afe;
