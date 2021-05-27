@@ -388,8 +388,18 @@ private:
         True = 1,
         UNKNOWN = 3,
     };
+
+    // we keep timestamps of the last time we informed the cores of
+    // the current state of takeoff/touchdown expected.  AP_NavEKF3
+    // and AP_NavEKF2 both have timers dictating the validity of these
+    // states.
     TriState touchdownExpectedState = TriState::UNKNOWN;
+    uint32_t last_touchDownExectedState_ms;
     TriState takeoffExpectedState = TriState::UNKNOWN;
+    uint32_t last_takeoffExectedState_ms;
+    // we should inform the EKFs of the state at least this often:
+    const uint32_t groundeffect_expected_state_inform_interval_ms = 200;
+
     TriState terrainHgtStableState = TriState::UNKNOWN;
 
     EKFType last_active_ekf_type;

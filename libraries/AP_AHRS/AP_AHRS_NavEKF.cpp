@@ -2583,21 +2583,28 @@ bool AP_AHRS_NavEKF::get_vel_innovations_and_variances_for_source(uint8_t source
 
 void AP_AHRS_NavEKF::setTakeoffExpected(bool val)
 {
+    // decide whether we should poke the EKFs based on the age of the
+    // last data we gave them:
+    const uint32_t now_ms = AP_HAL::millis();
+    const uint32_t age_ms = now_ms - last_takeoffExectedState_ms;
+    const bool aged_out = age_ms > groundeffect_expected_state_inform_interval_ms;
+
     switch (takeoffExpectedState) {
     case TriState::UNKNOWN:
         break;
     case TriState::True:
-        if (val) {
+        if (!aged_out && val) {
             return;
         }
         break;
     case TriState::False:
-        if (!val) {
+        if (!aged_out && !val) {
             return;
         }
         break;
     }
     takeoffExpectedState = (TriState)val;
+    last_takeoffExectedState_ms = now_ms;
 
 #if HAL_NAVEKF2_AVAILABLE
     EKF2.setTakeoffExpected(val);
@@ -2609,21 +2616,28 @@ void AP_AHRS_NavEKF::setTakeoffExpected(bool val)
 
 void AP_AHRS_NavEKF::setTouchdownExpected(bool val)
 {
+    // decide whether we should poke the EKFs based on the age of the
+    // last data we gave them:
+    const uint32_t now_ms = AP_HAL::millis();
+    const uint32_t age_ms = now_ms - last_touchDownExectedState_ms;
+    const bool aged_out = age_ms > groundeffect_expected_state_inform_interval_ms;
+
     switch (touchdownExpectedState) {
     case TriState::UNKNOWN:
         break;
     case TriState::True:
-        if (val) {
+        if (!aged_out && val) {
             return;
         }
         break;
     case TriState::False:
-        if (!val) {
+        if (!aged_out && !val) {
             return;
         }
         break;
     }
     touchdownExpectedState = (TriState)val;
+    last_touchDownExectedState_ms = now_ms;
 
 #if HAL_NAVEKF2_AVAILABLE
     EKF2.setTouchdownExpected(val);
