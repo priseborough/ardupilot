@@ -1235,6 +1235,7 @@ void NavEKF2::writeOptFlowMeas(const uint8_t rawFlowQuality, const Vector2f &raw
 
 // called by vehicle code to specify that a takeoff is happening
 // causes the EKF to compensate for expected barometer errors due to ground effect
+// internally times out 1000msec after last call and resets to false
 void NavEKF2::setTakeoffExpected(bool val)
 {
     if (val) {
@@ -1252,6 +1253,7 @@ void NavEKF2::setTakeoffExpected(bool val)
 
 // called by vehicle code to specify that a touchdown is expected to happen
 // causes the EKF to compensate for expected barometer errors due to ground effect
+// internally times out 1000msec after last call and resets to false
 void NavEKF2::setTouchdownExpected(bool val)
 {
     if (val) {
