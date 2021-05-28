@@ -429,6 +429,7 @@ bool NavEKF3_core::updateTakeoffExpected()
 // called by vehicle code to specify that a takeoff is happening
 // causes the EKF to compensate for expected barometer errors due to rotor wash ground interaction
 // causes the EKF to start the EKF-GSF yaw estimator
+// internally times out 1000msec after last call and resets to false
 void NavEKF3_core::setTakeoffExpected(bool val)
 {
     takeoffExpectedSet_ms = imuSampleTime_ms;
@@ -449,6 +450,7 @@ bool NavEKF3_core::updateTouchdownExpected()
 
 // called by vehicle code to specify that a touchdown is expected to happen
 // causes the EKF to compensate for expected barometer errors due to ground effect
+// internally times out 1000msec after last call and resets to false
 void NavEKF3_core::setTouchdownExpected(bool val)
 {
     touchdownExpectedSet_ms = imuSampleTime_ms;

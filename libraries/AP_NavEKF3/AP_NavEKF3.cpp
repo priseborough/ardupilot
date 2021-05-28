@@ -1699,6 +1699,7 @@ void NavEKF3::convert_parameters()
 // called by vehicle code to specify that a takeoff is happening
 // causes the EKF to compensate for expected barometer errors due to rotor wash ground interaction
 // causes the EKF to start the EKF-GSF yaw estimator
+// internally times out 1000msec after last call and resets to false
 void NavEKF3::setTakeoffExpected(bool val)
 {
     if (val) {
@@ -1716,6 +1717,7 @@ void NavEKF3::setTakeoffExpected(bool val)
 
 // called by vehicle code to specify that a touchdown is expected to happen
 // causes the EKF to compensate for expected barometer errors due to ground effect
+// internally times out 1000msec after last call and resets to false
 void NavEKF3::setTouchdownExpected(bool val)
 {
     if (val) {
