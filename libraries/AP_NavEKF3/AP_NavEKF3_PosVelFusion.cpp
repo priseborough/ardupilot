@@ -851,8 +851,10 @@ void NavEKF3_core::FuseVelPosNED()
                     const float gndMaxBaroErr = MAX(frontend->_baroGndEffectDeadZone, 0.0f);
                     const float gndBaroInnovFloor = -0.5f;
 
-                    if ((dal.get_touchdown_expected() || dal.get_takeoff_expected()) && activeHgtSource == AP_NavEKF_Source::SourceZ::BARO) {
-                        // when baro positive pressure error due to ground effect is expected,
+                    if ((dal.get_touchdown_expected() || dal.get_takeoff_expected()) &&
+                        activeHgtSource == AP_NavEKF_Source::SourceZ::BARO &&
+                        !assume_zero_sideslip()) {
+                        // when baro positive pressure error due to rotor ground effect is expected,
                         // floor the barometer innovation at gndBaroInnovFloor
                         // constrain the correction between 0 and gndBaroInnovFloor+gndMaxBaroErr
                         // this function looks like this:
