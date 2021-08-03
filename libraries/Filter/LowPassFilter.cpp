@@ -131,4 +131,4 @@ template class LowPassFilter<long>;
 template class LowPassFilter<float>;
 template class LowPassFilter<Vector2f>;
 template class LowPassFilter<Vector3f>;
-
+template class LowPassFilter<Vector3F>;

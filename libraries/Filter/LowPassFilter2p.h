@@ -94,3 +94,4 @@ typedef LowPassFilter2p<long>     LowPassFilter2pLong;
 typedef LowPassFilter2p<float>    LowPassFilter2pFloat;
 typedef LowPassFilter2p<Vector2f> LowPassFilter2pVector2f;
 typedef LowPassFilter2p<Vector3f> LowPassFilter2pVector3f;
+typedef LowPassFilter2p<Vector3F> LowPassFilter2pVector3F;
