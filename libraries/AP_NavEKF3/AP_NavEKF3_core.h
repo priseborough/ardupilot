@@ -1537,18 +1537,18 @@ private:
         LockedState locked;
         Location loc;
         float yaw;
-        Vector3f dVelSum;
-        Vector3f pos;
-        Vector3f vel;
-        Matrix3f rot;
+        Vector3F dVelSum;
+        Vector3F pos;
+        Vector3F vel;
+        Matrix3F rot;
         uint32_t last_print_ms;
-        Vector3f gyro_bias;
-        LowPassFilterVector3f gyro_bias_filter;
+        Vector3F gyro_bias;
+        LowPassFilterVector3F gyro_bias_filter;
         bool takeoff_alignment_complete;
     } locked_position;
 
-    void locked_update(const Vector3f &dv, float dv_dt,
-                       const Vector3f &da, float da_dt);
+    void locked_update(const Vector3F &dv, double dv_dt,
+                       const Vector3F &da, double da_dt);
     union {
         Vector24 predictedStatesArray;
         struct state_elements predictedStateStruct;
@@ -1558,12 +1558,12 @@ private:
         struct state_elements takeoffStateStruct;
     };
     struct {
-        Matrix3f Tnb;
-        Vector3f dVelSum;
-        float dAngDelTimeSum;
-        Vector3f dAngSum;
+        Matrix3F Tnb;
+        Vector3F dVelSum;
+        double dAngDelTimeSum;
+        Vector3F dAngSum;
         uint32_t imuSampleCount;
-        Vector3f gyroBias;
+        Vector3F gyroBias;
         bool alignment_complete;
     } takeoff_ins;
 

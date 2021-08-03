@@ -435,7 +435,7 @@ void NavEKF3_core::readIMUData()
     // Get delta angle data from primary gyro or primary if not available
     readDeltaAngle(gyro_index_active, imuDataNew.delAng, imuDataNew.delAngDT);
 
-    //locked_update(imuDataNew.delVel, imuDataNew.delVelDT, imuDataNew.delAng, imuDataNew.delAngDT);
+    locked_update(imuDataNew.delVel, imuDataNew.delVelDT, imuDataNew.delAng, imuDataNew.delAngDT);
 
     imuDataNew.delAngDT = MAX(imuDataNew.delAngDT, 1.0e-4f);
     imuDataNew.gyro_index = gyro_index_active;
@@ -706,7 +706,8 @@ void NavEKF3_core::readGpsData()
 
         if (locked_position.locked == LockedState::LOCKED) {
             // when we have a locked position we fuse that position
-            gpsDataNew.pos = EKF_origin.get_distance_NE(locked_position.loc);
+            gpsDataNew.lat = locked_position.loc.lat;
+            gpsDataNew.lng = locked_position.loc.lng;
             gpsDataNew.vel.zero();
         }
 
@@ -737,7 +738,7 @@ void NavEKF3_core::readGpsYawData()
     }
 
     if (gps.status(selected_gps) >= AP_DAL_GPS::GPS_OK_FIX_3D &&
-        && have_gps_yaw &&
+        have_gps_yaw &&
         yaw_time_ms != yawMeasTime_ms) {
         // GPS modules are rather too optimistic about their
         // accuracy. Set to min of 5 degrees here to prevent
