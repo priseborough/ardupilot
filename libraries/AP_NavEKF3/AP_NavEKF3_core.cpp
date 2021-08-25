@@ -2458,11 +2458,12 @@ void NavEKF3_core::locked_update(const Vector3F &dv, double dv_dt,
     locked_position.rot.rotate(da_corr);
     locked_position.rot.normalize();
     const uint32_t now = dal.millis();
-    if (now - locked_position.last_print_ms > 1000 && accel_index_active == 0) {
+    if (now - locked_position.last_print_ms > 1000) {
         locked_position.last_print_ms = now;
         double r, p, y;
         locked_position.rot.to_euler(&r, &p, &y);
-        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "a (%.4f,%.4f,%.4f) pos (%.3f,%.3f,%.3f) eul (%.3f,%.3f,%.3f) dv_dt=%.4f ab=(%.6f,%.6f) dv=(%.4f,%.4f)",
+        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "CORE[%u] a (%.4f,%.4f,%.4f) pos (%.3f,%.3f,%.3f) eul (%.3f,%.3f,%.3f) dv_dt=%.4f ab=(%.6f,%.6f) dv=(%.4f,%.4f)",
+                      accel_index_active,
                       accel.x, accel.y, accel.z,
                       locked_position.pos.x,
                       locked_position.pos.y,
