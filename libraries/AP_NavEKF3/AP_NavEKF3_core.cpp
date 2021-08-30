@@ -2425,18 +2425,18 @@ void NavEKF3_core::locked_update(const Vector3F &dv, double dv_dt,
 
     if (!locked_position.takeoff_alignment_complete) {
         // calculate initial roll and pitch orientation to be consistent with averaged accel vector
-        float pitch, roll, yaw;
+        ftype pitch, roll, yaw;
         stateStruct.quat.to_euler(roll, pitch, yaw);
-        const float roll_old = roll;
-        const float pitch_old = pitch;
+        const ftype roll_old = roll;
+        const ftype pitch_old = pitch;
         if (locked_position.dVelSum.length() > 0.001f) {
             locked_position.dVelSum.normalize();
 
             // calculate initial pitch angle
-            pitch = asinf(locked_position.dVelSum.x);
+            pitch = asinF(locked_position.dVelSum.x);
 
             // calculate initial roll angle
-            roll = atan2f(-locked_position.dVelSum.y , -locked_position.dVelSum.z);
+            roll = atan2F(-locked_position.dVelSum.y , -locked_position.dVelSum.z);
 
             stateStruct.quat.from_euler(roll, pitch, yaw);
             predictedStateStruct.quat = stateStruct.quat;
@@ -2447,33 +2447,34 @@ void NavEKF3_core::locked_update(const Vector3F &dv, double dv_dt,
         locked_position.takeoff_alignment_complete = true;
     }
 
-    Vector3F abias = inactiveBias[accel_index_active].accel_bias / dtEkfAvg;
     Vector3F dv_corr = dv - inactiveBias[accel_index_active].accel_bias * (dv_dt / dtEkfAvg);
     Vector3F dv_rot = locked_position.rot * dv_corr;
     dv_rot.z += GRAVITY_MSS*dv_dt;
-    Vector3F accel = dv_rot / dv_dt;
+    //Vector3F accel = dv_rot / dv_dt;
     locked_position.vel += dv_rot;
     locked_position.pos += locked_position.vel * dv_dt;
     Vector3F da_corr =  da - locked_position.gyro_bias * (da_dt / dtEkfAvg);
     locked_position.rot.rotate(da_corr);
     locked_position.rot.normalize();
+    AP::logger().WriteStreaming("LPOS", "TimeUS,C,PN,PE,PD", "s#---", "F----", "QBfff",
+                                AP_HAL::micros64(),
+                                core_index,
+                                locked_position.pos.x,
+                                locked_position.pos.y,
+                                locked_position.pos.z);
+
     const uint32_t now = dal.millis();
     if (now - locked_position.last_print_ms > 1000) {
         locked_position.last_print_ms = now;
         double r, p, y;
         locked_position.rot.to_euler(&r, &p, &y);
-        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "CORE[%u] a (%.4f,%.4f,%.4f) pos (%.3f,%.3f,%.3f) eul (%.3f,%.3f,%.3f) dv_dt=%.4f ab=(%.6f,%.6f) dv=(%.4f,%.4f)",
+        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "C%u p:(%.3f,%.3f,%.3f) a:(%.3f,%.3f,%.3f)",
                       accel_index_active,
-                      accel.x, accel.y, accel.z,
                       locked_position.pos.x,
                       locked_position.pos.y,
                       locked_position.pos.z,
                       degrees(r),
                       degrees(p),
-                      degrees(y),
-                      dv_dt,
-                      abias.x, abias.y,
-                      dv.x/dv_dt, dv.y/dv_dt);
-
+                      degrees(y));
     }
 }

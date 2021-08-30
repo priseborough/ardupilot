@@ -1536,7 +1536,7 @@ private:
     struct {
         LockedState locked;
         Location loc;
-        float yaw;
+        ftype yaw;
         Vector3F dVelSum;
         Vector3F pos;
         Vector3F vel;
