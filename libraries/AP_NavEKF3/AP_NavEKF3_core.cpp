@@ -2391,6 +2391,7 @@ bool NavEKF3_core::lockPosition(bool enable)
     if (!getLLH(locked_position.loc)) {
         return false;
     }
+    locked_position.baro_alt = dal.baro().get_altitude(selected_baro);
     Vector3f euler;
     getEulerAngles(euler);
     locked_position.yaw = euler.z;

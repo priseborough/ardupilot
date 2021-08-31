@@ -779,7 +779,11 @@ void NavEKF3_core::readBaroData()
     const auto &baro = dal.baro();
     if (baro.get_last_update(selected_baro) - lastBaroReceived_ms > frontend->sensorIntervalMin_ms) {
 
-        baroDataNew.hgt = baro.get_altitude(selected_baro);
+        if (locked_position.locked == LockedState::LOCKED) {
+            baroDataNew.hgt = locked_position.baro_alt;
+        } else {
+            baroDataNew.hgt = baro.get_altitude(selected_baro);
+        }
 
         // time stamp used to check for new measurement
         lastBaroReceived_ms = baro.get_last_update(selected_baro);
