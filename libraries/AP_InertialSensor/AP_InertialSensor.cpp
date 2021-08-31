@@ -27,6 +27,7 @@
 #include "AP_InertialSensor_ADIS1647x.h"
 #include "AP_InertialSensor_ExternalAHRS.h"
 #include "AP_InertialSensor_Invensensev3.h"
+#include <stdio.h>
 
 /* Define INS_TIMING_DEBUG to track down scheduling issues with the main loop.
  * Output is on the debug console. */
@@ -1682,6 +1683,7 @@ check_sample:
                     // comes back we will start waiting on it again
                     _gyro_wait_mask &= gyro_available_mask;
                     _accel_wait_mask &= accel_available_mask;
+                    ::printf("IMU mask 0x%x 0x%x\n", _gyro_wait_mask, _accel_wait_mask);
                     break;
                 }
             }

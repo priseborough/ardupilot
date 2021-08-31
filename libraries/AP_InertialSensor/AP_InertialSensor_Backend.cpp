@@ -5,8 +5,8 @@
 #include <AP_BoardConfig/AP_BoardConfig.h>
 #if AP_MODULE_SUPPORTED
 #include <AP_Module/AP_Module.h>
-#include <stdio.h>
 #endif
+#include <stdio.h>
 
 #define SENSOR_RATE_DEBUG 0
 
@@ -64,9 +64,6 @@ void AP_InertialSensor_Backend::_update_sensor_rate(uint16_t &count, uint32_t &s
         count++;
         if (now - start_us > 1000000UL) {
             float observed_rate_hz = count * 1.0e6f / (now - start_us);
-#if 0
-            printf("IMU RATE: %.1f should be %.1f\n", observed_rate_hz, rate_hz);
-#endif
             float filter_constant = 0.98f;
             float upper_limit = 1.05f;
             float lower_limit = 0.95f;
@@ -569,6 +566,15 @@ void AP_InertialSensor_Backend::_notify_new_delta_velocity(uint8_t instance, con
 
     _update_sensor_rate(_imu._sample_accel_count[instance], _imu._sample_accel_start_us[instance],
                         _imu._accel_raw_sample_rates[instance]);
+
+#if 1
+    if (instance == 0) {
+        static uint32_t ccc;
+        if (ccc++ % 2000 == 0) {
+            ::printf("IMU[0] rate %.2f\n", _imu._accel_raw_sample_rates[instance]);
+        }
+    }
+#endif
 
     uint64_t last_sample_us = _imu._accel_last_sample_us[instance];
 

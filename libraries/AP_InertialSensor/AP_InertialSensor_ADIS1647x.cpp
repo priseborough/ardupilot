@@ -48,7 +48,10 @@
 # define REG_DEC_RATE_2000Hz 0
 # define REG_DEC_RATE_1000Hz 1
 # define REG_DEC_RATE_666Hz 2
-# define REG_DEC_RATE_400Hz 3
+# define REG_DEC_RATE_500Hz 3
+# define REG_DEC_RATE_400Hz 4
+
+#define REG_FILT_CTRL 0x5c
 
 /*
   timings
@@ -166,7 +169,7 @@ bool AP_InertialSensor_ADIS1647x::check_product_id(uint16_t &prod_id)
         
     case PROD_ID_16507: {
         opmode = OpMode::Delta32;
-        expected_sample_rate_hz = 2000;
+        expected_sample_rate_hz = 400;
         accel_scale = 392.0 / 2097152000.0;
         dvel_scale = 400.0 / 0x7FFFFFFF;
         _clip_limit = 39.5f * GRAVITY_MSS;
@@ -204,12 +207,12 @@ bool AP_InertialSensor_ADIS1647x::init()
 {
     WITH_SEMAPHORE(dev->get_semaphore());
 
-    // perform software reset
-    write_reg16(REG_GLOB_CMD, GLOB_CMD_SW_RESET);
 
     uint8_t tries = 10;
     uint16_t prod_id = 0;
     do {
+        // perform software reset
+        write_reg16(REG_GLOB_CMD, GLOB_CMD_SW_RESET);
         hal.scheduler->delay(100);
     } while (!check_product_id(prod_id) && --tries);
     if (tries == 0) {
@@ -219,11 +222,29 @@ bool AP_InertialSensor_ADIS1647x::init()
     ::printf("ADIS ID 0x%04x\n", prod_id);
 
     // bring rate down
-    if (expected_sample_rate_hz < 1500 &&
-        !write_reg16(REG_DEC_RATE, REG_DEC_RATE_1000Hz, true)) {
-        return false;
+    if (expected_sample_rate_hz < 450) {
+        if (!write_reg16(REG_DEC_RATE, REG_DEC_RATE_400Hz, true)) {
+            return false;
+        }
+    } else if (expected_sample_rate_hz < 600) {
+        if (!write_reg16(REG_DEC_RATE, REG_DEC_RATE_500Hz, true)) {
+            return false;
+        }
+    } else if (expected_sample_rate_hz < 700) {
+        if (!write_reg16(REG_DEC_RATE, REG_DEC_RATE_666Hz, true)) {
+            return false;
+        }
+    } else if (expected_sample_rate_hz < 1500) {
+        if (!write_reg16(REG_DEC_RATE, REG_DEC_RATE_1000Hz, true)) {
+            return false;
+        }
     }
 
+    if (!write_reg16(REG_FILT_CTRL, 0, true)) {
+        ::printf("failed to set bartlett filter\n");
+        return false;
+    }
+    
     // choose burst type and compensation
     uint16_t msc_ctrl = REG_MSC_CTRL_GCOMP | REG_MSC_CTRL_PCOMP | REG_MSC_CTRL_DRPOL;
     if (opmode == OpMode::Delta32) {
@@ -577,12 +598,12 @@ void AP_InertialSensor_ADIS1647x::loop(void)
         uint32_t tstart = AP_HAL::micros();
         // we deliberately set the period a bit fast to ensure we
         // don't lose a sample
-        const uint32_t period_us = 480;
+        const uint32_t period_us = 1980;
         bool wait_ok = false;
         if (drdy_pin != 0) {
             // when we have a DRDY pin then wait for it to go high
             DEBUG_SET_PIN(0, 1);
-            wait_ok = hal.gpio->wait_pin(drdy_pin, AP_HAL::GPIO::INTERRUPT_RISING, 1000);
+            wait_ok = hal.gpio->wait_pin(drdy_pin, AP_HAL::GPIO::INTERRUPT_RISING, 2100);
             DEBUG_SET_PIN(0, 0);
         }
         if (opmode == OpMode::Delta32) {
