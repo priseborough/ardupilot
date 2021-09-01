@@ -1138,7 +1138,7 @@ void NavEKF3_core::RunTakeoffInertialNav()
     }
     const uint32_t now = dal.millis();
     static uint32_t time_ms[3];
-    if (now - time_ms[core_index] > unsigned(1000+core_index*100)) {
+    if (now - time_ms[core_index] > unsigned(2000+core_index*100)) {
         time_ms[core_index] = now;
         GCS_SEND_TEXT(MAV_SEVERITY_INFO, "TAKEOFF[%u] vx,vy=%.2f,%.2f px,py=%.2f,%.2f spx,spy=%.2f,%.2f",
                       core_index,
@@ -2448,6 +2448,7 @@ void NavEKF3_core::locked_update(const Vector3F &dv, double dv_dt,
         locked_position.takeoff_alignment_complete = true;
     }
 
+#if 0
     Vector3F dv_corr = dv - inactiveBias[accel_index_active].accel_bias * (dv_dt / dtEkfAvg);
     Vector3F dv_rot = locked_position.rot * dv_corr;
     dv_rot.z += GRAVITY_MSS*dv_dt;
@@ -2478,4 +2479,5 @@ void NavEKF3_core::locked_update(const Vector3F &dv, double dv_dt,
                       degrees(p),
                       degrees(y));
     }
+#endif
 }
