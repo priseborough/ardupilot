@@ -317,6 +317,9 @@ void peripheral_power_enable(void)
     // others need it active high
     palWriteLine(HAL_GPIO_PIN_VDD_3V3_SD_CARD_EN, 1);
 #endif
+#ifdef HAL_GPIO_PIN_SPEKTRUM_PWR
+    palWriteLine(HAL_GPIO_PIN_SPEKTRUM_PWR, HAL_SPEKTRUM_PWR_ENABLED);
+#endif
     for (i=0; i<20; i++) {
         // give 20ms for sensors to settle
         chThdSleep(chTimeMS2I(1));
