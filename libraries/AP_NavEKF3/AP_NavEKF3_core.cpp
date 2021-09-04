@@ -1144,7 +1144,7 @@ void NavEKF3_core::RunTakeoffInertialNav()
                       core_index,
                       (double)takeoffStateStruct.velocity.x, (double)takeoffStateStruct.velocity.y,
                       (double)takeoffStateStruct.position.x, (double)takeoffStateStruct.position.y,
-                      (double)stateStruct.position.x, (double)stateStruct.position.y);
+                      (double)(stateStruct.position.x-locked_position.pos.x), (double)(stateStruct.position.y-locked_position.pos.y));
     }
 }
 
