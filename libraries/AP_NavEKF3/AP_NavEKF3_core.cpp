@@ -1076,6 +1076,7 @@ void NavEKF3_core::RunTakeoffInertialNav()
         return;
     }
 
+    // senwor bias corrected delta angles at current and previous time step
     Vector3F deltaAngNow = imuDataNew.delAng - takeoff_ins.gyroBias * imuDataNew.delAngDT;
     Vector3F deltaAngPrev = imuDataNewPrev.delAng - takeoff_ins.gyroBias * imuDataNew.delAngDT;
 
@@ -1087,7 +1088,7 @@ void NavEKF3_core::RunTakeoffInertialNav()
     // the delta angle rotation quaternion and normalise
     // apply correction for earth's rotation rate
     // % * - and + operators have been overloaded
-    takeoffStateStruct.quat.rotate(imuDataNew.delAng - takeoff_ins.Tnb * earthRateNED*imuDataNew.delAngDT);
+    takeoffStateStruct.quat.rotate(deltaAngNow - takeoff_ins.Tnb * (earthRateNED * imuDataNew.delAngDT));
     stateStruct.quat.normalize();
     Matrix3F newTnb;
     takeoffStateStruct.quat.inverse().rotation_matrix(newTnb);
