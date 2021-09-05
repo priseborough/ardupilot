@@ -1063,10 +1063,12 @@ void NavEKF3_core::RunTakeoffInertialNav()
 
         takeoff_ins.alignment_complete = true;
 
-        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "roll old,new=%.2f,%.2f pitch old,new=%.2f,%.2f",
+        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "INS[%u] roll old,new=%.2f,%.2f pitch old,new=%.2f,%.2f",
+                        core_index,
                         (double)degrees(roll_old), (double)degrees(roll),
                         (double)degrees(pitch_old), (double)degrees(pitch));
-        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "gyro bias = %.5f,%.5f,%.5f",
+        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "INS[%u] gyro bias=%.5f,%.5f,%.5f",
+                        core_index,
                         (double)degrees(takeoff_ins.gyroBias.x),
                         (double)degrees(takeoff_ins.gyroBias.y),
                         (double)degrees(takeoff_ins.gyroBias.z));
@@ -2441,9 +2443,15 @@ void NavEKF3_core::locked_update(const Vector3F &dv, double dv_dt,
 
             stateStruct.quat.from_euler(roll, pitch, yaw);
             predictedStateStruct.quat = stateStruct.quat;
-            GCS_SEND_TEXT(MAV_SEVERITY_INFO, "roll old,new=%.2f,%.2f pitch old,new=%.2f,%.2f",
+            GCS_SEND_TEXT(MAV_SEVERITY_INFO, "EKF[%u] roll old,new=%.2f,%.2f pitch old,new=%.2f,%.2f",
+                          core_index,
                           (double)degrees(roll_old), (double)degrees(roll),
                           (double)degrees(pitch_old), (double)degrees(pitch));
+            GCS_SEND_TEXT(MAV_SEVERITY_INFO, "EKF[%u] gyro bias=%.5f,%.5f,%.5f",
+                          core_index,
+                          (double)degrees(stateStruct.gyro_bias.x/dtEkfAvg),
+                          (double)degrees(stateStruct.gyro_bias.y/dtEkfAvg),
+                          (double)degrees(stateStruct.gyro_bias.z/dtEkfAvg));
         }
         locked_position.takeoff_alignment_complete = true;
     }
