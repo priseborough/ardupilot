@@ -1527,6 +1527,7 @@ private:
     void Log_Write_State_Variances(uint64_t time_us) const;
     void Log_Write_Timing(uint64_t time_us);
     void Log_Write_GSF(uint64_t time_us);
+    void Log_Write_XKIT(uint64_t time_us) const;
 
     enum class LockedState : uint8_t {
         UNLOCKED = 0,

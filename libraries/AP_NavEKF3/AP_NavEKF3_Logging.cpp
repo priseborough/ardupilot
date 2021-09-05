@@ -8,6 +8,27 @@
 
 #pragma GCC diagnostic ignored "-Wnarrowing"
 
+void NavEKF3_core::Log_Write_XKIT(uint64_t time_us) const
+{
+    float roll, pitch, yaw;
+    takeoffStateStruct.quat.to_euler(roll, pitch, yaw);
+    const struct log_XKIT pkt{
+        LOG_PACKET_HEADER_INIT(LOG_XKIT_MSG),
+        time_us : time_us,
+        core    : DAL_CORE(core_index),
+        vx      : (float)takeoffStateStruct.velocity.x,
+        vy      : (float)takeoffStateStruct.velocity.y,
+        vz      : (float)takeoffStateStruct.velocity.z,
+        px      : (float)takeoffStateStruct.position.x,
+        py      : (float)takeoffStateStruct.position.y,
+        pz      : (float)takeoffStateStruct.position.z,
+        roll    : (float)roll,
+        pitch   : (float)pitch,
+        yaw     : (float)yaw
+    };
+    AP::logger().WriteBlock(&pkt, sizeof(pkt));
+}
+
 void NavEKF3_core::Log_Write_XKF1(uint64_t time_us) const
 {
     // Write first EKF packet

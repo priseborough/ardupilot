@@ -18,7 +18,8 @@
     LOG_XKV1_MSG, \
     LOG_XKV2_MSG, \
     LOG_XKY0_MSG, \
-    LOG_XKY1_MSG
+    LOG_XKY1_MSG, \
+    LOG_XKIT_MSG
 
 // @LoggerMessage: XKF0
 // @Description: EKF3 beacon sensor diagnostics
@@ -420,6 +421,34 @@ struct PACKED log_XKV {
     float v11;
 };
 
+// @LoggerMessage: XKIT
+// @Description: Inertial takeoff calculation
+// @Field: TimeUS: Time since system startup
+// @Field: C: EKF3 core this data is for
+// @Field: Vx: Velocity North (m/s/s)
+// @Field: Vy: Velocity East (m/s/s)
+// @Field: Vz: Velocity Down (m/s/s)
+// @Field: Px: Position North (m/s/s)
+// @Field: Py: Position East (m/s/s)
+// @Field: Pz: Position Down (m/s/s)
+// @Field: R: Roll (deg)
+// @Field: P: Pitch (deg)
+// @Field: Y: Yaw (deg)
+struct PACKED log_XKIT {
+    LOG_PACKET_HEADER;
+    uint64_t time_us;
+    uint8_t core;
+    float vx;
+    float vy;
+    float vz;
+    float px;
+    float py;
+    float pz;
+    float roll;
+    float pitch;
+    float yaw;
+};
+
 #define LOG_STRUCTURE_FROM_NAVEKF3        \
     { LOG_XKF0_MSG, sizeof(log_XKF0), \
       "XKF0","QBBccCCcccccccc","TimeUS,C,ID,rng,innov,SIV,TR,BPN,BPE,BPD,OFH,OFL,OFN,OFE,OFD", "s#-m---mmmmmmmm", "F--B---BBBBBBBB" , true }, \
@@ -447,4 +476,6 @@ struct PACKED log_XKV {
     { LOG_XKV1_MSG, sizeof(log_XKV), \
       "XKV1","QBffffffffffff","TimeUS,C,V00,V01,V02,V03,V04,V05,V06,V07,V08,V09,V10,V11", "s#------------", "F-------------" , true }, \
     { LOG_XKV2_MSG, sizeof(log_XKV), \
-      "XKV2","QBffffffffffff","TimeUS,C,V12,V13,V14,V15,V16,V17,V18,V19,V20,V21,V22,V23", "s#------------", "F-------------" , true },
+      "XKV2","QBffffffffffff","TimeUS,C,V12,V13,V14,V15,V16,V17,V18,V19,V20,V21,V22,V23", "s#------------", "F-------------" , true }, \
+    { Log_XKIT_MSG, sizeof(log_XKIT)} , \
+      "XKIT","QBfffffffff","TimeUS,C,VN,VE,VD,PN,PE,PD,Roll,Pitch,Yaw", "s#---------", "F----------", true },
