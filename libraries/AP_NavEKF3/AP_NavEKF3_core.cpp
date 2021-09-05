@@ -1035,15 +1035,15 @@ void NavEKF3_core::RunTakeoffInertialNav()
         }
         takeoff_ins.dVelSum.normalize();
 
-        float pitch, roll, yaw;
+        ftype pitch, roll, yaw;
         stateStruct.quat.to_euler(roll, pitch, yaw);
-        const float roll_old = roll;
-        const float pitch_old = pitch;
+        const ftype roll_old = roll;
+        const ftype pitch_old = pitch;
 
         // calculate initial tilt assuming IMU is static and measuring gravity
         // use previous yaw
-        pitch = asinf(takeoff_ins.dVelSum.x);
-        roll = atan2f(-takeoff_ins.dVelSum.y , -takeoff_ins.dVelSum.z);
+        pitch = asinF(takeoff_ins.dVelSum.x);
+        roll = atan2F(-takeoff_ins.dVelSum.y , -takeoff_ins.dVelSum.z);
         takeoffStateStruct.quat.from_euler(roll, pitch, yaw);
         takeoffStateStruct.quat.inverse().rotation_matrix(takeoff_ins.Tnb);
 
@@ -1094,7 +1094,7 @@ void NavEKF3_core::RunTakeoffInertialNav()
     // apply sculling corrections
     // * and + operators have been overloaded
     Vector3F sculling_correction = (deltaAngPrev % imuDataNew.delVel) + (imuDataNewPrev.delVel % deltaAngNow);
-    sculling_correction *= (1.0 / 12.0);
+    sculling_correction *= (1.0F / 12.0F);
     Vector3F delVelNav;  // delta velocity vector in earth axes
     delVelNav  = takeoff_ins.Tnb.mul_transpose(imuDataNew.delVel + sculling_correction);
     delVelNav.z += GRAVITY_MSS*imuDataNew.delVelDT;
