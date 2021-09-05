@@ -477,5 +477,5 @@ struct PACKED log_XKIT {
       "XKV1","QBffffffffffff","TimeUS,C,V00,V01,V02,V03,V04,V05,V06,V07,V08,V09,V10,V11", "s#------------", "F-------------" , true }, \
     { LOG_XKV2_MSG, sizeof(log_XKV), \
       "XKV2","QBffffffffffff","TimeUS,C,V12,V13,V14,V15,V16,V17,V18,V19,V20,V21,V22,V23", "s#------------", "F-------------" , true }, \
-    { Log_XKIT_MSG, sizeof(log_XKIT)} , \
+    { LOG_XKIT_MSG, sizeof(log_XKIT), \
       "XKIT","QBfffffffff","TimeUS,C,VN,VE,VD,PN,PE,PD,Roll,Pitch,Yaw", "s#---------", "F----------", true },

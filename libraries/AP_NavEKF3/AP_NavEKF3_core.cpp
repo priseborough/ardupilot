@@ -1112,6 +1112,8 @@ void NavEKF3_core::RunTakeoffInertialNav()
     // apply a trapezoidal integration to velocities to calculate position
     takeoffStateStruct.position += (takeoffStateStruct.velocity + lastVelocity) * (imuDataNew.delVelDT*0.5f);
 
+    Log_Write_XKIT(AP_HAL::micros64());
+
     const uint32_t now = dal.millis();
     static uint32_t time_ms[3];
     if (now - time_ms[core_index] > unsigned(2000+core_index*100)) {
