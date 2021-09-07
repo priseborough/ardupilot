@@ -852,14 +852,14 @@ void NavEKF3_core::FuseVelPosNED()
             fuseData[0] = true;
             fuseData[1] = true;
             if (core_index == 0) {
-                AP::logger().Write("IV01", "TimeUS,VN,VE", "Qff",
+                AP::logger().Write("IVAA", "TimeUS,VN,VE", "Qff",
                                     AP_HAL::micros64(),
                                     (double)varInnovVelPos[0],
                                     (double)varInnovVelPos[1]);
             }
             if (useGpsVertVel || useExtNavVel) {
             if (core_index == 0) {
-                AP::logger().Write("IV2", "TimeUS,VD", "Qf",
+                AP::logger().Write("IVAB", "TimeUS,VD", "Qf",
                                     AP_HAL::micros64(),
                                     (double)varInnovVelPos[2]);
             }
@@ -870,7 +870,7 @@ void NavEKF3_core::FuseVelPosNED()
             fuseData[3] = true;
             fuseData[4] = true;
             if (core_index == 0) {
-                AP::logger().Write("IV34", "TimeUS,PN,VPeE", "Qff",
+                AP::logger().Write("IVAC", "TimeUS,PN,PE", "Qff",
                                     AP_HAL::micros64(),
                                     (double)varInnovVelPos[3],
                                     (double)varInnovVelPos[4]);
@@ -879,7 +879,7 @@ void NavEKF3_core::FuseVelPosNED()
         if (fuseHgtData) {
             fuseData[5] = true;
             if (core_index == 0) {
-                AP::logger().Write("IV5", "TimeUS,PD", "Qf",
+                AP::logger().Write("IVAD", "TimeUS,PD", "Qf",
                                     AP_HAL::micros64(),
                                     (double)varInnovVelPos[2]);
             }
