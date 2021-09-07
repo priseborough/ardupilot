@@ -649,6 +649,9 @@ private:
     // constrain variances (diagonal terms) in the state covariance matrix
     void ConstrainVariances();
 
+    // log uppeer diagonal covariances in row order starting at element 12
+    void LogCovariances();
+
     // constrain states
     void ConstrainStates();
 
