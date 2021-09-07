@@ -4,6 +4,7 @@
 #include "AP_NavEKF3_core.h"
 #include <GCS_MAVLink/GCS.h>
 #include <AP_DAL/AP_DAL.h>
+#include <AP_Logger/AP_Logger.h>
 
 /********************************************************
 *                   RESET FUNCTIONS                     *
@@ -850,16 +851,38 @@ void NavEKF3_core::FuseVelPosNED()
         if (fuseVelData) {
             fuseData[0] = true;
             fuseData[1] = true;
+            if (core_index == 0) {
+                AP::logger().Write("IV01", "TimeUS,VN,VE", "Qff",
+                                    AP_HAL::micros64(),
+                                    (double)varInnovVelPos[0],
+                                    (double)varInnovVelPos[1]);
+            }
             if (useGpsVertVel || useExtNavVel) {
+            if (core_index == 0) {
+                AP::logger().Write("IV2", "TimeUS,VD", "Qf",
+                                    AP_HAL::micros64(),
+                                    (double)varInnovVelPos[2]);
+            }
                 fuseData[2] = true;
             }
         }
         if (fusePosData) {
             fuseData[3] = true;
             fuseData[4] = true;
+            if (core_index == 0) {
+                AP::logger().Write("IV34", "TimeUS,PN,VPeE", "Qff",
+                                    AP_HAL::micros64(),
+                                    (double)varInnovVelPos[3],
+                                    (double)varInnovVelPos[4]);
+            }
         }
         if (fuseHgtData) {
             fuseData[5] = true;
+            if (core_index == 0) {
+                AP::logger().Write("IV5", "TimeUS,PD", "Qf",
+                                    AP_HAL::micros64(),
+                                    (double)varInnovVelPos[2]);
+            }
         }
 
         // fuse measurements sequentially
