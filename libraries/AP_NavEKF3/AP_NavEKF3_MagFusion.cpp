@@ -5,6 +5,7 @@
 
 #include <GCS_MAVLink/GCS.h>
 #include <AP_DAL/AP_DAL.h>
+#include <AP_Logger/AP_Logger.h>
 
 /********************************************************
 *                   RESET FUNCTIONS                     *
@@ -552,6 +553,14 @@ void NavEKF3_core::FuseMagnetometer()
         CovarianceInit();
         faultStatus.bad_zmag = true;
         return;
+    }
+
+    if (core_index == 0) {
+        AP::logger().Write("IVAE", "TimeUS,MX,MY,MZ", "Qfff",
+                            AP_HAL::micros64(),
+                            (double)varInnovMag[0],
+                            (double)varInnovMag[1],
+                            (double)varInnovMag[2]);
     }
 
     // calculate the innovation test ratios
