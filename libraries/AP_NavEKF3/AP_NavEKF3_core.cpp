@@ -1012,6 +1012,7 @@ void NavEKF3_core::calcOutputStates()
 
 void NavEKF3_core::RunTakeoffInertialNav()
 {
+    const uint32_t now_ms = dal.millis();
     if (locked_position.locked == LockedState::LOCKED) {
         if (takeoff_ins.imuSampleCount == 0) {
             takeoff_ins.dAngSum.zero();
@@ -1062,6 +1063,7 @@ void NavEKF3_core::RunTakeoffInertialNav()
         stateStruct.velocity.zero();
 
         takeoff_ins.alignment_complete = true;
+        takeoff_ins.alignment_time_ms = now_ms;
 
         GCS_SEND_TEXT(MAV_SEVERITY_INFO, "INS[%u] roll old,new=%.2f,%.2f pitch old,new=%.2f,%.2f",
                         core_index,
@@ -1115,15 +1117,37 @@ void NavEKF3_core::RunTakeoffInertialNav()
 
     Log_Write_XKIT(dal.micros64());
 
-    const uint32_t now = dal.millis();
-    static uint32_t time_ms[3];
-    if (now - time_ms[core_index] > unsigned(2000+core_index*100)) {
-        time_ms[core_index] = now;
-        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "TAKEOFF[%u] vx,vy=%.2f,%.2f px,py=%.2f,%.2f spx,spy=%.2f,%.2f",
+    bool store_checkpoint_results = false;
+    if (takeoff_ins.checkpoint_time_ms[0] == 0 && now_ms - takeoff_ins.alignment_time_ms >= 10000) {
+        takeoff_ins.checkpoint_index = 0;
+        store_checkpoint_results = true;
+    } else if (takeoff_ins.checkpoint_time_ms[1] == 0 && now_ms - takeoff_ins.alignment_time_ms >= 15000) {
+        takeoff_ins.checkpoint_index = 1;
+        store_checkpoint_results = true;
+    } else if (takeoff_ins.checkpoint_time_ms[2] == 0 && now_ms - takeoff_ins.alignment_time_ms >= 20000) {
+        takeoff_ins.checkpoint_index = 2;
+        store_checkpoint_results = true;
+    } else if (takeoff_ins.checkpoint_time_ms[3] == 0 && now_ms - takeoff_ins.alignment_time_ms >= 25000) {
+        takeoff_ins.checkpoint_index = 3;
+        store_checkpoint_results = true;
+    }
+
+    if (store_checkpoint_results) {
+        takeoff_ins.checkpoint_time_ms[takeoff_ins.checkpoint_index] = now_ms;
+        takeoff_ins.print_checkpoint = true;
+        takeoff_ins.checkpoint_results[0] = sqrtf(sq(takeoffStateStruct.velocity.x)+sq(takeoffStateStruct.velocity.y));
+        takeoff_ins.checkpoint_results[1] = sqrtf(sq(takeoffStateStruct.position.x)+sq(takeoffStateStruct.position.y));
+        takeoff_ins.checkpoint_results[2] = sqrtf(sq(stateStruct.position.x-locked_position.pos.x)+sq(stateStruct.position.y-locked_position.pos.y));
+    }
+
+    if (takeoff_ins.print_checkpoint && now_ms - takeoff_ins.checkpoint_time_ms[takeoff_ins.checkpoint_index] >= unsigned(core_index*100)) {
+        takeoff_ins.print_checkpoint = false;
+        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "TKOFF[%u] t=%.1f vxy=%.2f pxy=%.2f spxy=%.2f",
                       core_index,
-                      (double)takeoffStateStruct.velocity.x, (double)takeoffStateStruct.velocity.y,
-                      (double)takeoffStateStruct.position.x, (double)takeoffStateStruct.position.y,
-                      (double)(stateStruct.position.x-locked_position.pos.x), (double)(stateStruct.position.y-locked_position.pos.y));
+                      (double)(0.001f * (float)(takeoff_ins.checkpoint_time_ms[takeoff_ins.checkpoint_index] - takeoff_ins.alignment_time_ms)),
+                      (double)takeoff_ins.checkpoint_results[0],
+                      (double)takeoff_ins.checkpoint_results[1],
+                      (double)takeoff_ins.checkpoint_results[2]);
     }
 }
 

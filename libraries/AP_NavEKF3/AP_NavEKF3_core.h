@@ -1570,6 +1570,11 @@ private:
         uint32_t imuSampleCount;
         Vector3F gyroBias;
         bool alignment_complete;
+        uint32_t alignment_time_ms;
+        uint32_t checkpoint_time_ms[4] = {};
+        uint8_t checkpoint_index;
+        bool print_checkpoint;
+        float checkpoint_results[3];
     } takeoff_ins;
 
     void RunTakeoffInertialNav();
