@@ -84,14 +84,35 @@ void NavEKF3_core::setWindMagStateLearningMode()
                 stateStruct.wind_vel.x = windSpeed * cosF(tempEuler.z);
                 stateStruct.wind_vel.y = windSpeed * sinF(tempEuler.z);
             } else {
-                trueAirspeedVariance = sq(WIND_VEL_VARIANCE_MAX); // use 2-sigma for faster initial convergence
+                // assume wind speed uncertinty is 1/3 of ground speed
+                trueAirspeedVariance = sq(1.0F / 3.0F) * stateStruct.velocity.length_squared();
             }
 
             // set the wind state variances to the measurement uncertainty
-            for (uint8_t index=22; index<=23; index++) {
-                zeroCols(P, 22, 23);
-                zeroRows(P, 22, 23);
-                P[index][index] = trueAirspeedVariance;
+            zeroCols(P, 22, 23);
+            zeroRows(P, 22, 23);
+
+            if (!haveAirspeedMeasurement) {
+                // fuse a faked airspeed equal to ground speed (assumes zero wind speed) with na small variance
+                // to condition the covariance matrix
+                stateStruct.wind_vel.zero();
+                tasDataDelayed.tas = stateStruct.velocity.length();
+                tasDataDelayed.tasVariance = sq(1.0F / 3.0F) * trueAirspeedVariance;
+                // assume flying with zero sideslip and set wind state covariances accordingly
+                // rotate a wind state covariance in a front,right frame to a North,East frame using
+                // R * P * transpose(R) where R is the rotation from front,right to North,East coordinates
+                // and P is the wind speed covariance matrix in front,right coordinates
+                Vector3F euler321;
+                stateStruct.quat.to_euler(euler321.x, euler321.y, euler321.z);
+                const ftype cos_yaw = cosF(euler321.z);
+                const ftype sin_yaw = sinF(euler321.z);
+                const ftype yAxisSpeedVariance = sq(radians(10.0F)) * trueAirspeedVariance; // allow for approx 10 degrees of yaw uncertainty
+                P[22][22] = trueAirspeedVariance * sq(cos_yaw) + yAxisSpeedVariance * sq(sin_yaw);
+                P[23][23] = trueAirspeedVariance * sq(sin_yaw) + yAxisSpeedVariance * sq(cos_yaw);
+                P[23][22] = P[22][23] = (trueAirspeedVariance  - yAxisSpeedVariance) * cos_yaw * sin_yaw;
+                FuseAirspeed();
+            } else {
+                P[22][22] = P[23][23] = trueAirspeedVariance;
             }
 
             windStatesAligned = true;
