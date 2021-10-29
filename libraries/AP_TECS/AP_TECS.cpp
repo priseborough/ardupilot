@@ -485,7 +485,6 @@ void AP_TECS::_update_height_demand(void)
     {
         _hgt_dem = _hgt_dem_prev - max_sink_rate * 0.1f;
     }
-    _hgt_dem_prev = _hgt_dem;
 
     // Apply first order lag to height demand
     _hgt_dem_adj = 0.05f * _hgt_dem + 0.95f * _hgt_dem_adj_last;
@@ -516,6 +515,14 @@ void AP_TECS::_update_height_demand(void)
         _hgt_rate_dem = (_hgt_dem_adj - _hgt_dem_adj_last) / 0.1f;
         _flare_counter = 0;
     }
+
+    // Don't allow height demand to get too far ahead of the vehicles current height
+    if (_pitch_dem_unc > _PITCHmaxf && _hgt_dem > _hgt_dem_prev) {
+        _hgt_dem = _hgt_dem_prev;
+    } else if (_pitch_dem_unc < _PITCHminf && _hgt_dem < _hgt_dem_prev) {
+        _hgt_dem = _hgt_dem_prev;
+    }
+    _hgt_dem_prev = _hgt_dem;
 
     // for landing approach we will predict ahead by the time constant
     // plus the lag produced by the first order filter. This avoids a
