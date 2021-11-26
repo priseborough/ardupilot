@@ -175,6 +175,9 @@ public:
     // return true if all configured battery monitors are healthy
     bool healthy() const;
 
+    // powered - returns true if any battery is connected and providing power
+    bool powered(void) const;
+
     /// voltage - returns battery voltage in volts
     float voltage(uint8_t instance) const;
     float voltage() const { return voltage(AP_BATT_PRIMARY_INSTANCE); }
