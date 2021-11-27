@@ -436,6 +436,22 @@ const AP_Param::GroupInfo QuadPlane::var_info2[] = {
     // @Range: 0 10000
     AP_GROUPINFO("BACKTRANS_MS", 28, QuadPlane, back_trans_pitch_limit_ms, 3000),
 
+    // @Param: FWD_THR_GAIN
+    // @DisplayName: Q mode fowd throttle gain
+    // @Description: Gain from forward accel/tilt to forward throttle. Set to 1/(thrust to weight ratio).
+    // @Range: 0.0 3.0
+    // @Increment: 0.1
+    // @User: Standard
+    AP_GROUPINFO("FWD_THR_GAIN", 29, QuadPlane, q_fwd_thr_gain, 2.0f),
+
+    // @Param: FWD_TILT_LIM
+    // @DisplayName: Q mode fwd tilt limit
+    // @Description: Forward tilt limit applied when forward throttle is used in Q modes. Set to the amount of pitch down required to remove wing lift.
+    // @Units: centi-deg
+    // @Range: 0 500
+    // @Increment: 10
+    // @User: Standard
+    AP_GROUPINFO("FWD_TILT_LIM", 30, QuadPlane, q_fwd_tilt_lim, 300),
     AP_GROUPEND
 };
 
@@ -555,6 +571,9 @@ bool QuadPlane::setup(void)
         return false;
     }
     float loop_delta_t = 1.0 / plane.scheduler.get_loop_rate_hz();
+
+    q_fwd_throttle = 0.0f;
+    q_fwd_nav_pitch_lim_cd = -aparm.angle_max;
 
     /*
       cope with upgrade from old AP_Motors values for frame_class
@@ -838,13 +857,13 @@ void QuadPlane::multicopter_attitude_rate_update(float yaw_rate_cds)
 
         if (use_yaw_target) {
             attitude_control->input_euler_angle_roll_pitch_yaw(plane.nav_roll_cd,
-                                                               plane.nav_pitch_cd,
+                                                               MAX(plane.nav_pitch_cd, q_fwd_nav_pitch_lim_cd),
                                                                yaw_target_cd,
                                                                true);
         } else {
             // use euler angle attitude control
             attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(plane.nav_roll_cd,
-                                                                          plane.nav_pitch_cd,
+                                                                          MAX(plane.nav_pitch_cd, q_fwd_nav_pitch_lim_cd),
                                                                           yaw_rate_cds);
         }
     } else {
@@ -2275,7 +2294,6 @@ void QuadPlane::vtol_position_controller(void)
             }
         }
 
-        
         if (poscontrol.get_state() == QPOS_APPROACH) {
             poscontrol_init_approach();
         }
@@ -2348,8 +2366,9 @@ void QuadPlane::vtol_position_controller(void)
 
         // call attitude controller
         attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(plane.nav_roll_cd,
-                                                                      plane.nav_pitch_cd,
+                                                                      MAX(plane.nav_pitch_cd, q_fwd_nav_pitch_lim_cd),
                                                                       desired_auto_yaw_rate_cds() + get_weathervane_yaw_rate_cds());
+
         if (plane.auto_state.wp_distance < position2_dist_threshold) {
             poscontrol.set_state(QPOS_POSITION2);
             poscontrol.pilot_correction_done = false;
@@ -2402,7 +2421,7 @@ void QuadPlane::vtol_position_controller(void)
 
         // call attitude controller
         attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(plane.nav_roll_cd,
-                                                                      plane.nav_pitch_cd,
+                                                                      MAX(plane.nav_pitch_cd, q_fwd_nav_pitch_lim_cd),
                                                                       get_pilot_input_yaw_rate_cds() + get_weathervane_yaw_rate_cds());
         break;
     }
@@ -2427,7 +2446,7 @@ void QuadPlane::vtol_position_controller(void)
 
         // call attitude controller
         attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(plane.nav_roll_cd,
-                                                                      plane.nav_pitch_cd,
+                                                                      MAX(plane.nav_pitch_cd, q_fwd_nav_pitch_lim_cd),
                                                                       get_pilot_input_yaw_rate_cds() + get_weathervane_yaw_rate_cds());
         break;
 
@@ -2615,7 +2634,7 @@ void QuadPlane::takeoff_controller(void)
     plane.nav_pitch_cd = pos_control->get_pitch_cd();
 
     attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(plane.nav_roll_cd,
-                                                                  plane.nav_pitch_cd,
+                                                                  MAX(plane.nav_pitch_cd, q_fwd_nav_pitch_lim_cd),
                                                                   get_pilot_input_yaw_rate_cds() + get_weathervane_yaw_rate_cds());
 
     float vel_z = wp_nav->get_default_speed_up();
@@ -2663,7 +2682,7 @@ void QuadPlane::waypoint_controller(void)
 
     // call attitude controller
     attitude_control->input_euler_angle_roll_pitch_yaw(plane.nav_roll_cd,
-                                                       plane.nav_pitch_cd,
+                                                       MAX(plane.nav_pitch_cd, q_fwd_nav_pitch_lim_cd),
                                                        wp_nav->get_yaw(),
                                                        true);
 
@@ -3060,6 +3079,17 @@ void QuadPlane::Log_Write_QControl_Tuning()
  */
 float QuadPlane::forward_throttle_pct()
 {
+    // handle special case where forward thrust motor is used instead of forward pitch.
+    // but not  in autotune as it will upset the results
+    if (is_positive(q_fwd_thr_gain) && plane.control_mode != &plane.mode_qautotune) {
+        calc_fwd_tilt_throttle();
+        // handle special case where we are using forward throttle instead of forward tilt in Q modes
+        return 100.0f * q_fwd_throttle;
+    } else {
+        q_fwd_throttle = 0.0f;
+        q_fwd_nav_pitch_lim_cd = -aparm.angle_max;
+    }
+
     /*
       Unless an RC channel is assigned for manual forward throttle control,
       we don't use forward throttle in QHOVER or QSTABILIZE as they are the primary
@@ -3776,6 +3806,27 @@ MAV_VTOL_STATE SLT_Transition::get_mav_vtol_state() const
     }
 
     return MAV_VTOL_STATE_UNDEFINED;
+}
+
+// calculate limit forward tilt demand and calculate throttle required to compensate
+void QuadPlane::calc_fwd_tilt_throttle()
+{
+    float fwd_tilt_rad = radians(constrain_float(-0.01f * (float)plane.nav_pitch_cd, 0.0f, 45.0f));
+    q_fwd_throttle = MIN(plane.quadplane.q_fwd_thr_gain * tanf(fwd_tilt_rad), 1.0f);
+
+    // To prevent forward motor prop strike, reduce throttle to zero when close to ground
+    // When we are doing horizontal positioning in a VTOL land
+    // we always allow the fwd motor to run. Otherwise a bad
+    // lidar could cause the aircraft not to be able to
+    // approach the landing point when landing below the takeoff point
+    if (!in_vtol_land_approach()) {
+        float alt_cutoff = MAX(0,vel_forward_alt_cutoff);
+        float height_above_ground = plane.relative_ground_altitude(plane.g.rangefinder_landing);
+        float fwd_thr_scaler = linear_interpolate(0.0f, 1.0f, height_above_ground, alt_cutoff, alt_cutoff+2);
+        q_fwd_throttle *= fwd_thr_scaler;
+    }
+
+    q_fwd_nav_pitch_lim_cd = MIN(-plane.quadplane.q_fwd_tilt_lim, 0);
 }
 
 #endif  // HAL_QUADPLANE_ENABLED
