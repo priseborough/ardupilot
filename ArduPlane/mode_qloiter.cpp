@@ -92,7 +92,7 @@ void ModeQLoiter::run()
 
     // call attitude controller with conservative smoothing gain of 4.0f
     attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(plane.nav_roll_cd,
-                                                                  plane.nav_pitch_cd,
+                                                                  MAX(plane.nav_pitch_cd, quadplane.q_fwd_nav_pitch_lim_cd),
                                                                   quadplane.get_desired_yaw_rate_cds());
 
     if (plane.control_mode == &plane.mode_qland) {
