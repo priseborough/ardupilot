@@ -504,9 +504,12 @@ void AP_TECS::_update_height_demand(void)
         // adjust the flare sink rate to increase/decrease as your travel further beyond the land wp
         float land_sink_rate_adj = _land_sink + _land_sink_rate_change*_distance_beyond_land_wp;
 
-        // bring it in over 1s to prevent overshoot
+        // bring it in over 1/3 of the TECS control time constant to prevent overshoot
+        // we use 1/3 as it would be the slowest a pitch loop could be tuned to work with TECS
         if (_flare_counter < 10) {
-            _hgt_rate_dem = _hgt_rate_dem * 0.8f - 0.2f * land_sink_rate_adj;
+            const float flare_tconst = 0.33f * timeConstant();
+            const float alpha_coef = 0.1f / flare_tconst;
+            _hgt_rate_dem = _hgt_rate_dem * (1.0f - alpha_coef) - land_sink_rate_adj * alpha_coef;
             _flare_counter++;
         } else {
             _hgt_rate_dem = - land_sink_rate_adj;
