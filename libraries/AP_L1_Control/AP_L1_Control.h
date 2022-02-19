@@ -125,6 +125,7 @@ private:
     bool _data_is_stale = true;
 
     AP_Float _loiter_bank_limit;
+    AP_Float _track_capture_angle_lim;
 
     bool _reverse = false;
     float get_yaw() const;

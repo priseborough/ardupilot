@@ -32,11 +32,19 @@ const AP_Param::GroupInfo AP_L1_Control::var_info[] = {
 
     // @Param: LIM_BANK
     // @DisplayName: Loiter Radius Bank Angle Limit
-    // @Description: The sealevel bank angle limit for a continous loiter. (Used to calculate airframe loading limits at higher altitudes). Setting to 0, will instead just scale the loiter radius directly
+    // @Description: The sealevel bank angle limit for a continuous loiter. (Used to calculate airframe loading limits at higher altitudes). Setting to 0, will instead just scale the loiter radius directly
     // @Units: deg
     // @Range: 0 89
     // @User: Advanced
     AP_GROUPINFO_FRAME("LIM_BANK",   3, AP_L1_Control, _loiter_bank_limit, 0.0f, AP_PARAM_FRAME_PLANE),
+
+    // @Param: ANGLE_LIM
+    // @DisplayName: Track capture angle limit
+    // @Description: The maximum angle to track allowed during track capture. Vehicles with slow turn rates may need to uae a smaller value tp prevent a situation where the turn rate is does not allow the vehicles heading to be reduced sufficiently before it has crossed the track resulting in a limit cycle at the maximum turn rate centred on the track.
+    // @Units: deg
+    // @Range: 5 45
+    // @User: Advanced
+    AP_GROUPINFO_FRAME("ANGLE_LIM",   4, AP_L1_Control, _track_capture_angle_lim, 45.0f, AP_PARAM_FRAME_ROVER),
 
     AP_GROUPEND
 };
@@ -288,15 +296,15 @@ void AP_L1_Control::update_waypoint(const struct Location &prev_WP, const struct
         _nav_bearing = atan2f(-B_air_unit.y , -B_air_unit.x); // bearing (radians) from AC to L1 point
     } else { //Calc Nu to fly along AB line
 
-        //Calculate Nu2 angle (angle of velocity vector relative to line connecting waypoints)
+        // Calculate Nu2 angle (angle of velocity vector relative to line connecting waypoints)
         xtrackVel = _groundspeed_vector % AB; // Velocity cross track
         ltrackVel = _groundspeed_vector * AB; // Velocity along track
         float Nu2 = atan2f(xtrackVel,ltrackVel);
-        //Calculate Nu1 angle (Angle to L1 reference point)
-        float sine_Nu1 = _crosstrack_error/MAX(_L1_dist, 0.1f);
-        //Limit sine of Nu1 to provide a controlled track capture angle of 45 deg
-        sine_Nu1 = constrain_float(sine_Nu1, -0.7071f, 0.7071f);
-        float Nu1 = asinf(sine_Nu1);
+
+        // Calculate Nu1 angle (Angle to L1 reference point)
+        const float sine_Nu1 = constrain_float(_crosstrack_error/MAX(_L1_dist, 0.1f), -1.0f, 1.0f);
+        const float Nu1_lim = radians(_track_capture_angle_lim);
+        float Nu1 = constrain_float(asinf(sine_Nu1), -Nu1_lim, Nu1_lim);
 
         // compute integral error component to converge to a crosstrack of zero when traveling
         // straight but reset it when disabled or if it changes. That allows for much easier
