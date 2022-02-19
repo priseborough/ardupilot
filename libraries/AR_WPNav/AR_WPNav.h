@@ -124,6 +124,7 @@ private:
     AP_Int16 _pivot_angle;          // angle error that leads to pivot turn
     AP_Int16 _pivot_rate;           // desired turn rate during pivot turns in deg/sec
     AP_Float _pivot_delay;          // waiting time after pivot turn
+    AP_Float _angle_error_gain;     // gain from tracking angle error to demanded turn rate
 
     // references
     AR_AttitudeControl& _atc;       // rover attitude control library

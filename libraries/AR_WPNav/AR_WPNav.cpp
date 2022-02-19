@@ -92,6 +92,15 @@ const AP_Param::GroupInfo AR_WPNav::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("PIVOT_DELAY", 7, AR_WPNav, _pivot_delay, 0),
 
+    // @Param: ANGLE_GAIN
+    // @DisplayName: Angle track error gain
+    // @Description: Gain from angle track error to demanded turn rate used when controlling track via heading instead of lateral acceleration. Set to zero to disable this control method.
+    // @Units: 1/s
+    // @Range: 0 1.0
+    // @Increment: 0.05
+    // @User: Standard
+    AP_GROUPINFO("ANGLE_GAIN", 8, AR_WPNav, _angle_error_gain, 0.0f),
+
     AP_GROUPEND
 };
 
@@ -398,7 +407,11 @@ void AR_WPNav::update_steering(const Location& current_loc, float current_speed)
             _desired_heading_cd = wrap_360_cd(_desired_heading_cd + 18000);
         }
         _cross_track_error = _nav_controller.crosstrack_error();
-        _desired_turn_rate_rads = _atc.get_turn_rate_from_lat_accel(_desired_lat_accel, current_speed);
+        if (is_positive(_angle_error_gain)) {
+            _desired_turn_rate_rads = _angle_error_gain * wrap_PI(radians(0.01f * (float)(_nav_controller.nav_bearing_cd() - AP::ahrs().yaw_sensor)));
+        } else {
+            _desired_turn_rate_rads = _atc.get_turn_rate_from_lat_accel(_desired_lat_accel, current_speed);
+        }
     }
 }
 
