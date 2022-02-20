@@ -46,14 +46,6 @@ const AP_Param::GroupInfo AP_L1_Control::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO_FRAME("ANGLE_LIM",   4, AP_L1_Control, _track_capture_angle_lim, 45.0f, AP_PARAM_FRAME_ROVER),
 
-    // @Param: ACCEL_LIM
-    // @DisplayName: Track capture lateral accelration limit
-    // @Description: The maximum lateral acceleration available during track capture. Vehicles with slow turn rates may need to uae this to prevent a situation where the turn rate is does not allow the vehicles heading to be reduced sufficiently before it has crossed the track resulting in a limit cycle at the maximum turn rate centred on the track. Set to 0 if unknown and the limit will not be applied.
-    // @Units: m/s/s
-    // @Range: 0.0 15.0
-    // @User: Advanced
-    AP_GROUPINFO_FRAME("ACCEL_LIM",   5, AP_L1_Control, _track_capture_accel_lim, 0.0f, AP_PARAM_FRAME_ROVER),
-
     AP_GROUPEND
 };
 
@@ -340,25 +332,6 @@ void AP_L1_Control::update_waypoint(const struct Location &prev_WP, const struct
     //Limit Nu to +-(pi/2)
     Nu = constrain_float(Nu, -1.5708f, +1.5708f);
     _latAccDem = K_L1 * groundSpeed * groundSpeed / _L1_dist * sinf(Nu);
-
-    // Handle the case where we are flying twards the track and need to start turning away to prevent overshoot
-    if (is_positive(_track_capture_accel_lim)) {
-        xtrackVel = _groundspeed_vector % AB; // Velocity cross track
-        if (is_negative(xtrackVel * _crosstrack_error) && !is_zero(_crosstrack_error)) {
-            // Calculate a lateral acceleration required to brake to a stop at the track line
-            // Positive is acceleration to right of track
-            float brake_accel = - sq(xtrackVel) / (2.0f * _crosstrack_error);
-            // Correct for the yaw offset between the vehicles lateral acceleration vector and the
-            // desired track perpendicular
-            const float yaw_offset = wrap_PI(_ahrs.get_yaw() - atan2f(AB.y,AB.x));
-            brake_accel /= MAX(cosf(yaw_offset),0.1f);
-            if (is_positive(brake_accel)) {
-                _latAccDem = MAX(_latAccDem, brake_accel);
-            } else {
-                _latAccDem = MIN(_latAccDem, brake_accel);
-            }
-        }
-    }
 
     // Waypoint capture status is always false during waypoint following
     _WPcircle = false;
