@@ -126,6 +126,7 @@ private:
 
     AP_Float _loiter_bank_limit;
     AP_Float _track_capture_angle_lim;
+    AP_Float _track_capture_accel_lim;
 
     bool _reverse = false;
     float get_yaw() const;
