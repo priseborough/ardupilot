@@ -192,9 +192,9 @@ protected:
       float Sref = 1.4340000; // reference area for force and moment coefficients - m^2
       float Cref = 0.3620000; // scaling length for longitudinal moment coefficients - m
       float Bref = 1.9810000; // scaling length for lateral moment coefficients - m
-      float Xcg = 0.6044410; // m positive is rearwards
-      float Ycg = 0.0000000; // m positive is right
-      float Zcg = -0.0040840; // m positive is up
+      float Xref = 0.6044410; // X coordinate of moment reference centre - positive is back - m
+      float Yref = 0.0000000; // Y coordinate of moment reference centre - positive is right - m
+      float Zref = -0.0040840; // Z coordinate of moment reference centre - positive is up - m
       float AoA_ref = 2.7000000; // angle of attack used to generate Base_Aero data - deg
       float Beta_ref = 0.0000000; // angle fo sideslip used to generate Base_Aero data - deg
       float Vinf = 50.0000000; // true airspeed used to generate aero data - m/s
