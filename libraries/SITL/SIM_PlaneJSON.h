@@ -20,6 +20,8 @@
 
 #include "SIM_Aircraft.h"
 
+#define USE_CFD_DATA true
+
 namespace SITL {
 
 /*
@@ -173,10 +175,67 @@ protected:
 
     struct Model model;
 
+      enum {
+          CFx = 0,
+          CFy,
+          CFz,
+          CMx,
+          CMy,
+          CMz,
+      } index;
+
+    struct ModelCFD {
+      float mass = 220.0; // Kg
+      float IXX = 20.0; // roll inertial - Kg.m^2
+      float IYY = 70.0; // pitch inertia - Kg.m^2
+      float IZZ = 70.0; // yaw inertia - Kg.m^2
+      float Sref = 1.4340000; // reference area for force and moment coefficients - m^2
+      float Cref = 0.3620000; // scaling length for longitudinal moment coefficients - m
+      float Bref = 1.9810000; // scaling length for lateral moment coefficients - m
+      float Xcg = 0.6044410; // m positive is rearwards
+      float Ycg = 0.0000000; // m positive is right
+      float Zcg = -0.0040840; // m positive is up
+      float AoA_ref = 2.7000000; // angle of attack used to generate Base_Aero data - deg
+      float Beta_ref = 0.0000000; // angle fo sideslip used to generate Base_Aero data - deg
+      float Vinf = 50.0000000; // true airspeed used to generate aero data - m/s
+
+      float delta_alpha = radians(1.0); // angle of attack delta used to generate Alpha_Delta data - rad
+      float delta_beta = radians(1.0); // angle of sideslip delta used to generate Beta_Delta data - rad
+      float delta_roll_rate = 1.0f; // roll rate used to generate Roll_Rate_Delta data - rad/sec
+      float delta_pitch_rate = 1.0f; // pitch rate used to generate Pitch_Rate_Delta data - rad/sec
+      float delta_yaw_rate = 1.0f; // yaw rate used to generate Yaw_Rate_Delta data - rad/sec
+      float delta_aileron = radians(1.0); // aileron deflection used to generate Aileron_Delta data - rad
+      float delta_elevator = radians(1.0); // elevator deflection used to generate Elevator_Delta data - rad
+      float delta_rudder = radians(1.0); // rudder deflection used to generate Rudder_Delta data - rad
+
+      // X is rearwards, Y is right, Z is up in body frame
+      //                               CFx          CFy          CFz          CMx          CMy          CMz
+      float Base_Aero[6]        = { 0.0002381,   0.0000358,   0.4192856,  -0.0000138,  -0.0001385,   0.0000198}; 
+      float Alpha_Delta[6]      = {-0.0052591,   0.0000090,   0.4782762,  -0.0000073,  -0.0232671,   0.0000054};
+      float Beta_Delta[6]       = {-0.0000403,  -0.0259597,   0.4192175,   0.0057064,  -0.0007883,  -0.0129232};
+      float Roll_Rate_Delta[6]  = {-0.0002035,  -0.0084585,   0.4193562,   0.0177141,  -0.0003815,  -0.0030445};
+      float Pitch_Rate_Delta[6] = {-0.0009847,  -0.0000064,   0.4530610,  -0.0000007,  -0.2038634,  -0.0000027};
+      float Yaw_Rate_Delta[6]   = {-0.0003137,   0.0415058,   0.4193819,  -0.0114662,  -0.0011315,   0.0274757};
+      float Aileron_Delta[6]    = { 0.0002381,   0.0000358,   0.4192856,  -0.0000138,  -0.0001385,   0.0000198}; 
+      float Elevator_Delta[6]   = { 0.0002381,   0.0000358,   0.4192856,  -0.0000138,  -0.0001385,   0.0000198}; 
+      float Rudder_Delta[6]     = { 0.0002381,   0.0000358,   0.4192856,  -0.0000138,  -0.0001385,   0.0000198}; 
+
+      // angle limits
+      float aileronDeflectionLimitDeg = 15.0;
+      float elevatorDeflectionLimitDeg = 15.0;
+      float rudderDeflectionLimitDeg = 15.0;
+      float alphaMaxDeg = radians(12.0);
+      float betaRadMax = radians(12.0);
+
+    } default_cfd_model;
+
+    struct ModelCFD cfd_model;
+
     Vector3f getForce(float inputAileron, float inputElevator, float inputRudder) const;
     Vector3f getTorque(float inputAileron, float inputElevator, float inputRudder, const Vector3f &force) const;
     bool update_balloon(float balloon, Vector3f &force, Vector3f &rot_accel);
     void calculate_forces(const struct sitl_input &input, Vector3f &rot_accel, Vector3f &body_accel);
+    Model convert_cfd_data(ModelCFD &cfd_model);
 
     Vector3f balloon_velocity;           // balloon velocity NED
     Vector3f balloon_position{0.0f, 0.0f, -45.0f}; // balloon position NED from origin

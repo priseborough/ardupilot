@@ -29,11 +29,108 @@ PlaneJSON::PlaneJSON(const char *frame_str) :
 {
     ground_behavior = GROUND_BEHAVIOR_NO_MOVEMENT;
     carriage_state = carriageState::WAITING_FOR_PICKUP;
-    model = default_model;
+    if (USE_CFD_DATA) {
+        model = convert_cfd_data(default_cfd_model);
+    } else {
+        model = default_model;
+    }
     auto *_sitl = AP::sitl();
     _sitl->setalt.set_and_save(0);
     _sitl->setspeed.set_and_save(0);
     _sitl->setpitch.set_and_save(0);
+}
+
+Model PlaneJSON::convert_cfd_data(ModelCFD &cfd_model) {
+    Model model = default_model;
+
+    // calculate AoA and AoS force and moment derivatives
+    const float delta_alpha_inv = 1.0f / cfd_model.delta_alpha;
+    const float delta_beta_inv = 1.0f / cfd_model.delta_beta;
+
+    model.CA0 = cfd_model.Base_Aero[CFx];
+    model.CA1 = (cfd_model.Alpha_Delta[CFx] - cfd_model.Base_Aero[CFx]) * delta_alpha_inv;
+    model.CA2 = 0;
+
+    model.CY0 = (cfd_model.Beta_Delta[CFy] - cfd_model.Base_Aero[CFy]) * delta_beta_inv;
+    model.CY1 = 0;
+    model.CY2 = 0;
+
+    model.CN0 = cfd_model.Base_Aero[CFz];
+    model.CN1 = (cfd_model.Alpha_Delta[CFz] - cfd_model.Base_Aero[CFz]) * delta_alpha_inv;
+    model.CN2 = 0;
+
+    model.Cl0 = - (cfd_model.Beta_Delta[CMx] - cfd_model.Base_Aero[CMx]) * delta_beta_inv;
+    model.Cl1 = 0;
+    model.Cl2 = 0;
+
+    model.Cm0 = cfd_model.Base_Aero[CMy];
+    model.Cm1 = (cfd_model.Alpha_Delta[CMy] - cfd_model.Base_Aero[CMy]) * delta_alpha_inv;
+    model.Cm2 = 0;
+
+    model.Cn0 = - (cfd_model.Beta_Delta[CMz] - cfd_model.Base_Aero[CMz]) * delta_beta_inv;
+    model.Cn1 = 0;
+    model.Cn2 = 0;
+
+    // calculate dynamic derivatives
+    Vector3f pqr_norm = Vector3f(cfd_model.delta_roll_rate, cfd_model.delta_pitch_rate, cfd_model.delta_yaw_rate);
+    pqr_norm.x *= 0.5f * cfd_model.Bref / cfd_model.Vinf;
+    pqr_norm.y *= 0.5f * cfd_model.Cref / cfd_model.Vinf;
+    pqr_norm.z *= 0.5f * cfd_model.Bref / cfd_model.Vinf;
+
+    model.Clp0 = - (cfd_model.Roll_Rate_Delta[CMx] - cfd_model.Base_Aero[CMx]) / pqr_norm.x;
+    model.Clp1 = 0;
+    model.Clp2 = 0;
+
+    model.Cnp0 = - (cfd_model.Roll_Rate_Delta[CMz] - cfd_model.Base_Aero[CMz]) / pqr_norm.x;
+    model.Cnp1 = 0;
+    model.Cnp2 = 0;
+
+    model.Clr0 = - (cfd_model.Yaw_Rate_Delta[CMx] - cfd_model.Base_Aero[CMx]) / pqr_norm.z;
+    model.Clr1 = 0;
+    model.Clr2 = 0;
+
+    model.Cnr0 = - (cfd_model.Yaw_Rate_Delta[CMz] - cfd_model.Base_Aero[CMz]) / pqr_norm.z;
+    model.Cnr1 = 0;
+    model.Cnr2 = 0;
+
+    model.Cmq = (cfd_model.Pitch_Rate_Delta[CMz] - cfd_model.Base_Aero[CMz]) / pqr_norm.y;
+
+    // calculate control derivatives - TBD values
+
+    // aileron
+    model.aileronDeflectionLimitDeg = cfd_model.aileronDeflectionLimitDeg;
+    const float delta_ail_inv = 1.0f / cfd_model.delta_aileron;
+    model.deltaClperRadianAil0 = - (cfd_model.Aileron_Delta[CMx] - cfd_model.Base_Aero[CMx]) * delta_ail_inv;
+    model.deltaClperRadianAil1 = 0;
+    model.deltaClperRadianAil2 = 0;
+    model.deltaCnperRadianAil0 = - (cfd_model.Aileron_Delta[CMz] - cfd_model.Base_Aero[CMz]) * delta_ail_inv;
+    model.deltaCnperRadianAil1 = 0;
+    model.deltaCnperRadianAil2 = 0;
+    model.deltaCNperRadianAil = (cfd_model.Aileron_Delta[CFz] - cfd_model.Base_Aero[CFz]) * delta_ail_inv;
+    model.deltaCAperRadianAil = (cfd_model.Aileron_Delta[CFx] - cfd_model.Base_Aero[CFx]) * delta_ail_inv;
+    model.deltaCmperRadianAil = (cfd_model.Aileron_Delta[CMy] - cfd_model.Base_Aero[CMy]) * delta_ail_inv;
+    model.deltaCYperRadianAil = (cfd_model.Aileron_Delta[CFy] - cfd_model.Base_Aero[CFy]) * delta_ail_inv;   
+
+    // elevator
+    model.elevatorDeflectionLimitDeg = cfd_model.elevatorDeflectionLimitDeg;
+    const float delta_elev_inv = 1.0f / cfd_model.delta_elevator;
+    model.deltaCNperRadianElev = 0;
+    model.deltaCAperRadianElev = (cfd_model.Elevator_Delta[CFx] - cfd_model.Base_Aero[CFx]) * delta_elev_inv;
+    model.deltaCmperRadianElev = (cfd_model.Elevator_Delta[CMy] - cfd_model.Base_Aero[CMy]) * delta_elev_inv;
+    model.deltaCYperRadianElev = 0;
+    model.deltaClperRadianElev = 0;
+    model.deltaCnperRadianElev = 0;
+
+    // rudder
+    model.rudderDeflectionLimitDeg = cfd_model.rudderDeflectionLimitDeg;
+    const float delta_rudd_inv = cfd_model.delta_rudder;
+    model.deltaCNperRadianRud = 0;
+    model.deltaCAperRadianRud = 0.058;
+    model.deltaCmperRadianRud = 0;
+    model.deltaCYperRadianRud = 0.31;
+    model.deltaClperRadianRud = 0.038;
+    model.deltaCnperRadianRud = -0.174;
+
 }
 
 // Torque calculation function
