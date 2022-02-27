@@ -95,41 +95,45 @@ Model PlaneJSON::convert_cfd_data(ModelCFD &cfd_model) {
 
     model.Cmq = (cfd_model.Pitch_Rate_Delta[CMz] - cfd_model.Base_Aero[CMz]) / pqr_norm.y;
 
-    // calculate control derivatives - TBD values
+    // calculate control derivatives
 
     // aileron
     model.aileronDeflectionLimitDeg = cfd_model.aileronDeflectionLimitDeg;
     const float delta_ail_inv = 1.0f / cfd_model.delta_aileron;
+    model.deltaCAperRadianAil = (cfd_model.Aileron_Delta[CFx] - cfd_model.Base_Aero[CFx]) * delta_ail_inv;
+    model.deltaCYperRadianAil = (cfd_model.Aileron_Delta[CFy] - cfd_model.Base_Aero[CFy]) * delta_ail_inv;
+    model.deltaCNperRadianAil = (cfd_model.Aileron_Delta[CFz] - cfd_model.Base_Aero[CFz]) * delta_ail_inv;
     model.deltaClperRadianAil0 = - (cfd_model.Aileron_Delta[CMx] - cfd_model.Base_Aero[CMx]) * delta_ail_inv;
     model.deltaClperRadianAil1 = 0;
     model.deltaClperRadianAil2 = 0;
+    model.deltaCmperRadianAil = (cfd_model.Aileron_Delta[CMy] - cfd_model.Base_Aero[CMy]) * delta_ail_inv;
     model.deltaCnperRadianAil0 = - (cfd_model.Aileron_Delta[CMz] - cfd_model.Base_Aero[CMz]) * delta_ail_inv;
     model.deltaCnperRadianAil1 = 0;
     model.deltaCnperRadianAil2 = 0;
-    model.deltaCNperRadianAil = (cfd_model.Aileron_Delta[CFz] - cfd_model.Base_Aero[CFz]) * delta_ail_inv;
-    model.deltaCAperRadianAil = (cfd_model.Aileron_Delta[CFx] - cfd_model.Base_Aero[CFx]) * delta_ail_inv;
-    model.deltaCmperRadianAil = (cfd_model.Aileron_Delta[CMy] - cfd_model.Base_Aero[CMy]) * delta_ail_inv;
-    model.deltaCYperRadianAil = (cfd_model.Aileron_Delta[CFy] - cfd_model.Base_Aero[CFy]) * delta_ail_inv;   
 
     // elevator
     model.elevatorDeflectionLimitDeg = cfd_model.elevatorDeflectionLimitDeg;
     const float delta_elev_inv = 1.0f / cfd_model.delta_elevator;
-    model.deltaCNperRadianElev = 0;
     model.deltaCAperRadianElev = (cfd_model.Elevator_Delta[CFx] - cfd_model.Base_Aero[CFx]) * delta_elev_inv;
-    model.deltaCmperRadianElev = (cfd_model.Elevator_Delta[CMy] - cfd_model.Base_Aero[CMy]) * delta_elev_inv;
     model.deltaCYperRadianElev = 0;
+    model.deltaCNperRadianElev = (cfd_model.Elevator_Delta[CFz] - cfd_model.Base_Aero[CFz]) * delta_elev_inv;
     model.deltaClperRadianElev = 0;
+    model.deltaCmperRadianElev = (cfd_model.Elevator_Delta[CMy] - cfd_model.Base_Aero[CMy]) * delta_elev_inv;
     model.deltaCnperRadianElev = 0;
 
     // rudder
     model.rudderDeflectionLimitDeg = cfd_model.rudderDeflectionLimitDeg;
     const float delta_rudd_inv = cfd_model.delta_rudder;
-    model.deltaCNperRadianRud = 0;
-    model.deltaCAperRadianRud = 0.058;
-    model.deltaCmperRadianRud = 0;
-    model.deltaCYperRadianRud = 0.31;
-    model.deltaClperRadianRud = 0.038;
-    model.deltaCnperRadianRud = -0.174;
+    model.deltaCNperRadianRud = (cfd_model.Rudder_Delta[CFz] - cfd_model.Base_Aero[CFz]) * delta_rudd_inv;
+    model.deltaCAperRadianRud = (cfd_model.Rudder_Delta[CFx] - cfd_model.Base_Aero[CFx]) * delta_rudd_inv;
+    model.deltaCYperRadianRud = (cfd_model.Rudder_Delta[CFy] - cfd_model.Base_Aero[CFy]) * delta_rudd_inv;
+    model.deltaClperRadianRud = - (cfd_model.Rudder_Delta[CMx] - cfd_model.Base_Aero[CMx]) * delta_rudd_inv;
+    model.deltaCmperRadianRud = (cfd_model.Rudder_Delta[CMy] - cfd_model.Base_Aero[CMy]) * delta_rudd_inv;
+    model.deltaCnperRadianRud = - (cfd_model.Rudder_Delta[CMz] - cfd_model.Base_Aero[CMz]) * delta_rudd_inv;
+
+    // AoA and AoS limits
+    model.alphaRadMax = radians(cfd_model.alphaMaxDeg);
+    model.betaRadMax = radians(cfd_model.betaMaxDeg);
 
 }
 

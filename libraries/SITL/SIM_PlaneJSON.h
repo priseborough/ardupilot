@@ -224,8 +224,8 @@ protected:
       float aileronDeflectionLimitDeg = 15.0;
       float elevatorDeflectionLimitDeg = 15.0;
       float rudderDeflectionLimitDeg = 15.0;
-      float alphaMaxDeg = radians(12.0);
-      float betaRadMax = radians(12.0);
+      float alphaMaxDeg = 12.0;
+      float betaMaxDeg = 12.0;
 
     } default_cfd_model;
 
