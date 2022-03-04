@@ -63,6 +63,10 @@ protected:
         float IYY = 1.85; // kg-m^2
         float IZZ = 2.04; // kg-m^2
 
+        float Xcg = 0.0000000; // X coordinate of c.g. wrt the aero moment reference centre - positive is forward - m
+        float Ycg = 0.0000000; // Y coordinate of c.g. wrt the aero moment reference centre - positive is right - m
+        float Zcg = 0.0000000; // Z coordinate of c.g. wrt the aero moment reference centre - positive is down - m
+
         // CN is coefficients for forces on +Z axis
         // quadratic in alpharad
         float CN2 = -0.5771;
@@ -175,26 +179,29 @@ protected:
 
     struct Model model;
 
-      enum {
-          CFx = 0,
-          CFy,
-          CFz,
-          CMx,
-          CMy,
-          CMz,
-      } index;
+    enum {
+        CFx = 0,
+        CFy,
+        CFz,
+        CMx,
+        CMy,
+        CMz,
+    } axis;
 
     struct ModelCFD {
       float mass = 220.0; // Kg
-      float IXX = 20.0; // roll inertial - Kg.m^2
-      float IYY = 70.0; // pitch inertia - Kg.m^2
-      float IZZ = 70.0; // yaw inertia - Kg.m^2
+      float IXX = 20.0; // roll inertia about c.g. - Kg.m^2
+      float IYY = 70.0; // pitch inertia about c.g. - Kg.m^2
+      float IZZ = 70.0; // yaw inertia about c.g. - Kg.m^2
       float Sref = 1.4340000; // reference area for force and moment coefficients - m^2
       float Cref = 0.3620000; // scaling length for longitudinal moment coefficients - m
       float Bref = 1.9810000; // scaling length for lateral moment coefficients - m
       float Xref = 0.6044410; // X coordinate of moment reference centre - positive is back - m
       float Yref = 0.0000000; // Y coordinate of moment reference centre - positive is right - m
       float Zref = -0.0040840; // Z coordinate of moment reference centre - positive is up - m
+      float Xcg = 0.6044410; // X coordinate of c.g. - positive is back - m
+      float Ycg = 0.0000000; // Y coordinate of c.g. - positive is right - m
+      float Zcg = 0.0000000; // Z coordinate of c.g. - positive is up - m
       float AoA_ref = 2.7000000; // angle of attack used to generate Base_Aero data - deg
       float Beta_ref = 0.0000000; // angle fo sideslip used to generate Base_Aero data - deg
       float Vinf = 50.0000000; // true airspeed used to generate aero data - m/s
@@ -204,28 +211,44 @@ protected:
       float delta_roll_rate = 1.0f; // roll rate used to generate Roll_Rate_Delta data - rad/sec
       float delta_pitch_rate = 1.0f; // pitch rate used to generate Pitch_Rate_Delta data - rad/sec
       float delta_yaw_rate = 1.0f; // yaw rate used to generate Yaw_Rate_Delta data - rad/sec
-      float delta_aileron = radians(1.0); // aileron deflection used to generate Aileron_Delta data - rad
-      float delta_elevator = radians(1.0); // elevator deflection used to generate Elevator_Delta data - rad
-      float delta_rudder = radians(1.0); // rudder deflection used to generate Rudder_Delta data - rad
+      float delta_control = radians(1.0); // deflection used to generate control surface effectiveness data - rad
 
+      // table data from PGB_15_DegenGeom.stab
       // X is rearwards, Y is right, Z is up in body frame
-      //                               CFx          CFy          CFz          CMx          CMy          CMz
-      float Base_Aero[6]        = { 0.0002381,   0.0000358,   0.4192856,  -0.0000138,  -0.0001385,   0.0000198}; 
-      float Alpha_Delta[6]      = {-0.0052591,   0.0000090,   0.4782762,  -0.0000073,  -0.0232671,   0.0000054};
-      float Beta_Delta[6]       = {-0.0000403,  -0.0259597,   0.4192175,   0.0057064,  -0.0007883,  -0.0129232};
-      float Roll_Rate_Delta[6]  = {-0.0002035,  -0.0084585,   0.4193562,   0.0177141,  -0.0003815,  -0.0030445};
-      float Pitch_Rate_Delta[6] = {-0.0009847,  -0.0000064,   0.4530610,  -0.0000007,  -0.2038634,  -0.0000027};
-      float Yaw_Rate_Delta[6]   = {-0.0003137,   0.0415058,   0.4193819,  -0.0114662,  -0.0011315,   0.0274757};
-      float Aileron_Delta[6]    = { 0.0002381,   0.0000358,   0.4192856,  -0.0000138,  -0.0001385,   0.0000198}; 
-      float Elevator_Delta[6]   = { 0.0002381,   0.0000358,   0.4192856,  -0.0000138,  -0.0001385,   0.0000198}; 
-      float Rudder_Delta[6]     = { 0.0002381,   0.0000358,   0.4192856,  -0.0000138,  -0.0001385,   0.0000198}; 
+      // Moments appear to be about moment reference centre
+      //                                CFx          CFy          CFz          CMx          CMy          CMz
+      float Base_Aero[6]         = { 0.0002381,   0.0000358,   0.4192856,  -0.0000138,  -0.0001385,   0.0000198}; 
+      float Alpha_Delta[6]       = {-0.0052591,   0.0000090,   0.4782762,  -0.0000073,  -0.0232671,   0.0000054};
+      float Beta_Delta[6]        = {-0.0000403,  -0.0259597,   0.4192175,   0.0057064,  -0.0007883,  -0.0129232};
+      float Roll_Rate_Delta[6]   = {-0.0002035,  -0.0084585,   0.4193562,   0.0177141,  -0.0003815,  -0.0030445};
+      float Pitch_Rate_Delta[6]  = {-0.0009847,  -0.0000064,   0.4530610,  -0.0000007,  -0.2038634,  -0.0000027};
+      float Yaw_Rate_Delta[6]    = {-0.0003137,   0.0415058,   0.4193819,  -0.0114662,  -0.0011315,   0.0274757};
+
+      // table data from PGB_19_DegenGeom.stab
+      // X is rearwards, Y is right, Z is up in body frame
+      // Moments appear to be about CAD origin
+      //                                CFx          CFy          CFz          CMx          CMy          CMz
+      float Base_Aero_Control[6] = {-0.0724402,  -0.0001758,   0.8455596,   0.0000542,  -0.1810522,  -0.0000879};
+      float Front_Right_Delta[6] = {-0.0722422,  -0.0009996,   0.8518152,   0.0021481,  -0.1701203,  -0.0004897};
+      float Front_Left_Delta[6]  = {-0.0726025,  -0.0012347,   0.8392525,   0.0022508,  -0.1920116,  -0.0006566};
+      float Rear_Right_Delta[6]  = {-0.0725716,   0.0002820,   0.8525984,   0.0021835,  -0.2051517,   0.0002638};
+      float Rear_Left_Delta[6]   = {-0.0722704,   0.0002839,   0.8384862,   0.0021943,  -0.1568705,   0.0002782};
 
       // angle limits
       float aileronDeflectionLimitDeg = 15.0;
       float elevatorDeflectionLimitDeg = 15.0;
-      float rudderDeflectionLimitDeg = 15.0;
       float alphaMaxDeg = 12.0;
       float betaMaxDeg = 12.0;
+
+      // mixing from aileron and elevator to individual control surfaces (front right, front left, rear right, rear left)
+      float ail_to_fr = - 0.5; // positive deflection in CFD model is TE down
+      float ail_to_fl = - 0.5; // positive deflection is CFD model TE up
+      float ail_to_rr = - 0.5; // positive deflection is CFD model TE down
+      float ail_to_rl = - 0.5; // positive deflection is CFD model TE up
+      float ele_to_fr = + 0.5; // positive deflection is CFD model TE down
+      float ele_to_fl = - 0.5; // positive deflection is CFD model TE up
+      float ele_to_rr = - 0.5; // positive deflection is CFD model TE down
+      float ele_to_rl = + 0.5; // positive deflection is CFD model TE up
 
     } default_cfd_model;
 
