@@ -102,7 +102,6 @@ protected:
     bool have_launcher;
     float launch_accel;
     float launch_time;
-    uint64_t launch_start_ms;
 
     const uint8_t throttle_servo = 2;
     const int8_t choke_servo = 14;

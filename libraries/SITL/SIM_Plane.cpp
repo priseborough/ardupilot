@@ -60,21 +60,27 @@ Plane::Plane(const char *frame_str) :
     if (strstr(frame_str, "-elevrev")) {
         reverse_elevator_rudder = true;
     }
-    if (strstr(frame_str, "-catapult")) {
+    // if (strstr(frame_str, "-catapult")) {
+    //     have_launcher = true;
+    //     launch_accel = 15;
+    //     launch_time = 2;
+    // }
+    // if (strstr(frame_str, "-bungee")) {
+    //     have_launcher = true;
+    //     launch_accel = 7;
+    //     launch_time = 4;
+    // }
+    // if (strstr(frame_str, "-throw")) {
+    //     have_launcher = true;
+    //     launch_accel = 25;
+    //     launch_time = 0.4;
+    // }
+    // if (strstr(frame_str, "-drop")) {
         have_launcher = true;
-        launch_accel = 15;
-        launch_time = 2;
-    }
-    if (strstr(frame_str, "-bungee")) {
-        have_launcher = true;
-        launch_accel = 7;
-        launch_time = 4;
-    }
-    if (strstr(frame_str, "-throw")) {
-        have_launcher = true;
-        launch_accel = 25;
-        launch_time = 0.4;
-    }
+        launch_accel = 0;
+        launch_time = 0.0;
+        release_velocity = 50.0;
+    // }
     if (strstr(frame_str, "-tailsitter")) {
         tailsitter = true;
         ground_behavior = GROUND_BEHAVIOR_TAILSITTER;
@@ -357,7 +363,8 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
     // scale thrust to newtons
     thrust *= thrust_scale;
 
-    accel_body = Vector3f(thrust, 0, 0) + force;
+    // accel_body = Vector3f(thrust, 0, 0) + force;
+    accel_body = force;
     accel_body /= mass;
 
     // add some noise

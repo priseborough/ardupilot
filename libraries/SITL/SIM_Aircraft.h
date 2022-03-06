@@ -215,6 +215,8 @@ protected:
     Vector3f mag_bf;  // local earth magnetic field vector in Gauss, earth frame
 
     uint64_t time_now_us;
+    uint64_t launch_start_ms;
+    float release_velocity;
 
     const float gyro_noise = radians(0.1f);
     const float accel_noise = 0.3f;
@@ -252,6 +254,8 @@ protected:
     float ground_height_difference() const;
 
     virtual bool on_ground() const;
+
+    bool waiting_to_drop() const;
 
     // returns height above ground level in metres
     float hagl() const;  // metres
