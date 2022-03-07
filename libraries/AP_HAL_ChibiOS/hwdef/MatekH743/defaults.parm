@@ -38,4 +38,14 @@ INITIAL_MODE		2
 THR_FAILSAFE        0
 FS_GCS_ENABL        0
 
-#TODO add stream rate params for SR*
+GCS_PID_MASK        3
+
+SR1_RAW_SENS        15
+SR1_RAW_CTRL        15
+SR1_EXTRA1          15
+SR1_POSITION        5
+SR1_EXTRA2          3
+SR1_EXTRA3          1
+SR1_EXT_STAT        1
+SR1_RC_CHAN         0
+SR1_ADSB            0
