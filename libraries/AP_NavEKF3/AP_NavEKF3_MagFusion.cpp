@@ -1534,6 +1534,42 @@ bool NavEKF3_core::learnMagBiasFromGPS(void)
 // Reset states using yaw from EKF-GSF and velocity and position from GPS
 bool NavEKF3_core::EKFGSF_resetMainFilterYaw(bool emergency_reset)
 {
+    // special case code added for high speed airborne release
+    if (!emergency_reset && assume_zero_sideslip()) {
+        ftype gps_spd = sqrtf(sq(gpsDataDelayed.vel.x) + sq(gpsDataDelayed.vel.y));
+        ftype gps_spd_accuracy = MAX(gpsSpdAccuracy, 0.5f);
+        if (gps_spd > 10.0f && gps_spd > 10.0f * gps_spd_accuracy) {
+            // get yaw from GPS ground course and yaw variance from GPS speed uncertainty
+            ftype gps_yaw = atan2f(gpsDataDelayed.vel.y,gpsDataDelayed.vel.x);
+            ftype gps_yaw_variance = sq(asinf(gps_spd_accuracy/gps_spd));
+
+            // keep roll and pitch and reset yaw
+            rotationOrder order;
+            bestRotationOrder(order);
+            resetQuatStateYawOnly(gps_yaw, gps_yaw_variance, order);
+
+            // record the reset event
+            EKFGSF_yaw_reset_request_ms = 0;
+            EKFGSF_yaw_reset_ms = imuSampleTime_ms;
+            EKFGSF_yaw_reset_count++;
+
+            GCS_SEND_TEXT(MAV_SEVERITY_INFO, "EKF3 IMU%u yaw aligned to GPS ground course",(unsigned)imu_index);
+
+            // record the yaw reset event
+            recordYawReset();
+
+            // reset velocity and position states to GPS - if yaw is fixed then the filter should start to operate correctly
+            ResetVelocity(resetDataSource::DEFAULT);
+            ResetPosition(resetDataSource::DEFAULT);
+
+            // reset test ratios that are reported to prevent a race condition with the external state machine requesting the reset
+            velTestRatio = 0.0f;
+            posTestRatio = 0.0f;
+
+            return true;
+        }
+    }
+
     // Don't do a reset unless permitted by the EK3_GSF_USE and EK3_GSF_RUN parameter masks
     if ((yawEstimator == nullptr)
         || !(frontend->_gsfUseMask & (1U<<core_index))) {
