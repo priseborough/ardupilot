@@ -498,16 +498,16 @@ bool AP_Arming::gps_checks(bool report)
             return false;
         }
 
-        // check AHRS and GPS are within 10m of each other
-        const Location gps_loc = gps.location();
-        Location ahrs_loc;
-        if (AP::ahrs().get_position(ahrs_loc)) {
-            const float distance = gps_loc.get_distance(ahrs_loc);
-            if (distance > AP_ARMING_AHRS_GPS_ERROR_MAX) {
-                check_failed(ARMING_CHECK_GPS, report, "GPS and AHRS differ by %4.1fm", (double)distance);
-                return false;
-            }
-        }
+        // // check AHRS and GPS are within 10m of each other
+        // const Location gps_loc = gps.location();
+        // Location ahrs_loc;
+        // if (AP::ahrs().get_position(ahrs_loc)) {
+        //     const float distance = gps_loc.get_distance(ahrs_loc);
+        //     if (distance > AP_ARMING_AHRS_GPS_ERROR_MAX) {
+        //         check_failed(ARMING_CHECK_GPS, report, "GPS and AHRS differ by %4.1fm", (double)distance);
+        //         return false;
+        //     }
+        // }
     }
 
     if ((checks_to_perform & ARMING_CHECK_ALL) || (checks_to_perform & ARMING_CHECK_GPS_CONFIG)) {
