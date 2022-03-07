@@ -34,3 +34,8 @@ TECS_SPDWEIGHT		0
 HOME_RESET_ALT		-1
 LOITER_RAD			800
 INITIAL_MODE		2
+
+THR_FAILSAFE        0
+FS_GCS_ENABL        0
+
+#TODO add stream rate params for SR*
