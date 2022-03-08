@@ -491,7 +491,7 @@ static const ap_message STREAM_RAW_SENSORS_msgs[] = {
     MSG_RAW_IMU,
     // MSG_SCALED_IMU2,
     // MSG_SCALED_IMU3,
-    MSG_SCALED_PRESSURE,
+    // MSG_SCALED_PRESSURE,
     // MSG_SCALED_PRESSURE2,
     // MSG_SCALED_PRESSURE3,
     // MSG_SENSOR_OFFSETS
@@ -543,6 +543,7 @@ static const ap_message STREAM_EXTRA3_msgs[] = {
     // MSG_AHRS,
     // MSG_HWSTATUS,
     MSG_WIND,
+    MSG_SCALED_PRESSURE,
 //     MSG_RANGEFINDER,
 //     MSG_DISTANCE_SENSOR,
 //     MSG_SYSTEM_TIME,
