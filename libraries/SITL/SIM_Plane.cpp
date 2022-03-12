@@ -114,6 +114,14 @@ Vector3f Plane::getTorque(float inputAileron, float inputElevator, float inputRu
     float Cm = m.Cm2 * sq(delta_alpha) + m.Cm1 * delta_alpha + m.Cm0;
     float Cn = (m.Cn2 * sq(delta_alpha) + m.Cn1 * delta_alpha + m.Cn0) * betarad;
 
+    AP::logger().Write("DBG2", "TimeUS,alpha,cm,elev,cm_elev",
+                                           "Qffff",
+                                           AP_HAL::micros64(),
+                                           degrees(alpharad),
+                                           Cm,
+                                           degrees(elevator_rad),
+                                           radians(m.deltaCmperRadianElev));
+
     Cl += m.deltaClperRadianElev * elevator_rad;
     Cm += m.deltaCmperRadianElev * elevator_rad;
     Cn += m.deltaCnperRadianElev * elevator_rad;
@@ -227,6 +235,17 @@ Vector3f Plane::getForce(float inputAileron, float inputElevator, float inputRud
         CA = m.CA_sweep[last_alpha_index] + fraction * (m.CA_sweep[last_alpha_index+1] - m.CA_sweep[last_alpha_index]);
         CN = m.CN_sweep[last_alpha_index] + fraction * (m.CN_sweep[last_alpha_index+1] - m.CN_sweep[last_alpha_index]);
     }
+
+#if 1
+    const float Cl = CN * cosf(alpharad) - CA * sinf(alphaRad);
+    const float Cd = CN * sinf(alphaRad) + CA * cosf(alphaRad);
+    AP::logger().Write("DBG1", "TimeUS,alpha,Cl,Cd",
+                                           "Qfff",
+                                           AP_HAL::micros64(),
+                                           degrees(alpharad),
+                                           Cl,
+                                           Cd);
+#endif
 
     CN += m.deltaCNperRadianElev * elevator_rad;
     CA += m.deltaCAperRadianElev * elevator_rad;
