@@ -228,9 +228,9 @@ Vector3f Plane::getForce(float inputAileron, float inputElevator, float inputRud
         CN = m.CN_sweep[last_alpha_index] + fraction * (m.CN_sweep[last_alpha_index+1] - m.CN_sweep[last_alpha_index]);
     }
 
-    CN = m.deltaCNperRadianElev * elevator_rad;
-    CA = m.deltaCAperRadianElev * elevator_rad;
-    CY = m.deltaCYperRadianElev * elevator_rad;
+    CN += m.deltaCNperRadianElev * elevator_rad;
+    CA += m.deltaCAperRadianElev * elevator_rad;
+    CY += m.deltaCYperRadianElev * elevator_rad;
 
     CN += m.deltaCNperRadianRud * rudder_rad;
     CA += m.deltaCAperRadianRud * rudder_rad;
