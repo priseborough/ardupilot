@@ -142,10 +142,13 @@ float Aircraft::hagl() const
 */
 bool Aircraft::on_ground() const
 {
-    return hagl() <= 0.001f && !waiting_to_launch();  // prevent bouncing around ground
+    return hagl() <= 0.001f && !waiting_to_release();  // prevent bouncing around ground
 }
 
-bool Aircraft::waiting_to_launch() const
+/*
+    return true if waiting for the release to be initiated via CH7 going high
+*/
+bool Aircraft::waiting_to_release() const
 {
     return (launch_start_ms == 0);
 }
@@ -583,19 +586,21 @@ void Aircraft::update_dynamics(const Vector3f &rot_accel)
     update_eas_airspeed();
 
     // constrain states to match ground or launching platform
-    if (waiting_to_launch()) {
+    if (waiting_to_release()) {
+        // Hack to simulate waiting to be released from a plane travelling at 60m/s and 3000m above field elevation
         float r, p, y;
         dcm.to_euler(&r, &p, &y);
         dcm.from_euler(0.0f, radians(3.0f), y);
         // X, Y movement tracks launching plane movement
-        const float launch_speed = 60.0f;
-        velocity_ef.x = launch_speed * MIN((((float)time_now_us - 10E6f) / 30E6f), 1.0f) * cosf(y);
-        velocity_ef.y = launch_speed * MIN((((float)time_now_us - 10E6f) / 30E6f), 1.0f) * sinf(y);
+        const float speed_target = 60.0f;
+        const float speed = speed_target * constrain_float((((float)time_now_us - 10E6f) / 30E6f), 0.0f, 1.0f);
+        velocity_ef.x = speed * cosf(y);
+        velocity_ef.y = speed * sinf(y);
         velocity_ef.z = 0.0f;
         gyro.zero();
-        position.z = -3000.0f;
+        const float hafe_target_m = 3000.0f;
+        position.z = - hafe_target_m;
         use_smoothing = true;
-
     } else if (on_ground()) {
         if (!was_on_ground && AP_HAL::millis() - last_ground_contact_ms > 1000) {
             gcs().send_text(MAV_SEVERITY_INFO, "SIM Hit ground at %f m/s", velocity_ef.z);

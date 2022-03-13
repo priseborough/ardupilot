@@ -63,9 +63,10 @@ Plane::Plane(const char *frame_str) :
     //     reverse_elevator_rudder = true;
     // }
     // if (strstr(frame_str, "-catapult")) {
+        // Hack to drop from a constant velocity airborne platform
         have_launcher = true;
-        launch_accel = 15;
-        launch_time = 5;
+        launch_accel = 0;
+        launch_time = 0;
         mass = model.mass;
     // }
     // if (strstr(frame_str, "-bungee")) {

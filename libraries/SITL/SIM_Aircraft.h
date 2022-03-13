@@ -239,7 +239,7 @@ protected:
 
     virtual bool on_ground() const;
 
-    bool waiting_to_launch() const;
+    bool waiting_to_release() const;
 
     // returns height above ground level in metres
     float hagl() const;  // metres
