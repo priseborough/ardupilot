@@ -8,8 +8,17 @@ local manoeuvre_start_time_ms = 0
 local target_bearing = 0
 local last_turn_right = false
 local gps_loc
+local ekf_alignment_detected = false
 
 function update()
+    if (not ekf_alignment_detected) then
+        vel_variance, pos_variance, height_variance, mag_variance, airspeed_variance = ahrs:get_variances()
+        if (vel_variance > 0.001) then
+            ekf_alignment_detected = true
+            gcs:send_text(0, string.format("Lua script detected EKF GPS use"))
+        end
+    end
+
     -- If aircraft falling and stable - switch to loiter
     local roll_angle_deg = math.deg(ahrs:get_roll())
     local angle_rate_vec = Vector3f()
