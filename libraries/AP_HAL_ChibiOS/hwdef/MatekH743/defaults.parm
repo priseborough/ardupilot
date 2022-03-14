@@ -1,79 +1,58 @@
 ARSPD_FBW_MAX         96.0000
 ARSPD_FBW_MIN         48.0000
+
 COMPASS_ENABLE        0.0000
 COMPASS_USE           0.0000
 COMPASS_USE2          0.0000
 COMPASS_USE3          0.0000
-EK3_SRC1_YAW          8.0000
+
+EK3_GSF_RUN_MASK 	  3
+EK3_GSF_USE_MASK 	  3
+EK3_IMU_MASK     	  3
+EK3_MAG_CAL      	  0
+EK3_SRC1_YAW     	  8
+EK3_SRC2_YAW     	  0
+EK3_SRC1_POSZ     	  1
+EK3_SRC2_POSZ     	  1
+
 FLTMODE_CH            0.0000
 GCS_PID_MASK          3.0000
 HOME_RESET_ALT        -1.0000
 INITIAL_MODE          2.0000
+
 INS_GYR_CAL           0.0000
 INS_USE2              0.0000
 INS_USE3              0.0000
+
 LIM_PITCH_MAX         500.0000
 LIM_PITCH_MIN         -2000.0000
+
 PTCH_RATE_FF          0.2500
-PTCH_RATE_SMAX        250.0000
-RLL_RATE_D            0.0100
-RLL_RATE_FF           0.0000
-RLL_RATE_I            0.1000
-RLL_RATE_P            0.1000
-RLL_RATE_SMAX         250.0000
+PTCH_RATE_SMAX        200.0000
+
+RLL_RATE_D            0.00125
+RLL_RATE_FF           0
+RLL_RATE_FLTD         12
+RLL_RATE_FLTE         0
+RLL_RATE_FLTT         3
+RLL_RATE_I            0.1
+RLL_RATE_IMAX         0.666
+RLL_RATE_P            0.02500
+RLL_RATE_SMAX         200
+
 SCALING_SPEED         70.0000
 SCHED_LOOP_RATE       200.0000
 SCR_ENABLE            1.0000
 SERVO_RATE            200.0000
-SR0_ADSB              0.0000
-SR0_EXTRA1            10.0000
-SR0_EXTRA2            1.0000
-SR0_POSITION          1.0000
-SR0_RAW_CTRL          10.0000
-SR0_RAW_SENS          10.0000
-SR0_RC_CHAN           0.0000
-SR1_ADSB              0.0000
-SR1_EXTRA1            10.0000
-SR1_EXTRA2            1.0000
-SR1_POSITION          1.0000
-SR1_RAW_CTRL          10.0000
-SR1_RAW_SENS          10.0000
-SR1_RC_CHAN           0.0000
-SR2_ADSB              0.0000
-SR2_EXTRA1            10.0000
-SR2_RAW_CTRL          10.0000
-SR2_RAW_SENS          10.0000
-SR2_RC_CHAN           0.0000
-SR3_ADSB              0.0000
-SR3_EXTRA1            10.0000
-SR3_RAW_CTRL          10.0000
-SR3_RAW_SENS          10.0000
-SR3_RC_CHAN           0.0000
-SR4_ADSB              0.0000
-SR4_EXTRA1            10.0000
-SR4_RAW_CTRL          10.0000
-SR4_RAW_SENS          10.0000
-SR4_RC_CHAN           0.0000
-SR5_ADSB              0.0000
-SR5_EXTRA1            10.0000
-SR5_EXTRA2            1.0000
-SR5_POSITION          1.0000
-SR5_RAW_CTRL          10.0000
-SR5_RAW_SENS          10.0000
-SR5_RC_CHAN           0.0000
-SR6_ADSB              0.0000
-SR0_EXTRA1            10.0000
-SR6_EXTRA2            1.0000
-SR6_POSITION          1.0000
-SR6_RAW_CTRL          10.0000
-SR6_RAW_SENS          10.0000
-SR6_RC_CHAN           0.0000
-STAB_PITCH_DOWN       10.0000
+
+STAB_PITCH_DOWN       12.0000
 STICK_MIXING          0.0000
 TECS_LAND_SPDWGT      0.0000
-TECS_PITCH_MAX        -10.0000
+TECS_PITCH_MAX        -12.0000
 TECS_PITCH_MIN        -20.0000
 TECS_SPDWEIGHT        0.0000
+
 THR_FAILSAFE          0.0000
+
 WP_LOITER_RAD         800.0000
 WP_RADIUS             360.0000
