@@ -1,8 +1,8 @@
 local loiter_exit_alt_cm = 300000 -- AMSL height in cm where we exit loiter down and go into GUIDED mode
 local turn_separation_time_ms = 15000 -- time between turns in guided mode
-local stabilize_exit_sink_min = 15.0 -- minimum sink rate in m/s allowed for exit from STABILIZE
+local stabilize_exit_sink_min = 10.0 -- minimum sink rate in m/s allowed for exit from STABILIZE
 local stabilize_exit_bank_max = 20.0 -- maximum roll angle in degrees allowed for exit from STABILIZE
-local stabilize_angle_rate_max = 40.0 -- maximum angle rate in degrees/secallowed for exit from STABILIZE
+local stabilize_angle_rate_max = 40.0 -- maximum angle rate in degrees/sec allowed for exit from STABILIZE
 
 local manoeuvre_start_time_ms = 0
 local target_bearing = 0
