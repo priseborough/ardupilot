@@ -685,7 +685,7 @@ void NavEKF3_core::FuseOptFlow(const of_elements &ofDataDelayed, bool really_fus
 
             // correct the covariance P = (I - K*H)*P calculated as P - K(HP)
             // take advantage of the empty rows in H to reduce the number of operations
-            Vector24 HP = {};
+            Vector24 HP;
             for (unsigned row = 0; row <= 6; row++) {
                 for (unsigned col = 0; col <= stateIndexLim; col++) {
                     HP[col] += H_LOS[row] * P[row][col];

@@ -27,7 +27,7 @@ void NavEKF3_core::FuseAirspeed()
     ftype vwe;
     ftype SH_TAS[3];
     ftype SK_TAS[2];
-    Vector24 H_TAS = {};
+    Vector24 H_TAS;
     ftype VtasPred;
 
     // copy required states to local variable names
@@ -157,7 +157,7 @@ void NavEKF3_core::FuseAirspeed()
 
             // correct the covariance P = (I - K*H)*P calculated as P - K(HP)
             // take advantage of the empty rows in H to reduce the number of operations
-            Vector24 HP = {};
+            Vector24 HP;
             for (unsigned row = 4; row <= 6; row++) {
                 for (unsigned col = 0; col <= stateIndexLim; col++) {
                     HP[col] += H_TAS[row] * P[row][col];
@@ -434,7 +434,7 @@ void NavEKF3_core::FuseSideslip()
 
         // correct the covariance P = (I - K*H)*P calculated as P - K(HP)
         // take advantage of the empty rows in H to reduce the number of operations
-        Vector24 HP = {};
+        Vector24 HP;
         for (unsigned row = 0; row <= 6; row++) {
             for (unsigned col = 0; col <= stateIndexLim; col++) {
                 HP[col] += H_BETA[row] * P[row][col];
@@ -699,7 +699,7 @@ void NavEKF3_core::FuseDragForces()
 
         // correct the covariance P = (I - K*H)*P calculated as P - K(HP)
         // take advantage of the empty rows in H to reduce the number of operations
-        Vector24 HP = {};
+        Vector24 HP;
         for (unsigned row = 0; row <= 6; row++) {
             for (unsigned col = 0; col <= stateIndexLim; col++) {
                 HP[col] += Hfusion[row] * P[row][col];
