@@ -207,29 +207,20 @@ void NavEKF3_core::FuseRngBcn()
             // restart the counter
             lastRngBcnPassTime_ms = imuSampleTime_ms;
 
-            // correct the covariance P = (I - K*H)*P
-            // take advantage of the empty columns in KH to reduce the
-            // number of operations
-            for (unsigned i = 0; i<=stateIndexLim; i++) {
-                for (unsigned j = 0; j<=6; j++) {
-                    KH[i][j] = 0.0f;
-                }
-                for (unsigned j = 7; j<=9; j++) {
-                    KH[i][j] = Kfusion[i] * H_BCN[j];
-                }
-                for (unsigned j = 10; j<=23; j++) {
-                    KH[i][j] = 0.0f;
+            // correct the covariance P = (I - K*H)*P calculated as P - K(HP)
+            // take advantage of the empty rows in H to reduce the number of operations
+            Vector24 HP = {};
+            for (unsigned row = 7; row <= 9; row++) {
+                for (unsigned col = 0; col <= stateIndexLim; col++) {
+                    HP[col] += H_BCN[row] * P[row][col];
                 }
             }
-            for (unsigned j = 0; j<=stateIndexLim; j++) {
-                for (unsigned i = 0; i<=stateIndexLim; i++) {
-                    ftype res = 0;
-                    res += KH[i][7] * P[7][j];
-                    res += KH[i][8] * P[8][j];
-                    res += KH[i][9] * P[9][j];
-                    KHP[i][j] = res;
+            for (unsigned row = 0; row <= stateIndexLim; row++) {
+                for (unsigned col = 0; col <= stateIndexLim; col++) {
+                    KHP[row][col] = Kfusion[row] * HP[col];
                 }
             }
+
             // Check that we are not going to drive any variances negative and skip the update if so
             bool healthyFusion = true;
             for (uint8_t i= 0; i<=stateIndexLim; i++) {

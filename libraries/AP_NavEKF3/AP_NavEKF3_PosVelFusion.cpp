@@ -1832,28 +1832,18 @@ void NavEKF3_core::FuseBodyVel()
                 bodyVelFusionActive = true;
                 GCS_SEND_TEXT(MAV_SEVERITY_INFO, "EKF3 IMU%u fusing odometry",(unsigned)imu_index);
             }
-            // correct the covariance P = (I - K*H)*P
-            // take advantage of the empty columns in KH to reduce the
-            // number of operations
-            for (unsigned i = 0; i<=stateIndexLim; i++) {
-                for (unsigned j = 0; j<=6; j++) {
-                    KH[i][j] = Kfusion[i] * H_VEL[j];
-                }
-                for (unsigned j = 7; j<=stateIndexLim; j++) {
-                    KH[i][j] = 0.0f;
+
+            // correct the covariance P = (I - K*H)*P calculated as P - K(HP)
+            // take advantage of the empty rows in H to reduce the number of operations
+            Vector24 HP = {};
+            for (unsigned row = 0; row <= 6; row++) {
+                for (unsigned col = 0; col <= stateIndexLim; col++) {
+                    HP[col] += H_VEL[row] * P[row][col];
                 }
             }
-            for (unsigned j = 0; j<=stateIndexLim; j++) {
-                for (unsigned i = 0; i<=stateIndexLim; i++) {
-                    ftype res = 0;
-                    res += KH[i][0] * P[0][j];
-                    res += KH[i][1] * P[1][j];
-                    res += KH[i][2] * P[2][j];
-                    res += KH[i][3] * P[3][j];
-                    res += KH[i][4] * P[4][j];
-                    res += KH[i][5] * P[5][j];
-                    res += KH[i][6] * P[6][j];
-                    KHP[i][j] = res;
+            for (unsigned row = 0; row <= stateIndexLim; row++) {
+                for (unsigned col = 0; col <= stateIndexLim; col++) {
+                    KHP[row][col] = Kfusion[row] * HP[col];
                 }
             }
 

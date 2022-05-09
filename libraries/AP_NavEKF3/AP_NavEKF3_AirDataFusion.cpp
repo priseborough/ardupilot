@@ -155,32 +155,22 @@ void NavEKF3_core::FuseAirspeed()
             }
             stateStruct.quat.normalize();
 
-            // correct the covariance P = (I - K*H)*P
-            // take advantage of the empty columns in KH to reduce the
-            // number of operations
-            for (unsigned i = 0; i<=stateIndexLim; i++) {
-                for (unsigned j = 0; j<=3; j++) {
-                    KH[i][j] = 0.0f;
-                }
-                for (unsigned j = 4; j<=6; j++) {
-                    KH[i][j] = Kfusion[i] * H_TAS[j];
-                }
-                for (unsigned j = 7; j<=21; j++) {
-                    KH[i][j] = 0.0f;
-                }
-                for (unsigned j = 22; j<=23; j++) {
-                    KH[i][j] = Kfusion[i] * H_TAS[j];
+            // correct the covariance P = (I - K*H)*P calculated as P - K(HP)
+            // take advantage of the empty rows in H to reduce the number of operations
+            Vector24 HP = {};
+            for (unsigned row = 4; row <= 6; row++) {
+                for (unsigned col = 0; col <= stateIndexLim; col++) {
+                    HP[col] += H_TAS[row] * P[row][col];
                 }
             }
-            for (unsigned j = 0; j<=stateIndexLim; j++) {
-                for (unsigned i = 0; i<=stateIndexLim; i++) {
-                    ftype res = 0;
-                    res += KH[i][4] * P[4][j];
-                    res += KH[i][5] * P[5][j];
-                    res += KH[i][6] * P[6][j];
-                    res += KH[i][22] * P[22][j];
-                    res += KH[i][23] * P[23][j];
-                    KHP[i][j] = res;
+            for (unsigned row = 22; row <= 23; row++) {
+                for (unsigned col = 0; col <= stateIndexLim; col++) {
+                    HP[col] += H_TAS[row] * P[row][col];
+                }
+            }
+            for (unsigned row = 0; row <= stateIndexLim; row++) {
+                for (unsigned col = 0; col <= stateIndexLim; col++) {
+                    KHP[row][col] = Kfusion[row] * HP[col];
                 }
             }
             for (unsigned i = 0; i<=stateIndexLim; i++) {
@@ -441,33 +431,22 @@ void NavEKF3_core::FuseSideslip()
         }
         stateStruct.quat.normalize();
 
-        // correct the covariance P = (I - K*H)*P
-        // take advantage of the empty columns in KH to reduce the
-        // number of operations
-        for (unsigned i = 0; i<=stateIndexLim; i++) {
-            for (unsigned j = 0; j<=6; j++) {
-                KH[i][j] = Kfusion[i] * H_BETA[j];
-            }
-            for (unsigned j = 7; j<=21; j++) {
-                KH[i][j] = 0.0f;
-            }
-            for (unsigned j = 22; j<=23; j++) {
-                KH[i][j] = Kfusion[i] * H_BETA[j];
+        // correct the covariance P = (I - K*H)*P calculated as P - K(HP)
+        // take advantage of the empty rows in H to reduce the number of operations
+        Vector24 HP = {};
+        for (unsigned row = 0; row <= 6; row++) {
+            for (unsigned col = 0; col <= stateIndexLim; col++) {
+                HP[col] += H_BETA[row] * P[row][col];
             }
         }
-        for (unsigned j = 0; j<=stateIndexLim; j++) {
-            for (unsigned i = 0; i<=stateIndexLim; i++) {
-                ftype res = 0;
-                res += KH[i][0] * P[0][j];
-                res += KH[i][1] * P[1][j];
-                res += KH[i][2] * P[2][j];
-                res += KH[i][3] * P[3][j];
-                res += KH[i][4] * P[4][j];
-                res += KH[i][5] * P[5][j];
-                res += KH[i][6] * P[6][j];
-                res += KH[i][22] * P[22][j];
-                res += KH[i][23] * P[23][j];
-                KHP[i][j] = res;
+        for (unsigned row = 22; row <= 23; row++) {
+            for (unsigned col = 0; col <= stateIndexLim; col++) {
+                HP[col] += H_BETA[row] * P[row][col];
+            }
+        }
+        for (unsigned row = 0; row <= stateIndexLim; row++) {
+            for (unsigned col = 0; col <= stateIndexLim; col++) {
+                KHP[row][col] = Kfusion[row] * HP[col];
             }
         }
         for (unsigned i = 0; i<=stateIndexLim; i++) {
@@ -716,33 +695,22 @@ void NavEKF3_core::FuseDragForces()
         }
         stateStruct.quat.normalize();
 
-        // correct the covariance P = (I - K*H)*P
-        // take advantage of the empty columns in KH to reduce the
-        // number of operations
-        for (unsigned i = 0; i<=stateIndexLim; i++) {
-            for (unsigned j = 0; j<=6; j++) {
-                KH[i][j] = Kfusion[i] * Hfusion[j];
-            }
-            for (unsigned j = 7; j<=21; j++) {
-                KH[i][j] = 0.0f;
-            }
-            for (unsigned j = 22; j<=23; j++) {
-                KH[i][j] = Kfusion[i] * Hfusion[j];
+        // correct the covariance P = (I - K*H)*P calculated as P - K(HP)
+        // take advantage of the empty rows in H to reduce the number of operations
+        Vector24 HP = {};
+        for (unsigned row = 0; row <= 6; row++) {
+            for (unsigned col = 0; col <= stateIndexLim; col++) {
+                HP[col] += Hfusion[row] * P[row][col];
             }
         }
-        for (unsigned j = 0; j<=stateIndexLim; j++) {
-            for (unsigned i = 0; i<=stateIndexLim; i++) {
-                ftype res = 0;
-                res += KH[i][0] * P[0][j];
-                res += KH[i][1] * P[1][j];
-                res += KH[i][2] * P[2][j];
-                res += KH[i][3] * P[3][j];
-                res += KH[i][4] * P[4][j];
-                res += KH[i][5] * P[5][j];
-                res += KH[i][6] * P[6][j];
-                res += KH[i][22] * P[22][j];
-                res += KH[i][23] * P[23][j];
-                KHP[i][j] = res;
+        for (unsigned row = 22; row <= 23; row++) {
+            for (unsigned col = 0; col <= stateIndexLim; col++) {
+                HP[col] += Hfusion[row] * P[row][col];
+            }
+        }
+        for (unsigned row = 0; row <= stateIndexLim; row++) {
+            for (unsigned col = 0; col <= stateIndexLim; col++) {
+                KHP[row][col] = Kfusion[row] * HP[col];
             }
         }
         for (unsigned i = 0; i<=stateIndexLim; i++) {
