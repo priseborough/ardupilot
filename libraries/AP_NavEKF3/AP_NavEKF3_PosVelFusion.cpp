@@ -910,7 +910,7 @@ void NavEKF3_core::FuseVelPosNED()
                 // calculate the Kalman gain and calculate innovation variances
                 varInnovVelPos[obsIndex] = P[stateIndex][stateIndex] + R_OBS[obsIndex];
                 SK = 1.0f/varInnovVelPos[obsIndex];
-                for (uint8_t i= 0; i<=9; i++) {
+                for (uint8_t i = 0; i<=9; i++) {
                     Kfusion[i] = P[i][stateIndex]*SK;
                 }
 
@@ -979,22 +979,22 @@ void NavEKF3_core::FuseVelPosNED()
 
                 // update the covariance - take advantage of direct observation of a single state at index = stateIndex to reduce computations
                 // this is a numerically optimised implementation of standard equation P = (I - K*H)*P;
-                for (uint8_t i= 0; i<=stateIndexLim; i++) {
-                    for (uint8_t j= 0; j<=stateIndexLim; j++) {
+                for (uint8_t i = 0; i <= stateIndexLim; i++) {
+                    for (uint8_t j = 0; j <= stateIndexLim; j++) {
                         KHP[i][j] = Kfusion[i] * P[stateIndex][j];
                     }
                 }
                 // Check that we are not going to drive any variances negative and skip the update if so
                 bool healthyFusion = true;
-                for (uint8_t i= 0; i<=stateIndexLim; i++) {
+                for (uint8_t i = 0; i <= stateIndexLim; i++) {
                     if (KHP[i][i] > P[i][i]) {
                         healthyFusion = false;
                     }
                 }
                 if (healthyFusion) {
                     // update the covariance matrix
-                    for (uint8_t i= 0; i<=stateIndexLim; i++) {
-                        for (uint8_t j= 0; j<=stateIndexLim; j++) {
+                    for (uint8_t i = 0; i <= stateIndexLim; i++) {
+                        for (uint8_t j = 0; j <= stateIndexLim; j++) {
                             P[i][j] = P[i][j] - KHP[i][j];
                         }
                     }
@@ -1004,7 +1004,7 @@ void NavEKF3_core::FuseVelPosNED()
                     ConstrainVariances();
 
                     // update states and renormalise the quaternions
-                    for (uint8_t i = 0; i<=stateIndexLim; i++) {
+                    for (uint8_t i = 0; i <= stateIndexLim; i++) {
                         statesArray[i] = statesArray[i] - Kfusion[i] * innovVelPos[obsIndex];
                     }
                     stateStruct.quat.normalize();
@@ -1849,7 +1849,7 @@ void NavEKF3_core::FuseBodyVel()
 
             // Check that we are not going to drive any variances negative and skip the update if so
             bool healthyFusion = true;
-            for (uint8_t i= 0; i<=stateIndexLim; i++) {
+            for (uint8_t i = 0; i <= stateIndexLim; i++) {
                 if (KHP[i][i] > P[i][i]) {
                     healthyFusion = false;
                 }
@@ -1857,8 +1857,8 @@ void NavEKF3_core::FuseBodyVel()
 
             if (healthyFusion) {
                 // update the covariance matrix
-                for (uint8_t i= 0; i<=stateIndexLim; i++) {
-                    for (uint8_t j= 0; j<=stateIndexLim; j++) {
+                for (uint8_t i = 0; i <= stateIndexLim; i++) {
+                    for (uint8_t j = 0; j <= stateIndexLim; j++) {
                         P[i][j] = P[i][j] - KHP[i][j];
                     }
                 }
@@ -1868,7 +1868,7 @@ void NavEKF3_core::FuseBodyVel()
                 ConstrainVariances();
 
                 // correct the state vector
-                for (uint8_t j= 0; j<=stateIndexLim; j++) {
+                for (uint8_t j = 0; j <= stateIndexLim; j++) {
                     statesArray[j] = statesArray[j] - Kfusion[j] * innovBodyVel[obsIndex];
                 }
                 stateStruct.quat.normalize();

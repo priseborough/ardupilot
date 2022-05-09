@@ -571,7 +571,7 @@ void NavEKF3_core::FuseMagnetometer()
 
         if (obsIndex == 0) {
 
-            for (uint8_t i = 0; i<=stateIndexLim; i++) H_MAG[i] = 0.0f;
+            for (uint8_t i = 0; i <= stateIndexLim; i++) H_MAG[i] = 0.0f;
             H_MAG[0] = SH_MAG[7] + SH_MAG[8] - 2.0f*magD*q2;
             H_MAG[1] = SH_MAG[0];
             H_MAG[2] = -SH_MAG[1];
@@ -651,7 +651,7 @@ void NavEKF3_core::FuseMagnetometer()
         } else if (obsIndex == 1) { // Fuse Y axis
 
             // calculate observation jacobians
-            for (uint8_t i = 0; i<=stateIndexLim; i++) H_MAG[i] = 0.0f;
+            for (uint8_t i = 0; i <= stateIndexLim; i++) H_MAG[i] = 0.0f;
             H_MAG[0] = SH_MAG[2];
             H_MAG[1] = SH_MAG[1];
             H_MAG[2] = SH_MAG[0];
@@ -733,7 +733,7 @@ void NavEKF3_core::FuseMagnetometer()
         else if (obsIndex == 2) // we are now fusing the Z measurement
         {
             // calculate observation jacobians
-            for (uint8_t i = 0; i<=stateIndexLim; i++) H_MAG[i] = 0.0f;
+            for (uint8_t i = 0; i <= stateIndexLim; i++) H_MAG[i] = 0.0f;
             H_MAG[0] = SH_MAG[1];
             H_MAG[1] = -SH_MAG[2];
             H_MAG[2] = SH_MAG[7] + SH_MAG[8] - 2.0f*magD*q2;
@@ -834,15 +834,16 @@ void NavEKF3_core::FuseMagnetometer()
 
         // Check that we are not going to drive any variances negative and skip the update if so
         bool healthyFusion = true;
-        for (uint8_t i= 0; i<=stateIndexLim; i++) {
+        for (uint8_t i = 0; i <= stateIndexLim; i++) {
             if (KHP[i][i] > P[i][i]) {
                 healthyFusion = false;
             }
         }
+
         if (healthyFusion) {
             // update the covariance matrix
-            for (uint8_t i= 0; i<=stateIndexLim; i++) {
-                for (uint8_t j= 0; j<=stateIndexLim; j++) {
+            for (uint8_t i = 0; i <= stateIndexLim; i++) {
+                for (uint8_t j = 0; j <= stateIndexLim; j++) {
                     P[i][j] = P[i][j] - KHP[i][j];
                 }
             }
@@ -852,7 +853,7 @@ void NavEKF3_core::FuseMagnetometer()
             ConstrainVariances();
 
             // correct the state vector
-            for (uint8_t j= 0; j<=stateIndexLim; j++) {
+            for (uint8_t j = 0; j <= stateIndexLim; j++) {
                 statesArray[j] = statesArray[j] - Kfusion[j] * innovMag[obsIndex];
             }
 
@@ -1140,7 +1141,7 @@ bool NavEKF3_core::fuseEulerYaw(yawFusionMethod method)
     }
 
     // calculate Kalman gain
-    for (uint8_t rowIndex=0; rowIndex<=stateIndexLim; rowIndex++) {
+    for (uint8_t rowIndex=0; rowIndex <= stateIndexLim; rowIndex++) {
         Kfusion[rowIndex] = 0.0f;
         for (uint8_t colIndex=0; colIndex<=3; colIndex++) {
             Kfusion[rowIndex] += P[rowIndex][colIndex]*H_YAW[colIndex];
@@ -1179,15 +1180,16 @@ bool NavEKF3_core::fuseEulerYaw(yawFusionMethod method)
 
     // Check that we are not going to drive any variances negative and skip the update if so
     bool healthyFusion = true;
-    for (uint8_t i= 0; i<=stateIndexLim; i++) {
+    for (uint8_t i = 0; i <= stateIndexLim; i++) {
         if (KHP[i][i] > P[i][i]) {
             healthyFusion = false;
         }
     }
+
     if (healthyFusion) {
         // update the covariance matrix
-        for (uint8_t i= 0; i<=stateIndexLim; i++) {
-            for (uint8_t j= 0; j<=stateIndexLim; j++) {
+        for (uint8_t i = 0; i <= stateIndexLim; i++) {
+            for (uint8_t j = 0; j <= stateIndexLim; j++) {
                 P[i][j] = P[i][j] - KHP[i][j];
             }
         }
@@ -1197,7 +1199,7 @@ bool NavEKF3_core::fuseEulerYaw(yawFusionMethod method)
         ConstrainVariances();
 
         // correct the state vector
-        for (uint8_t i=0; i<=stateIndexLim; i++) {
+        for (uint8_t i=0; i <= stateIndexLim; i++) {
             statesArray[i] -= Kfusion[i] * constrain_ftype(innovYaw, -0.5f, 0.5f);
         }
         stateStruct.quat.normalize();
@@ -1357,7 +1359,7 @@ void NavEKF3_core::FuseDeclination(ftype declErr)
 
     // Check that we are not going to drive any variances negative and skip the update if so
     bool healthyFusion = true;
-    for (uint8_t i= 0; i<=stateIndexLim; i++) {
+    for (uint8_t i = 0; i <= stateIndexLim; i++) {
         if (KHP[i][i] > P[i][i]) {
             healthyFusion = false;
         }
@@ -1365,8 +1367,8 @@ void NavEKF3_core::FuseDeclination(ftype declErr)
 
     if (healthyFusion) {
         // update the covariance matrix
-        for (uint8_t i= 0; i<=stateIndexLim; i++) {
-            for (uint8_t j= 0; j<=stateIndexLim; j++) {
+        for (uint8_t i = 0; i <= stateIndexLim; i++) {
+            for (uint8_t j = 0; j <= stateIndexLim; j++) {
                 P[i][j] = P[i][j] - KHP[i][j];
             }
         }
@@ -1376,7 +1378,7 @@ void NavEKF3_core::FuseDeclination(ftype declErr)
         ConstrainVariances();
 
         // correct the state vector
-        for (uint8_t j= 0; j<=stateIndexLim; j++) {
+        for (uint8_t j = 0; j <= stateIndexLim; j++) {
             statesArray[j] = statesArray[j] - Kfusion[j] * innovation;
         }
         stateStruct.quat.normalize();

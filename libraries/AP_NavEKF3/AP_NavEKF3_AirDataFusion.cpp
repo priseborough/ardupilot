@@ -150,7 +150,7 @@ void NavEKF3_core::FuseAirspeed()
             lastTasPassTime_ms = imuSampleTime_ms;
 
             // correct the state vector
-            for (uint8_t j= 0; j<=stateIndexLim; j++) {
+            for (uint8_t j = 0; j <= stateIndexLim; j++) {
                 statesArray[j] = statesArray[j] - Kfusion[j] * innovVtas;
             }
             stateStruct.quat.normalize();
@@ -173,8 +173,9 @@ void NavEKF3_core::FuseAirspeed()
                     KHP[row][col] = Kfusion[row] * HP[col];
                 }
             }
-            for (unsigned i = 0; i<=stateIndexLim; i++) {
-                for (unsigned j = 0; j<=stateIndexLim; j++) {
+
+            for (unsigned i = 0; i <= stateIndexLim; i++) {
+                for (unsigned j = 0; j <= stateIndexLim; j++) {
                     P[i][j] = P[i][j] - KHP[i][j];
                 }
             }
@@ -426,7 +427,7 @@ void NavEKF3_core::FuseSideslip()
         innovBeta = constrain_ftype(vel_rel_wind.y / vel_rel_wind.x, -0.5f, 0.5f);
 
         // correct the state vector
-        for (uint8_t j= 0; j<=stateIndexLim; j++) {
+        for (uint8_t j = 0; j <= stateIndexLim; j++) {
             statesArray[j] = statesArray[j] - Kfusion[j] * innovBeta;
         }
         stateStruct.quat.normalize();
@@ -449,8 +450,9 @@ void NavEKF3_core::FuseSideslip()
                 KHP[row][col] = Kfusion[row] * HP[col];
             }
         }
-        for (unsigned i = 0; i<=stateIndexLim; i++) {
-            for (unsigned j = 0; j<=stateIndexLim; j++) {
+
+        for (unsigned i = 0; i <= stateIndexLim; i++) {
+            for (unsigned j = 0; j <= stateIndexLim; j++) {
                 P[i][j] = P[i][j] - KHP[i][j];
             }
         }
@@ -690,7 +692,7 @@ void NavEKF3_core::FuseDragForces()
         }
 
         // correct the state vector
-        for (uint8_t j= 0; j<=stateIndexLim; j++) {
+        for (uint8_t j = 0; j <= stateIndexLim; j++) {
             statesArray[j] = statesArray[j] - Kfusion[j] * innovDrag[axis_index];
         }
         stateStruct.quat.normalize();
@@ -713,8 +715,9 @@ void NavEKF3_core::FuseDragForces()
                 KHP[row][col] = Kfusion[row] * HP[col];
             }
         }
-        for (unsigned i = 0; i<=stateIndexLim; i++) {
-            for (unsigned j = 0; j<=stateIndexLim; j++) {
+
+        for (unsigned i = 0; i <= stateIndexLim; i++) {
+            for (unsigned j = 0; j <= stateIndexLim; j++) {
                 P[i][j] = P[i][j] - KHP[i][j];
             }
         }

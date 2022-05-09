@@ -699,7 +699,7 @@ void NavEKF3_core::FuseOptFlow(const of_elements &ofDataDelayed, bool really_fus
 
             // Check that we are not going to drive any variances negative and skip the update if so
             bool healthyFusion = true;
-            for (uint8_t i= 0; i<=stateIndexLim; i++) {
+            for (uint8_t i = 0; i <= stateIndexLim; i++) {
                 if (KHP[i][i] > P[i][i]) {
                     healthyFusion = false;
                 }
@@ -707,8 +707,8 @@ void NavEKF3_core::FuseOptFlow(const of_elements &ofDataDelayed, bool really_fus
 
             if (healthyFusion) {
                 // update the covariance matrix
-                for (uint8_t i= 0; i<=stateIndexLim; i++) {
-                    for (uint8_t j= 0; j<=stateIndexLim; j++) {
+                for (uint8_t i = 0; i <= stateIndexLim; i++) {
+                    for (uint8_t j = 0; j <= stateIndexLim; j++) {
                         P[i][j] = P[i][j] - KHP[i][j];
                     }
                 }
@@ -718,7 +718,7 @@ void NavEKF3_core::FuseOptFlow(const of_elements &ofDataDelayed, bool really_fus
                 ConstrainVariances();
 
                 // correct the state vector
-                for (uint8_t j= 0; j<=stateIndexLim; j++) {
+                for (uint8_t j = 0; j <= stateIndexLim; j++) {
                     statesArray[j] = statesArray[j] - Kfusion[j] * flowInnov[obsIndex];
                 }
                 stateStruct.quat.normalize();

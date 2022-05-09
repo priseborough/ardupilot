@@ -223,15 +223,15 @@ void NavEKF3_core::FuseRngBcn()
 
             // Check that we are not going to drive any variances negative and skip the update if so
             bool healthyFusion = true;
-            for (uint8_t i= 0; i<=stateIndexLim; i++) {
+            for (uint8_t i = 0; i <= stateIndexLim; i++) {
                 if (KHP[i][i] > P[i][i]) {
                     healthyFusion = false;
                 }
             }
             if (healthyFusion) {
                 // update the covariance matrix
-                for (uint8_t i= 0; i<=stateIndexLim; i++) {
-                    for (uint8_t j= 0; j<=stateIndexLim; j++) {
+                for (uint8_t i = 0; i <= stateIndexLim; i++) {
+                    for (uint8_t j = 0; j <= stateIndexLim; j++) {
                         P[i][j] = P[i][j] - KHP[i][j];
                     }
                 }
@@ -241,7 +241,7 @@ void NavEKF3_core::FuseRngBcn()
                 ConstrainVariances();
 
                 // correct the state vector
-                for (uint8_t j= 0; j<=stateIndexLim; j++) {
+                for (uint8_t j = 0; j <= stateIndexLim; j++) {
                     statesArray[j] = statesArray[j] - Kfusion[j] * innovRngBcn;
                 }
 
@@ -371,7 +371,7 @@ void NavEKF3_core::FuseRngBcnStatic()
         }
 
         // Add some process noise to the states at each time step
-        for (uint8_t i= 0; i<=2; i++) {
+        for (uint8_t i = 0; i<=2; i++) {
             receiverPosCov[i][i] += 0.1f;
         }
 
@@ -461,7 +461,7 @@ void NavEKF3_core::FuseRngBcnStatic()
             }
 
             // prevent negative variances
-            for (uint8_t i= 0; i<=2; i++) {
+            for (uint8_t i = 0; i<=2; i++) {
                 if (receiverPosCov[i][i] < 0.0f) {
                     receiverPosCov[i][i] = 0.0f;
                     KHP[i][i] = 0.0f;
@@ -471,8 +471,8 @@ void NavEKF3_core::FuseRngBcnStatic()
             }
 
             // apply the covariance correction
-            for (uint8_t i= 0; i<=2; i++) {
-                for (uint8_t j= 0; j<=2; j++) {
+            for (uint8_t i = 0; i<=2; i++) {
+                for (uint8_t j = 0; j<=2; j++) {
                     receiverPosCov[i][j] -= KHP[i][j];
                 }
             }
