@@ -404,7 +404,7 @@ float AP_Baro::get_altitude_difference(float base_pressure, float pressure) cons
 // 1976 standard atmospheric model
 float AP_Baro::get_sealevel_pressure(float pressure) const
 {
-    float temp    = C_TO_KELVIN(get_ground_temperature());
+    float temp    = get_ground_temperature() + C_TO_KELVIN;
     float p0_sealevel;
     // This is an exact calculation that is within +-2.5m of the standard
     // atmosphere tables in the troposphere (up to 11,000 m amsl).
@@ -924,9 +924,12 @@ void AP_Baro::update(void)
       if (!AP::arming().is_armed()) {
         _field_elevation_last_ms = now_ms;
         _field_elevation_active = _field_elevation;
-        AP::ahrs().resetHeightDatum();
-        update_calibration();
-        BARO_SEND_TEXT(MAV_SEVERITY_INFO, "Barometer Field Elevation Set: %.0fm",_field_elevation_active);
+        if (!AP::ahrs().resetHeightDatum()) {
+            BARO_SEND_TEXT(MAV_SEVERITY_ALERT, "Failed to Set Field Elevation: Disarmed");
+        } else {
+            update_calibration();
+            BARO_SEND_TEXT(MAV_SEVERITY_INFO, "Barometer Field Elevation Set: %.0fm",_field_elevation_active);
+        }
       }
       else {
         _field_elevation.set(_field_elevation_active);
