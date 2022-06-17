@@ -789,9 +789,11 @@ void NavEKF3_core::correctEkfOriginHeight()
     // calculate the variance of our a-priori estimate of the ekf origin height
     ftype deltaTime = constrain_ftype(0.001f * (imuDataDelayed.time_ms - lastOriginHgtTime_ms), 0.0, 1.0);
     if (activeHgtSource == AP_NavEKF_Source::SourceZ::BARO) {
-        // Use the baro drift rate
-        const ftype baroDriftRate = 0.05;
-        ekfOriginHgtVar += sq(baroDriftRate * deltaTime);
+        // calculate the process nosie variances due to drift and scale factor error and sum them
+        const ftype driftRate = 0.05F;
+        const ftype biasInducedVariance = sq(driftRate * deltaTime);
+        const ftype scaleFactorInducedVariance = sq(constrain_float(frontend->_paltScaleFactorError, 0.0F, 0.1F) * stateStruct.velocity.z * deltaTime);
+        ekfOriginHgtVar += biasInducedVariance + scaleFactorInducedVariance;
     } else if (activeHgtSource == AP_NavEKF_Source::SourceZ::RANGEFINDER) {
         // use the worse case expected terrain gradient and vehicle horizontal speed
         const ftype maxTerrGrad = 0.25;

@@ -712,6 +712,14 @@ const AP_Param::GroupInfo NavEKF3::var_info2[] = {
     // @User: Advanced
     AP_GROUPINFO("PRIMARY", 8, NavEKF3, _primary_core, 0),
     
+    // @Param: PALT_SCL_ERR
+    // @DisplayName: Pressure altitude scale factor error
+    // @Description: This is the predicted 1-STD pressure altitude scale factor variation that results from sensor scale factor and atmospheric model errors. Larger values will allow the EKF height to compensate more rapidly for differences between pressure and GPS height during climb or descent.
+    // @Range: 0.0 0.1
+    // @Increment: 0.01
+    // @User: Advanced
+    AP_GROUPINFO("BARO_SCL_ERR", 9, NavEKF3, _paltScaleFactorError, 0.05f),
+
     AP_GROUPEND
 };
 
