@@ -13,8 +13,6 @@
 
 #include "AP_Airspeed.h"
 
-extern const AP_HAL::HAL& hal;
-
 // constructor - fill in all the initial values
 Airspeed_Calibration::Airspeed_Calibration()
     : P(100,   0,         0,
