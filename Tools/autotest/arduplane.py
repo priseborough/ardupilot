@@ -1650,6 +1650,33 @@ class AutoTestPlane(AutoTest):
         self.run_subtest("Mission test",
                          lambda: self.fly_mission("ap1.txt", strict=False))
 
+    def test_pitot_blockage(self):
+        self.set_parameter("ARSPD_OPTIONS",15)
+        self.set_parameter("ARSPD_USE",1)
+        self.set_parameter("SIM_WIND_SPD",10)
+        self.set_parameter("SIM_WIND_DIR",0)
+        self.set_parameter("ARSPD_WIND_MAX",15)
+        self.wait_ready_to_arm()
+        self.change_mode("TAKEOFF")
+        self.arm_vehicle()
+        self.delay_sim_time(60)
+        # simulate the effect of a blocked pitot tube
+        self.set_parameter("ARSPD_RATIO",0.1)
+        self.delay_sim_time(10)
+        if (self.get_parameter("ARSPD_USE") == 0):
+            self.progress("Faulty Sensor Disabled")
+        else:
+            raise NotAchievedException("Airspeed Sensor Not Disabled")
+        self.delay_sim_time(20)
+        # simulate the effect of blockage clearing
+        self.set_parameter("ARSPD_RATIO",2.0)
+        self.delay_sim_time(60)
+        if (self.get_parameter("ARSPD_USE") == 1):
+            self.progress("Sensor Re-Enabled")
+        else:
+            raise NotAchievedException("Airspeed Sensor Not Re-Enabled")
+        self.disarm_vehicle(force=True)
+
     def airspeed_autocal(self):
         self.progress("Ensure no AIRSPEED_AUTOCAL on ground")
         self.set_parameters({
@@ -3706,6 +3733,10 @@ function'''
             ("DeadreckoningNoAirSpeed",
              "Test deadreckoning support with no airspeed sensor",
              self.deadreckoning_no_airspeed_sensor),
+
+            ("PitotBlockage",
+             "Test airspeed sensor blockage and recovery",
+             self.test_pitot_blockage),
 
             ("EKFlaneswitch",
              "Test EKF3 Affinity and Lane Switching",
