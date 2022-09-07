@@ -404,7 +404,7 @@ float AP_Baro::get_altitude_difference(float base_pressure, float pressure) cons
 // 1976 standard atmospheric model
 float AP_Baro::get_sealevel_pressure(float pressure) const
 {
-    float temp    = get_ground_temperature() + C_TO_KELVIN;
+    float temp    = C_TO_KELVIN(get_ground_temperature());
     float p0_sealevel;
     // This is an exact calculation that is within +-2.5m of the standard
     // atmosphere tables in the troposphere (up to 11,000 m amsl).
