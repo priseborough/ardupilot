@@ -228,10 +228,47 @@ void NavEKF3_core::SelectMagFusion()
          yaw_source != AP_NavEKF_Source::SourceYaw::EXTNAV)) {
 
         // because this type of reset event is not as time critical, require a continuous history of valid estimates
-        if ((!yawAlignComplete || yaw_source_reset) && EKFGSF_yaw_valid_count >= GSF_YAW_VALID_HISTORY_THRESHOLD) {
+        if ((!yawAlignComplete || yaw_source_reset)) {
             const bool emergency_reset = (yaw_source != AP_NavEKF_Source::SourceYaw::GSF);
-            yawAlignComplete = EKFGSF_resetMainFilterYaw(emergency_reset);
-            yaw_source_reset = false;
+            // special case code added for high speed airborne release
+            if ((frontend->_options & (1<<0)) && motorsArmed && !emergency_reset) {
+                ftype gps_spd = sqrtf(sq(gpsDataDelayed.vel.x) + sq(gpsDataDelayed.vel.y));
+                ftype gps_spd_accuracy = MAX(gpsSpdAccuracy, 0.5f);
+                if (gps_spd > 10.0f && gps_spd > 10.0f * gps_spd_accuracy) {
+                    // get yaw from GPS ground course and yaw variance from GPS speed uncertainty
+                    ftype gps_yaw = atan2f(gpsDataDelayed.vel.y,gpsDataDelayed.vel.x);
+                    ftype gps_yaw_variance = sq(asinf(gps_spd_accuracy/gps_spd));
+
+                    // keep roll and pitch and reset yaw
+                    rotationOrder order;
+                    bestRotationOrder(order);
+                    resetQuatStateYawOnly(gps_yaw, gps_yaw_variance, order);
+
+                    // record the reset event
+                    EKFGSF_yaw_reset_request_ms = 0;
+                    EKFGSF_yaw_reset_ms = imuSampleTime_ms;
+                    EKFGSF_yaw_reset_count++;
+
+                    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "EKF3 IMU%u yaw aligned to GPS ground course",(unsigned)imu_index);
+
+                    // record the yaw reset event
+                    recordYawReset();
+
+                    // reset velocity and position states to GPS - if yaw is fixed then the filter should start to operate correctly
+                    ResetVelocity(resetDataSource::DEFAULT);
+                    ResetPosition(resetDataSource::DEFAULT);
+
+                    // reset test ratios that are reported to prevent a race condition with the external state machine requesting the reset
+                    velTestRatio = 0.0f;
+                    posTestRatio = 0.0f;
+                }
+            } else if (EKFGSF_yaw_valid_count >= GSF_YAW_VALID_HISTORY_THRESHOLD) {
+                yawAlignComplete = EKFGSF_resetMainFilterYaw(emergency_reset);
+                yaw_source_reset = false;
+            }
+        } else if ((frontend->_options & (1<<0)) && yawAlignComplete && !motorsArmed) {
+            // clear the yaw aligned status when disarmed so that we get a fresh yaw alignment on each arm event
+            yawAlignComplete = false;
         }
 
         if (imuSampleTime_ms - lastSynthYawTime_ms > 140) {

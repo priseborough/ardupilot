@@ -728,6 +728,14 @@ const AP_Param::GroupInfo NavEKF3::var_info2[] = {
     // @User: Advanced
     AP_GROUPINFO("BARO_SCL_ERR", 9, NavEKF3, _paltScaleFactorError, 0.05f),
 
+    // @Param: OPTIONS
+    // @DisplayName: Bitmask of miscellaneous options
+    // @Description: A bitmask of non standard EKF3 options that can be selected.
+    // @Bitmask: 0:Align yaw initially to GPS ground course on arming when not using a compass
+    // @User: Advanced
+    // @RebootRequired: True
+    AP_GROUPINFO("OPTIONS", 10, NavEKF3, _options, 0),
+
     AP_GROUPEND
 };
 

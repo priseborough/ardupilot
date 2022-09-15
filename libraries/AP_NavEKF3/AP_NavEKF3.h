@@ -439,7 +439,7 @@ private:
     AP_Float _baroGndEffectDeadZone;// Dead zone applied to positive baro height innovations when in ground effect (m)
     AP_Int8 _primary_core;          // initial core number
     AP_Float _paltScaleFactorError; // 1-Sigma pressure altitude scale factor error
-
+    AP_Int8  _options;              // Bitmask of miscellaneous EKF options
 // Possible values for _flowUse
 #define FLOW_USE_NONE    0
 #define FLOW_USE_NAV     1
