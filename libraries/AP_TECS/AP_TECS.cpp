@@ -264,6 +264,15 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("PTCH_FF_K", 30, AP_TECS, _pitch_ff_k, 0.0),
 
+    // @Param: HDEM_TCONST
+    // @DisplayName: Height demand time constant (sec)
+    // @Description: Time constant applied to the height demand after rate limiting.
+    // @Units: s
+    // @Range: 1.0 5.0
+    // @Increment: 0.1
+    // @User: Advanced
+    AP_GROUPINFO("HDEM_TCONST",  31, AP_TECS, _hdemTimeConst, 2.0f),
+
     AP_GROUPEND
 };
 
@@ -471,15 +480,20 @@ void AP_TECS::_update_height_demand(void)
         max_sink_rate = _maxSinkRate_approach;
     }
 
+    // assume constant calling rate of 10Hz
+    const float dt = 0.1f;
+
     // Limit height rate of change
-    if ((_hgt_dem - _hgt_dem_prev) > (_maxClimbRate * 0.1f)) {
-        _hgt_dem = _hgt_dem_prev + _maxClimbRate * 0.1f;
-    } else if ((_hgt_dem - _hgt_dem_prev) < (-max_sink_rate * 0.1f)) {
-        _hgt_dem = _hgt_dem_prev - max_sink_rate * 0.1f;
+    const float max_climb_rate = _maxClimbRate * _max_climb_scaler;
+    if ((_hgt_dem - _hgt_dem_prev) > (max_climb_rate * dt)) {
+        _hgt_dem = _hgt_dem_prev + max_climb_rate * dt;
+    } else if ((_hgt_dem - _hgt_dem_prev) < (-max_sink_rate * dt)) {
+        _hgt_dem = _hgt_dem_prev - max_sink_rate * dt;
     }
 
     // Apply first order lag to height demand
-    _hgt_dem_adj = 0.05f * _hgt_dem + 0.95f * _hgt_dem_adj_last;
+    const float hgt_dem_alpha = dt / MAX(dt + _hdemTimeConst, dt);
+    _hgt_dem_adj = _hgt_dem_adj_last * (1.0f - hgt_dem_alpha) + _hgt_dem * hgt_dem_alpha;
 
     // when flaring force height rate demand to the
     // configured sink rate and adjust the demanded height to
@@ -504,7 +518,7 @@ void AP_TECS::_update_height_demand(void)
         _land_hgt_dem += 0.1f * _hgt_rate_dem;
         _hgt_dem_adj = _land_hgt_dem;
     } else {
-        _hgt_rate_dem = (_hgt_dem_adj - _hgt_dem_adj_last) / 0.1f;
+        _hgt_rate_dem = (_hgt_dem_adj - _hgt_dem_adj_last) / dt;
         _flare_counter = 0;
     }
 
