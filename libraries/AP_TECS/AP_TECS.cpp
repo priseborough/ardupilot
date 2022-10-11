@@ -470,7 +470,7 @@ void AP_TECS::_update_height_demand(void)
     _hgt_dem = 0.5f * (_hgt_dem + _hgt_dem_in_old);
     _hgt_dem_in_old = _hgt_dem;
 
-    float max_sink_rate = _maxSinkRate;
+    float max_sink_rate = _maxSinkRate * _max_sink_scaler;
     if (_maxSinkRate_approach > 0 && _flags.is_doing_auto_land) {
         // special sink rate for approach to accommodate steep slopes and reverse thrust.
         // A special check must be done to see if we're LANDing on approach but also if
@@ -526,11 +526,14 @@ void AP_TECS::_update_height_demand(void)
     // if vehicle is unable to follow the demanded climb or descent
     const bool max_climb_condition = (_pitch_dem_unc > _PITCHmaxf || _thr_clip_status == ThrClipStatus::MAX) &&
                                      !(_flight_stage == AP_Vehicle::FixedWing::FLIGHT_TAKEOFF || _flight_stage == AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND);
-    const bool max_descent_condition = _pitch_dem_unc < _PITCHminf || _thr_clip_status == ThrClipStatus::MIN;
+    const bool max_descent_condition = _pitch_dem_unc < _PITCHminf || (_thr_clip_status == ThrClipStatus::MIN && !_landing.is_flaring());
     if (max_climb_condition && _hgt_dem > _hgt_dem_prev) {
-        _hgt_dem = _hgt_dem_prev;
+        _max_climb_scaler *= (1.0f - hgt_dem_alpha);
     } else if (max_descent_condition && _hgt_dem < _hgt_dem_prev) {
-        _hgt_dem = _hgt_dem_prev;
+        _max_sink_scaler *= (1.0f - hgt_dem_alpha);
+    } else {
+        _max_climb_scaler = _max_climb_scaler * (1.0f - hgt_dem_alpha) + hgt_dem_alpha;
+        _max_sink_scaler  =  _max_sink_scaler * (1.0f - hgt_dem_alpha) + hgt_dem_alpha;
     }
     _hgt_dem_prev = _hgt_dem;
 
@@ -965,6 +968,8 @@ void AP_TECS::_initialise_states(int32_t ptchMinCO_cd, float hgt_afe)
         _DT                = 0.1f; // when first starting TECS, use a
         // small time constant
         _need_reset = false;
+        _max_climb_scaler = 1.0f;
+        _max_sink_scaler = 1.0f;
     } else if (_flight_stage == AP_Vehicle::FixedWing::FLIGHT_TAKEOFF || _flight_stage == AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND) {
         _PITCHminf          = 0.000174533f * ptchMinCO_cd;
         _hgt_dem_adj_last  = hgt_afe;
@@ -973,6 +978,8 @@ void AP_TECS::_initialise_states(int32_t ptchMinCO_cd, float hgt_afe)
         _TAS_dem_adj       = _TAS_dem;
         _flags.underspeed        = false;
         _flags.badDescent  = false;
+        _max_climb_scaler = 1.0f;
+        _max_sink_scaler = 1.0f;
     }
 
     if (_flight_stage != AP_Vehicle::FixedWing::FLIGHT_TAKEOFF && _flight_stage != AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND) {

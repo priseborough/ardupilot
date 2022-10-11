@@ -273,6 +273,10 @@ private:
     float _hgt_dem_prev;
     float _land_hgt_dem;
 
+    // used to scale max climb and sink limits to match vehicle ability
+    float _max_climb_scaler;
+    float _max_sink_scaler;
+
     // Speed demand after application of rate limiting
     // This is the demand tracked by the TECS control loops
     float _TAS_dem_adj;
