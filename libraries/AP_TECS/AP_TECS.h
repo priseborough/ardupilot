@@ -362,8 +362,8 @@ private:
     // counter for demanded sink rate on land final
     uint8_t _flare_counter;
 
-    // slew height demand lag filter value when transition to land
-    float hgt_dem_lag_filter_slew;
+    // fader applied to height demand lag correction during landing
+    float _hgt_dem_lag_fader;
 
     // percent traveled along the previous and next waypoints
     float _path_proportion;

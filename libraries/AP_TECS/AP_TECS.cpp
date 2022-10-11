@@ -541,14 +541,18 @@ void AP_TECS::_update_height_demand(void)
     // be replaced with a better zero-lag filter in the future.
     float new_hgt_dem = _hgt_dem_adj;
     if (_flags.is_doing_auto_land) {
-        if (hgt_dem_lag_filter_slew < 1) {
-            hgt_dem_lag_filter_slew += 0.1f; // increment at 10Hz to gradually apply the compensation at first
+        if (_hgt_dem_lag_fader < 1) {
+            _hgt_dem_lag_fader += dt; // apply the compensation over 1 second
         } else {
-            hgt_dem_lag_filter_slew = 1;
+            _hgt_dem_lag_fader = 1;
         }
-        new_hgt_dem += hgt_dem_lag_filter_slew*(_hgt_dem_adj - _hgt_dem_adj_last)*10.0f*(timeConstant()+1);
+        // calculate the offset introduced by the LPF that is applied
+        // to the height demand input after it is rate limited
+        const float height_offset = _hgt_dem - _hgt_dem_adj;
+        // fade in th eoffset correction
+        new_hgt_dem += _hgt_dem_lag_fader * height_offset;
     } else {
-        hgt_dem_lag_filter_slew = 0;
+        _hgt_dem_lag_fader = 0;
     }
     _hgt_dem_adj_last = _hgt_dem_adj;
     _hgt_dem_adj = new_hgt_dem;
