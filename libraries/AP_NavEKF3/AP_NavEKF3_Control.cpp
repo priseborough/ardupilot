@@ -69,39 +69,7 @@ void NavEKF3_core::setWindMagStateLearningMode()
                (sq(stateStruct.velocity.x) + sq(stateStruct.velocity.y) > sq(5.0f) || dragFusionEnabled)) {
         inhibitWindStates = false;
         updateStateIndexLim();
-        // set states and variances
-        if (yawAlignComplete && assume_zero_sideslip()) {
-            // if we have a valid heading, set the wind states to the reciprocal of the vehicle heading
-            // which assumes the vehicle has launched into the wind
-            // use airspeed if if recent data available
-            Vector3F tempEuler;
-            stateStruct.quat.to_euler(tempEuler.x, tempEuler.y, tempEuler.z);
-            ftype trueAirspeedVariance;
-            const bool haveAirspeedMeasurement = usingDefaultAirspeed || (imuDataDelayed.time_ms - tasDataDelayed.time_ms < 500 && useAirspeed());
-            if (haveAirspeedMeasurement) {
-                trueAirspeedVariance = constrain_ftype(tasDataDelayed.tasVariance, WIND_VEL_VARIANCE_MIN, WIND_VEL_VARIANCE_MAX);
-                const ftype windSpeed =  sqrtF(sq(stateStruct.velocity.x) + sq(stateStruct.velocity.y)) - tasDataDelayed.tas;
-                stateStruct.wind_vel.x = windSpeed * cosF(tempEuler.z);
-                stateStruct.wind_vel.y = windSpeed * sinF(tempEuler.z);
-            } else {
-                trueAirspeedVariance = sq(WIND_VEL_VARIANCE_MAX); // use 2-sigma for faster initial convergence
-            }
-
-            // set the wind state variances to the measurement uncertainty
-            zeroCols(P, 22, 23);
-            zeroRows(P, 22, 23);
-            P[22][22] = P[23][23] = trueAirspeedVariance;
-
-            windStatesAligned = true;
-
-        } else {
-            // set the variances using a typical max wind speed for small UAV operation
-            zeroCols(P, 22, 23);
-            zeroRows(P, 22, 23);
-            for (uint8_t index=22; index<=23; index++) {
-                P[index][index] = sq(WIND_VEL_VARIANCE_MAX);
-            }
-        }
+        windStatesCovarianceReset();
     }
 
     // determine if the vehicle is manoeuvring
@@ -184,6 +152,47 @@ void NavEKF3_core::setWindMagStateLearningMode()
     }
 
     updateStateIndexLim();
+}
+
+// reset wind states and covariances
+void NavEKF3_core::windStatesCovarianceReset()
+{
+    // set states and variances
+    if (yawAlignComplete && assume_zero_sideslip()) {
+        // if we have a valid heading, set the wind states to the reciprocal of the vehicle heading
+        // which assumes the vehicle has launched into the wind
+        // use airspeed if if recent data available
+        Vector3F tempEuler;
+        stateStruct.quat.to_euler(tempEuler.x, tempEuler.y, tempEuler.z);
+        ftype trueAirspeedVariance;
+        const bool haveAirspeedMeasurement = usingDefaultAirspeed || (imuDataDelayed.time_ms - tasDataDelayed.time_ms < 500 && useAirspeed());
+        if (haveAirspeedMeasurement) {
+            trueAirspeedVariance = constrain_ftype(tasDataDelayed.tasVariance, WIND_VEL_VARIANCE_MIN, WIND_VEL_VARIANCE_MAX);
+            const ftype windSpeed =  sqrtF(sq(stateStruct.velocity.x) + sq(stateStruct.velocity.y)) - tasDataDelayed.tas;
+            stateStruct.wind_vel.x = windSpeed * cosF(tempEuler.z);
+            stateStruct.wind_vel.y = windSpeed * sinF(tempEuler.z);
+        } else {
+            trueAirspeedVariance = sq(WIND_VEL_VARIANCE_MAX); // use 2-sigma for faster initial convergence
+            if (frontend->_options & (1<<0)) {
+                // if doing an airborne release, then ignore prior wind states as they could be corrupted
+                stateStruct.wind_vel.zero();
+            }
+        }
+
+        // set the wind state variances to the measurement uncertainty
+        zeroCols(P, 22, 23);
+        zeroRows(P, 22, 23);
+        P[22][22] = P[23][23] = trueAirspeedVariance;
+
+        windStatesAligned = true;
+    } else {
+        // set the variances using a typical max wind speed for small UAV operation
+        zeroCols(P, 22, 23);
+        zeroRows(P, 22, 23);
+        for (uint8_t index=22; index<=23; index++) {
+            P[index][index] = sq(WIND_VEL_VARIANCE_MAX);
+        }
+    }
 }
 
 // Adjust the indexing limits used to address the covariance, states and other EKF arrays to avoid unnecessary operations

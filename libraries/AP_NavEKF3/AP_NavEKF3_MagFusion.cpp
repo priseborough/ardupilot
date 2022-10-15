@@ -261,6 +261,11 @@ void NavEKF3_core::SelectMagFusion()
                     // reset test ratios that are reported to prevent a race condition with the external state machine requesting the reset
                     velTestRatio = 0.0f;
                     posTestRatio = 0.0f;
+
+                    if (!inhibitWindStates) {
+                        // wind state esitimation is already running and needs to be reset
+                        windStatesCovarianceReset();
+                    }
                 }
             } else if (EKFGSF_yaw_valid_count >= GSF_YAW_VALID_HISTORY_THRESHOLD) {
                 yawAlignComplete = EKFGSF_resetMainFilterYaw(emergency_reset);

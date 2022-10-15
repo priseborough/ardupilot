@@ -844,6 +844,9 @@ private:
     // avoid unnecessary operations
     void setWindMagStateLearningMode();
 
+    // reset wind states and covariances
+    void windStatesCovarianceReset();
+
     // Check the alignmnent status of the tilt attitude
     // Used during initial bootstrap alignment of the filter
     void checkAttitudeAlignmentStatus();
