@@ -464,6 +464,8 @@ void Tailsitter::output(void)
     SRV_Channels::set_output_scaled(SRV_Channel::k_elevon_right, elevator_mix + aileron_mix);
     SRV_Channels::set_output_scaled(SRV_Channel::k_vtail_right, elevator_mix - rudder_mix);
     SRV_Channels::set_output_scaled(SRV_Channel::k_vtail_left, elevator_mix + rudder_mix);
+    SRV_Channels::set_output_scaled(SRV_Channel::k_ruddervon_top, rudder_mix - aileron_mix);
+    SRV_Channels::set_output_scaled(SRV_Channel::k_ruddervon_bottom, rudder_mix + aileron_mix);
 
     if (roll_lim) {
         motors->limit.roll = true;

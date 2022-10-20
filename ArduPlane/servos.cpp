@@ -153,7 +153,7 @@ bool Plane::suppress_throttle(void)
 
 
 /*
-  mixer for elevon and vtail channels setup using designated servo
+  mixer for elevon, ruddervon and vtail channels setup using designated servo
   function values. This mixer operates purely on scaled values,
   allowing the user to trim and limit individual servos using the
   SERVOn_* parameters
@@ -963,9 +963,10 @@ void Plane::servos_output(void)
     // support twin-engine aircraft
     servos_twin_engine_mix();
 
-    // run vtail and elevon mixers
+    // run vtail, ruddervon and elevon mixers
     channel_function_mixer(SRV_Channel::k_aileron, SRV_Channel::k_elevator, SRV_Channel::k_elevon_left, SRV_Channel::k_elevon_right);
     channel_function_mixer(SRV_Channel::k_rudder,  SRV_Channel::k_elevator, SRV_Channel::k_vtail_right, SRV_Channel::k_vtail_left);
+    channel_function_mixer(SRV_Channel::k_aileron, SRV_Channel::k_rudder, SRV_Channel::k_ruddervon_top, SRV_Channel::k_ruddervon_bottom);
 
 #if HAL_QUADPLANE_ENABLED
     // cope with tailsitters and bicopters
@@ -1045,6 +1046,7 @@ void Plane::servos_auto_trim(void)
     // adjust trim on channels by a small amount according to I value
     float roll_I = rollController.get_pid_info().I;
     float pitch_I = pitchController.get_pid_info().I;
+    float yaw_I = yawController.get_pid_info().I;
 
     g2.servo_channels.adjust_trim(SRV_Channel::k_aileron, roll_I);
     g2.servo_channels.adjust_trim(SRV_Channel::k_elevator, pitch_I);
@@ -1057,6 +1059,9 @@ void Plane::servos_auto_trim(void)
 
     g2.servo_channels.adjust_trim(SRV_Channel::k_flaperon_left,  roll_I);
     g2.servo_channels.adjust_trim(SRV_Channel::k_flaperon_right, roll_I);
+
+    g2.servo_channels.adjust_trim(SRV_Channel::k_ruddervon_top,  yaw_I - roll_I);
+    g2.servo_channels.adjust_trim(SRV_Channel::k_ruddervon_bottom, yaw_I + roll_I);
 
     // cope with various dspoiler options
     const int8_t bitmask = g2.crow_flap_options.get();
