@@ -206,6 +206,14 @@ void AP_IOMCU_FW::run_mixer(void)
             pwm = mix_output_angle(i, mix_elevon_vtail(roll, pitch, false));
             break;
 
+        case SRV_Channel::k_ruddervon_top:
+            pwm = mix_output_angle(i, mix_elevon_vtail(roll, rudder, true));
+            break;
+
+        case SRV_Channel::k_ruddervon_bottom:
+            pwm = mix_output_angle(i, mix_elevon_vtail(roll, rudder, false));
+            break;
+
         case SRV_Channel::k_vtail_left:
             pwm = mix_output_angle(i, mix_elevon_vtail(rudder, pitch, false));
             break;
