@@ -2192,13 +2192,34 @@ void  AP_AHRS::writeBodyFrameOdom(float quality, const Vector3f &delPos, const V
 }
 
 // Write position and quaternion data from an external navigation system
-void AP_AHRS::writeExtNavData(const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint16_t delay_ms, uint32_t resetTime_ms)
+void AP_AHRS::writeExtNavData(const Vector3f &pos, const Vector3f &rpy, const float covariance[21], uint32_t timeStamp_ms, uint16_t delay_ms, uint32_t resetTime_ms)
 {
 #if HAL_NAVEKF2_AVAILABLE
+    Quaternion quat;
+    quat.from_euler(rpy);
+    const float posErr = (covariance[0]+covariance[6]+covariance[11]) / 3.0f;
+    const float angErr = (covariance[15]+covariance[18]+covariance[20]) / 3.0f;
     EKF2.writeExtNavData(pos, quat, posErr, angErr, timeStamp_ms, delay_ms, resetTime_ms);
 #endif
 #if HAL_NAVEKF3_AVAILABLE
-    EKF3.writeExtNavData(pos, quat, posErr, angErr, timeStamp_ms, delay_ms, resetTime_ms);
+    // split covariance into separate position and attitude matrices as the EKF does not use error correlations between position and attitude
+    float posCov[6], rpyCov[6];
+    posCov[0] = covariance[0];
+    posCov[1] = covariance[1];
+    posCov[2] = covariance[2];
+    posCov[3] = covariance[6];
+    posCov[4] = covariance[7];
+    posCov[5] = covariance[11];
+
+    rpyCov[0] = covariance[15];
+    rpyCov[1] = covariance[16];
+    rpyCov[2] = covariance[17];
+    rpyCov[3] = covariance[18];
+    rpyCov[4] = covariance[19];
+    rpyCov[5] = covariance[20];
+
+    EKF3.writeExtNavPoseData(pos, rpy, timeStamp_ms, delay_ms, resetTime_ms);
+    EKF3.writeExtNavCovarianceData(posCov, rpyCov, timeStamp_ms);
 #endif
 }
 
