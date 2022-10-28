@@ -1018,11 +1018,11 @@ void NavEKF3_core::writeDefaultAirSpeed(float airspeed, float uncertainty)
 *            External Navigation Measurements           *
 ********************************************************/
 
-void NavEKF3_core::writeExtNavData(const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint16_t delay_ms, uint32_t resetTime_ms)
+void NavEKF3_core::writeExtNavPoseData(const Vector3f &pos, const Vector3f &rpy, uint32_t timeStamp_ms, uint16_t delay_ms, uint32_t resetTime_ms)
 {
 #if EK3_FEATURE_EXTERNAL_NAV
     // protect against NaN
-    if (pos.is_nan() || isnan(posErr)) {
+    if (pos.is_nan()) {
         return;
     }
 
@@ -1034,8 +1034,6 @@ void NavEKF3_core::writeExtNavData(const Vector3f &pos, const Quaternion &quat, 
         extNavMeasTime_ms = timeStamp_ms;
     }
 
-    ext_nav_elements extNavDataNew {};
-
     if (resetTime_ms != extNavLastPosResetTime_ms) {
         extNavDataNew.posReset = true;
         extNavLastPosResetTime_ms = resetTime_ms;
@@ -1044,32 +1042,49 @@ void NavEKF3_core::writeExtNavData(const Vector3f &pos, const Quaternion &quat, 
     }
 
     extNavDataNew.pos = pos.toftype();
-    extNavDataNew.posErr = posErr;
+
+    extNavDataNew.timeStamp_ms = timeStamp_ms;
 
     // calculate timestamp
-    timeStamp_ms = timeStamp_ms - delay_ms;
+    extNavDataNew.time_ms = timeStamp_ms - delay_ms;
     // Correct for the average intersampling delay due to the filter update rate
-    timeStamp_ms -= localFilterTimeStep_ms/2;
+    extNavDataNew.time_ms -= localFilterTimeStep_ms/2;
     // Prevent time delay exceeding age of oldest IMU data in the buffer
-    timeStamp_ms = MAX(timeStamp_ms, imuDataDelayed.time_ms);
+    extNavDataNew.time_ms = MAX(extNavDataNew.time_ms, imuDataDelayed.time_ms);
+
     extNavDataNew.time_ms = timeStamp_ms;
 
-    // store position data to buffer
-    storedExtNav.push(extNavDataNew);
-
-    // protect against attitude or angle being NaN
-    if (!quat.is_nan() && !isnan(angErr)) {
+    // protect against yaw angle being NaN
+    if (isfinite(rpy.z)) {
         // extract yaw from the attitude
-        ftype roll_rad, pitch_rad, yaw_rad;
-        quat.to_euler(roll_rad, pitch_rad, yaw_rad);
-        yaw_elements extNavYawAngDataNew;
-        extNavYawAngDataNew.yawAng = yaw_rad;
-        extNavYawAngDataNew.yawAngErr = MAX(angErr, radians(5.0f)); // ensure yaw accuracy is no better than 5 degrees (some callers may send zero)
+        extNavYawAngDataNew.timeStamp_ms = timeStamp_ms;
+        extNavYawAngDataNew.yawAng = ftype(rpy.z);
         extNavYawAngDataNew.order = rotationOrder::TAIT_BRYAN_321; // Euler rotation order is 321 (ZYX)
         extNavYawAngDataNew.time_ms = timeStamp_ms;
-        storedExtNavYawAng.push(extNavYawAngDataNew);
     }
 #endif // EK3_FEATURE_EXTERNAL_NAV
+}
+
+void NavEKF3_core::writeExtNavCovarianceData(const float posCov[6], const float rpyCov[6], uint32_t timeStamp_ms)
+{
+#if EK3_FEATURE_EXTERNAL_NAV
+
+    // store to buffer if there is a corresponding position data
+    if (timeStamp_ms == extNavDataNew.timeStamp_ms) {
+        for (uint8_t i=0; i<6; i++) {
+            extNavDataNew.posCov[i] = ftype(posCov[i]);
+        }
+        storedExtNav.push(extNavDataNew);
+    }
+
+    // store to buffer if there is corresponding angle data
+    if (timeStamp_ms == extNavYawAngDataNew.timeStamp_ms) {
+        const float yawCov = MAX(rpyCov[5], sq(radians(5.0f))); // ensure yaw accuracy is no better than 5 degrees (some callers may send zero)
+        extNavYawAngDataNew.yawAngErr = sqrtF(yawCov);
+        storedExtNavYawAng.push(extNavYawAngDataNew);
+    }
+
+#endif
 }
 
 void NavEKF3_core::writeExtNavVelData(const Vector3f &vel, float err, uint32_t timeStamp_ms, uint16_t delay_ms)

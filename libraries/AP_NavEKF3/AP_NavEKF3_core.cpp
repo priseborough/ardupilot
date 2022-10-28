@@ -2230,6 +2230,10 @@ void NavEKF3_core::moveEKFOrigin(void)
     outputDataNew.position.xy() += diffNE;
     outputDataDelayed.position.xy() += diffNE;
 
+#if EK3_FEATURE_EXTERNAL_NAV
+    extNavOriginNED.xy() -= diffNE;
+#endif
+
     for (unsigned index=0; index < imu_buffer_length; index++) {
         storedOutput[index].position.xy() += diffNE;
     }

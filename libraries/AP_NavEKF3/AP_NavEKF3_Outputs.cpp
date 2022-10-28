@@ -469,6 +469,7 @@ bool NavEKF3_core::getVelInnovationsAndVariancesForSource(AP_NavEKF_Source::Sour
         return true;
 #if EK3_FEATURE_EXTERNAL_NAV
     case AP_NavEKF_Source::SourceXY::EXTNAV:
+    case AP_NavEKF_Source::SourceXY::GPSANDEXTNAV:
         // check for timeouts
         if (AP_HAL::millis() - extNavVelInnovTime_ms > 500) {
             return false;

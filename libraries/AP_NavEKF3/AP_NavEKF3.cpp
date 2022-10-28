@@ -1367,7 +1367,7 @@ bool NavEKF3::setOriginLLH(const Location &loc)
     if (!core) {
         return false;
     }
-    if ((sources.getPosXYSource() == AP_NavEKF_Source::SourceXY::GPS) || common_origin_valid) {
+    if ((sources.getPosXYSource() == AP_NavEKF_Source::SourceXY::GPS || sources.getPosXYSource() == AP_NavEKF_Source::SourceXY::GPSANDEXTNAV) || common_origin_valid) {
         // we don't allow setting of the EKF origin if using GPS
         // or if the EKF origin has already been set.
         // This is to prevent accidental setting of EKF origin with an
@@ -1497,7 +1497,7 @@ bool NavEKF3::using_extnav_for_yaw() const
 bool NavEKF3::configuredToUseGPSForPosXY(void) const
 {
     // 0 = use 3D velocity, 1 = use 2D velocity, 2 = use no velocity, 3 = do not use GPS
-    return  (sources.getPosXYSource() == AP_NavEKF_Source::SourceXY::GPS);
+    return  (sources.getPosXYSource() == AP_NavEKF_Source::SourceXY::GPS || sources.getPosXYSource() == AP_NavEKF_Source::SourceXY::GPSANDEXTNAV);
 }
 
 // write the raw optical flow measurements
@@ -1541,24 +1541,34 @@ void NavEKF3::writeEulerYawAngle(float yawAngle, float yawAngleErr, uint32_t tim
 }
 
 /*
- * Write position and quaternion data from an external navigation system
+ * Write position attitude and covariance data from an external navigation system
  *
  * pos        : XYZ position (m) in a RH navigation frame with the Z axis pointing down and XY axes horizontal. Frame must be aligned with NED if the magnetomer is being used for yaw.
- * quat       : quaternion describing the the rotation from navigation frame to body frame
- * posErr     : 1-sigma spherical position error (m)
- * angErr     : 1-sigma spherical angle error (rad)
+ * rpy        : 321 sequence Tait-Bryan angles defining the the rotation from navigation frame to body frame (rad)
+ * posCov     ; Row-major representation of position 3x3 cross-covariance matrix upper right triangle (states: x_global, y_global, z_global; first three entries are the first ROW, next two entries are the second ROW, etc.). If unknown, assign NaN value to first element in the array. If off diagonals are unkown, assign to zero.
+ * rpyCov     ; Row-major representation of attitude 3x3 cross-covariance matrix upper right triangle (states: roll, pitch; first three entries are the first ROW, next two entries are the second ROW, etc.). If unknown, assign NaN value to first element in the array. If off diagonals are unkown, assign to zero.
  * timeStamp_ms : system time the measurement was taken, not the time it was received (mSec)
  * delay_ms   : average delay of external nav system measurements relative to inertial measurements
  * resetTime_ms : system time of the last position reset request (mSec)
  *
 */
-void NavEKF3::writeExtNavData(const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint16_t delay_ms, uint32_t resetTime_ms)
+void NavEKF3::writeExtNavPoseData(const Vector3f &pos, const Vector3f &rpy, uint32_t timeStamp_ms, uint16_t delay_ms, uint32_t resetTime_ms)
 {
-    AP::dal().writeExtNavData(pos, quat, posErr, angErr, timeStamp_ms, delay_ms, resetTime_ms);
+    AP::dal().writeExtNavPoseData(pos, rpy, timeStamp_ms, delay_ms, resetTime_ms);
 
     if (core) {
         for (uint8_t i=0; i<num_cores; i++) {
-            core[i].writeExtNavData(pos, quat, posErr, angErr, timeStamp_ms, delay_ms, resetTime_ms);
+            core[i].writeExtNavPoseData(pos, rpy, timeStamp_ms, delay_ms, resetTime_ms);
+        }
+    }
+}
+void NavEKF3::writeExtNavCovarianceData(const float posCov[6], const float rpyCov[6], uint32_t timeStamp_ms)
+{
+    AP::dal().writeExtNavCovarianceData(posCov, rpyCov, timeStamp_ms);
+
+    if (core) {
+        for (uint8_t i=0; i<num_cores; i++) {
+            core[i].writeExtNavCovarianceData(posCov, rpyCov, timeStamp_ms);
         }
     }
 }
