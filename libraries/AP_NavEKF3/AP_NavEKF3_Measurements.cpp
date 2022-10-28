@@ -1075,6 +1075,7 @@ void NavEKF3_core::writeExtNavCovarianceData(const float posCov[6], const float 
             extNavDataNew.posCov[i] = ftype(posCov[i]);
         }
         storedExtNav.push(extNavDataNew);
+        extNavDataNew.timeStamp_ms = 0;
     }
 
     // store to buffer if there is corresponding angle data
@@ -1082,6 +1083,7 @@ void NavEKF3_core::writeExtNavCovarianceData(const float posCov[6], const float 
         const float yawCov = MAX(rpyCov[5], sq(radians(5.0f))); // ensure yaw accuracy is no better than 5 degrees (some callers may send zero)
         extNavYawAngDataNew.yawAngErr = sqrtF(yawCov);
         storedExtNavYawAng.push(extNavYawAngDataNew);
+        extNavYawAngDataNew.timeStamp_ms = 0;
     }
 
 #endif
