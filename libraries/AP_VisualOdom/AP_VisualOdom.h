@@ -88,9 +88,12 @@ public:
 
     // general purpose methods to consume position estimate data and send to EKF
     // distances in meters, roll, pitch and yaw are in radians
-    void handle_vision_position_estimate(uint64_t remote_time_us, uint32_t time_ms, float x, float y, float z, float roll, float pitch, float yaw, float posErr, float angErr, uint8_t reset_counter);
-    void handle_vision_position_estimate(uint64_t remote_time_us, uint32_t time_ms, float x, float y, float z, const Quaternion &attitude, float posErr, float angErr, uint8_t reset_counter);
-    
+    void handle_vision_position_estimate(uint64_t remote_time_us, uint32_t time_ms,
+                                            const Vector3f position,
+                                            const Vector3f rpy,
+                                            const float covariance[21],
+                                            uint8_t reset_counter);
+
     // general purpose methods to consume velocity estimate data and send to EKF
     // velocity in NED meters per second
     void handle_vision_speed_estimate(uint64_t remote_time_us, uint32_t time_ms, const Vector3f &vel, uint8_t reset_counter);

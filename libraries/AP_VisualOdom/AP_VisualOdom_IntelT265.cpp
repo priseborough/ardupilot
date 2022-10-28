@@ -26,15 +26,21 @@
 extern const AP_HAL::HAL& hal;
 
 // consume vision position estimate data and send to EKF. distances in meters
-void AP_VisualOdom_IntelT265::handle_vision_position_estimate(uint64_t remote_time_us, uint32_t time_ms, float x, float y, float z, const Quaternion &attitude, float posErr, float angErr, uint8_t reset_counter)
+void AP_VisualOdom_IntelT265::handle_vision_position_estimate(uint64_t remote_time_us, uint32_t time_ms,
+                                                              const Vector3f position,
+                                                              const Vector3f rpy,
+                                                              const float covariance[21],
+                                                              uint8_t reset_counter)
 {
     const float scale_factor = _frontend.get_pos_scale();
-    Vector3f pos{x * scale_factor, y * scale_factor, z * scale_factor};
-    Quaternion att = attitude;
+    Vector3f pos = position * scale_factor;
+
+    Quaternion att;
+    att.from_euler(rpy);
 
     // handle user request to align camera
     if (_align_camera) {
-        if (align_sensor_to_vehicle(pos, attitude)) {
+        if (align_sensor_to_vehicle(pos, att)) {
             _align_camera = false;
         }
     }
@@ -48,14 +54,44 @@ void AP_VisualOdom_IntelT265::handle_vision_position_estimate(uint64_t remote_ti
     rotate_and_correct_position(pos);
     rotate_attitude(att);
 
-    posErr = constrain_float(posErr, _frontend.get_pos_noise(), 100.0f);
-    angErr = constrain_float(angErr, _frontend.get_yaw_noise(), 1.5f);
+    float cov[21];
+    memcpy(cov, covariance, sizeof(cov));
+    float posErr;
+    if (isnanf(cov[0])) {
+        // position uncertainty is not provided so use parameter defaults
+        posErr = _frontend.get_pos_noise();
+        cov[0] = sq(posErr);
+        cov[6] = sq(posErr);
+        cov[11] = sq(posErr);
+        // assume position errors for each axis are uncorrelated to each other and to the angle errors
+        cov[1] = cov[2] = cov[3] = cov[4] = cov[5] = 0.0f;
+        cov[7] = cov[8] = cov[9] = cov[10] = 0.0f;
+        cov[12] = cov[13] = cov[14] = 0.0f;
+    } else {
+        posErr = (cov[0]+cov[6]+cov[11]) / 3.0f;
+    }
+    float angErr;
+    if (isnanf(cov[15])) {
+        // angle uncertainty is not provided so use parameter defaults
+        angErr = _frontend.get_yaw_noise();
+        cov[15] = sq(angErr);
+        cov[18] = sq(angErr);
+        cov[20] = sq(angErr);
+        // assume angle errors uncorrelated to postion errors
+        cov[3] = cov[4] = cov[5] = 0.0f;
+        cov[8] = cov[9] = cov[10] = 0.0f;
+        cov[12] = cov[13] = cov[14] = 0.0f;
+        // assume angle errors uncorrelated to each other
+        cov[16] = cov[17] = cov[19] = 0.0f;
+    } else {
+        angErr = (cov[15]+cov[18]+cov[20]) / 3.0f;
+    }
 
     // check for recent position reset
     bool consume = should_consume_sensor_data(true, reset_counter);
     if (consume) {
         // send attitude and position to EKF
-        AP::ahrs().writeExtNavData(pos, att, posErr, angErr, time_ms, _frontend.get_delay_ms(), get_reset_timestamp_ms(reset_counter));
+        AP::ahrs().writeExtNavData(pos, rpy, cov, time_ms, _frontend.get_delay_ms(), get_reset_timestamp_ms(reset_counter));
     }
 
     // calculate euler orientation for logging

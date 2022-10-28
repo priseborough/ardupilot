@@ -24,24 +24,22 @@
 extern const AP_HAL::HAL& hal;
 
 // consume vision position estimate data and send to EKF. distances in meters
-void AP_VisualOdom_MAV::handle_vision_position_estimate(uint64_t remote_time_us, uint32_t time_ms, float x, float y, float z, const Quaternion &attitude, float posErr, float angErr, uint8_t reset_counter)
+void AP_VisualOdom_MAV::handle_vision_position_estimate(uint64_t remote_time_us, uint32_t time_ms,
+                                                        const Vector3f position,
+                                                        const Vector3f rpy,
+                                                        const float covariance[21],
+                                                        uint8_t reset_counter)
 {
     const float scale_factor =  _frontend.get_pos_scale();
-    Vector3f pos{x * scale_factor, y * scale_factor, z * scale_factor};
+    Vector3f pos = position * scale_factor;
 
-    posErr = constrain_float(posErr, _frontend.get_pos_noise(), 100.0f);
-    angErr = constrain_float(angErr, _frontend.get_yaw_noise(), 1.5f);
     // send attitude and position to EKF
-    AP::ahrs().writeExtNavData(pos, attitude, posErr, angErr, time_ms, _frontend.get_delay_ms(), get_reset_timestamp_ms(reset_counter));
-
-    // calculate euler orientation for logging
-    float roll;
-    float pitch;
-    float yaw;
-    attitude.to_euler(roll, pitch, yaw);
+    AP::ahrs().writeExtNavData(pos, rpy, covariance, time_ms, _frontend.get_delay_ms(), get_reset_timestamp_ms(reset_counter));
 
     // log sensor data
-    Write_VisualPosition(remote_time_us, time_ms, pos.x, pos.y, pos.z, degrees(roll), degrees(pitch), degrees(yaw), posErr, angErr, reset_counter, false);
+    const float posErr = (covariance[0]+covariance[6]+covariance[11]) / 3.0f;
+    const float angErr = (covariance[15]+covariance[18]+covariance[20]) / 3.0f;
+    Write_VisualPosition(remote_time_us, time_ms, pos.x, pos.y, pos.z, rpy[0], rpy[1], rpy[2], posErr, angErr, reset_counter, false);
 
     // record time for health monitoring
     _last_update_ms = AP_HAL::millis();
