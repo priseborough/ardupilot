@@ -1552,20 +1552,58 @@ void NavEKF3::writeEulerYawAngle(float yawAngle, float yawAngleErr, uint32_t tim
  * resetTime_ms : system time of the last position reset request (mSec)
  *
 */
-void NavEKF3::writeExtNavPoseData(const Vector3f &pos, const Vector3f &rpy, uint32_t timeStamp_ms, uint16_t delay_ms, uint32_t resetTime_ms)
+void NavEKF3::writeExtNavData(const Vector3f &pos, const Vector3f &rpy, const float covariance[21], uint32_t timeStamp_ms, uint16_t delay_ms, uint32_t resetTime_ms)
 {
     AP::dal().writeExtNavPoseData(pos, rpy, timeStamp_ms, delay_ms, resetTime_ms);
 
+    // split covariance into separate position and attitude matrices as the EKF does not use error correlations between position and attitude
+    float posCov[6], rpyCov[6];
+    if (!isnan(covariance[0])) {
+        posCov[0] = covariance[0];
+        posCov[1] = covariance[1];
+        posCov[2] = covariance[2];
+        posCov[3] = covariance[6];
+        posCov[4] = covariance[7];
+        posCov[5] = covariance[11];
+    } else {
+        memset(&posCov, 0, sizeof(posCov));
+        rpyCov[0] = rpyCov[3] = sq(_gpsHorizPosNoise);
+        rpyCov[5] = sq(_baroAltNoise);
+    }
+
+    if (!isnan(covariance[15])) {
+        rpyCov[0] = covariance[15];
+        rpyCov[1] = covariance[16];
+        rpyCov[2] = covariance[17];
+        rpyCov[3] = covariance[18];
+        rpyCov[4] = covariance[19];
+        rpyCov[5] = covariance[20];
+    } else {
+        memset(&rpyCov, 0, sizeof(rpyCov));
+        rpyCov[0] = rpyCov[3] = rpyCov[5] = sq(_yawNoise);
+    }
+
+    AP::dal().writeExtNavCovarianceData(posCov, rpyCov, timeStamp_ms);
+
+    if (core) {
+        for (uint8_t i=0; i<num_cores; i++) {
+            core[i].writeExtNavPoseData(pos, rpy, timeStamp_ms, delay_ms, resetTime_ms);
+            core[i].writeExtNavCovarianceData(posCov, rpyCov, timeStamp_ms);
+        }
+    }
+}
+
+void NavEKF3::writeExtNavPoseData(const Vector3f &pos, const Vector3f &rpy, uint32_t timeStamp_ms, uint16_t delay_ms, uint32_t resetTime_ms)
+{
     if (core) {
         for (uint8_t i=0; i<num_cores; i++) {
             core[i].writeExtNavPoseData(pos, rpy, timeStamp_ms, delay_ms, resetTime_ms);
         }
     }
 }
+
 void NavEKF3::writeExtNavCovarianceData(const float posCov[6], const float rpyCov[6], uint32_t timeStamp_ms)
 {
-    AP::dal().writeExtNavCovarianceData(posCov, rpyCov, timeStamp_ms);
-
     if (core) {
         for (uint8_t i=0; i<num_cores; i++) {
             core[i].writeExtNavCovarianceData(posCov, rpyCov, timeStamp_ms);

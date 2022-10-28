@@ -1055,7 +1055,7 @@ void NavEKF3_core::writeExtNavPoseData(const Vector3f &pos, const Vector3f &rpy,
     extNavDataNew.time_ms = timeStamp_ms;
 
     // protect against yaw angle being NaN
-    if (isfinite(rpy.z)) {
+    if (!isnan(rpy.z)) {
         // extract yaw from the attitude
         extNavYawAngDataNew.timeStamp_ms = timeStamp_ms;
         extNavYawAngDataNew.yawAng = ftype(rpy.z);
