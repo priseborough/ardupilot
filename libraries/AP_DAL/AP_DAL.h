@@ -306,9 +306,9 @@ public:
 #endif
     }
     void handle_message(const log_ROFH &msg, NavEKF2 &ekf2, NavEKF3 &ekf3);
-    void handle_message(const log_REPH &msg, NavEKF2 &ekf2);
-    void handle_message(const log_RENP &msg, NavEKF3 &ekf3);
-    void handle_message(const log_RENC &msg, NavEKF3 &ekf3);
+    void handle_message(const log_REPH &msg, NavEKF2 &ekf2, NavEKF3 &ekf3);
+    void handle_message(const log_RENP &msg, NavEKF2 &ekf2, NavEKF3 &ekf3);
+    void handle_message(const log_RENC &msg, NavEKF2 &ekf2, NavEKF3 &ekf3);
     void handle_message(const log_REVH &msg, NavEKF2 &ekf2, NavEKF3 &ekf3);
     void handle_message(const log_RWOH &msg, NavEKF2 &ekf2, NavEKF3 &ekf3);
     void handle_message(const log_RBOH &msg, NavEKF2 &ekf2, NavEKF3 &ekf3);

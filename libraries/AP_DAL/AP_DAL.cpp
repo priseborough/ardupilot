@@ -480,20 +480,30 @@ void AP_DAL::handle_message(const log_ROFH &msg, NavEKF2 &ekf2, NavEKF3 &ekf3)
 /*
   handle external position data
  */
-void AP_DAL::handle_message(const log_REPH &msg, NavEKF2 &ekf2)
+void AP_DAL::handle_message(const log_REPH &msg, NavEKF2 &ekf2, NavEKF3 &ekf3)
 {
     _REPH = msg;
     ekf2.writeExtNavData(msg.pos, msg.quat, msg.posErr, msg.angErr, msg.timeStamp_ms, msg.delay_ms, msg.resetTime_ms);
 }
 
 /*
-  handle external nav data
+  handle external nav pose data
  */
-void AP_DAL::handle_message(const log_RENP &msg1, const log_RENP &msg2, NavEKF2 &ekf3)
+void AP_DAL::handle_message(const log_RENP &msg, NavEKF2 &ekf2, NavEKF3 &ekf3)
 {
-    _RENP = msg1;
-    _RENC = msg2;
-    ekf3.writeExtNavData(msg1.pos, msg1.rpy, msg2.posCov, msg2.rpyCov, msg1.timeStamp_ms, msg1.delay_ms, msg1.resetTime_ms);
+    _RENP = msg;
+    ekf3.writeExtNavPoseData(msg.pos, msg.rpy, msg.timeStamp_ms, msg.delay_ms, msg.resetTime_ms);
+}
+
+/*
+  handle external nav covariance data
+ */
+void AP_DAL::handle_message(const log_RENC &msg, NavEKF2 &ekf2, NavEKF3 &ekf3)
+{
+    _RENC = msg;
+    const float posCov[6] = {msg.posCov_0, msg.posCov_1, msg.posCov_2, msg.posCov_3, msg.posCov_4, msg.posCov_5};
+    const float rpyCov[6] = {msg.rpyCov_0, msg.rpyCov_1, msg.rpyCov_2, msg.rpyCov_3, msg.rpyCov_4, msg.rpyCov_5};
+    ekf3.writeExtNavCovarianceData(posCov, rpyCov, msg.timeStamp_ms);
 }
 
 /*
