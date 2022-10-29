@@ -2202,24 +2202,7 @@ void AP_AHRS::writeExtNavData(const Vector3f &pos, const Vector3f &rpy, const fl
     EKF2.writeExtNavData(pos, quat, posErr, angErr, timeStamp_ms, delay_ms, resetTime_ms);
 #endif
 #if HAL_NAVEKF3_AVAILABLE
-    // split covariance into separate position and attitude matrices as the EKF does not use error correlations between position and attitude
-    float posCov[6], rpyCov[6];
-    posCov[0] = covariance[0];
-    posCov[1] = covariance[1];
-    posCov[2] = covariance[2];
-    posCov[3] = covariance[6];
-    posCov[4] = covariance[7];
-    posCov[5] = covariance[11];
-
-    rpyCov[0] = covariance[15];
-    rpyCov[1] = covariance[16];
-    rpyCov[2] = covariance[17];
-    rpyCov[3] = covariance[18];
-    rpyCov[4] = covariance[19];
-    rpyCov[5] = covariance[20];
-
-    EKF3.writeExtNavPoseData(pos, rpy, timeStamp_ms, delay_ms, resetTime_ms);
-    EKF3.writeExtNavCovarianceData(posCov, rpyCov, timeStamp_ms);
+    EKF3.writeExtNavData(pos, rpy, covariance, timeStamp_ms, delay_ms, resetTime_ms);
 #endif
 }
 
