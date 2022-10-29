@@ -104,6 +104,8 @@ void NavEKF3_core::ResetPosition(resetDataSource posResetSource)
             stateStruct.position.xy() += gps_corrected.vel.xy()*0.001*tdiff;
             // set the variances using the position measurement noise parameter
             P[7][7] = P[8][8] = sq(MAX(gpsPosAccuracy,frontend->_gpsHorizPosNoise));
+            // trigger and external nav origin reset next time we get data
+            lastExtNavOriginTime_ms = 0;
         } else if ((imuSampleTime_ms - rngBcnLast3DmeasTime_ms < 250 && posResetSource == resetDataSource::DEFAULT) || posResetSource == resetDataSource::RNGBCN) {
             // use the range beacon data as a second preference
             stateStruct.position.x = receiverPos.x;
@@ -373,6 +375,27 @@ void NavEKF3_core::CorrectExtNavForSensorOffset(ext_nav_elements &ext_nav_data)
     ext_nav_data.pos.y -= posOffsetEarth.y;
     ext_nav_data.pos.z -= posOffsetEarth.z;
 #endif
+
+    // When simultaneously using PGS and external nav data, adjust external nav slowly to prevent
+    // the external nav fighting the GPS as it drifts,
+    // TODO calculate the correction using covariance ad other data after we get replay logs
+    const AP_NavEKF_Source::SourceXY posxy_source = frontend->sources.getPosXYSource();
+    if ((posxy_source == AP_NavEKF_Source::SourceXY::GPSANDEXTNAV) &&
+        (gpsCheckStatus.bad_hAcc == false) &&
+        (imuDataDelayed.time_ms - gpsDataDelayed.time_ms < 1000))
+    {
+        // update origin correction to track EKF
+        const uint32_t dt_msec = imuDataDelayed.time_ms - lastExtNavOriginTime_ms;
+        if ((dt_msec > 5000 || posxy_source == AP_NavEKF_Source::SourceXY::GPS) && !gpsCheckStatus.bad_hAcc)  {
+            extNavOriginNED = stateStruct.position - extNavDataDelayed.pos;
+        } else {
+            const ftype tconst = 10.0f;
+            const ftype dt_sec = 0.001f * (float)dt_msec;
+            const ftype alpha = dt_sec / (dt_sec + tconst);
+            extNavOriginNED = extNavOriginNED * (1.0f - alpha) + (stateStruct.position - extNavDataDelayed.pos) * alpha;
+        }
+        lastExtNavOriginTime_ms = imuDataDelayed.time_ms;
+    }
 }
 
 // correct external navigation earth-frame velocity using sensor body-frame offset
@@ -542,7 +565,7 @@ void NavEKF3_core::SelectVelPosFusion()
 
 #if EK3_FEATURE_EXTERNAL_NAV
     // check for external nav position reset
-    if (extNavDataToFuse && (PV_AidingMode == AID_ABSOLUTE) && (posxy_source == AP_NavEKF_Source::SourceXY::EXTNAV || posxy_source == AP_NavEKF_Source::SourceXY::GPSANDEXTNAV) && (extNavDataDelayed.posReset || posxy_source_reset)) {
+    if (extNavDataToFuse && (PV_AidingMode == AID_ABSOLUTE) && (posxy_source == AP_NavEKF_Source::SourceXY::EXTNAV)) {
         // mark a source reset as consumed
         posxy_source_reset = false;
         ResetPositionNE(extNavDataDelayed.pos.x, extNavDataDelayed.pos.y);

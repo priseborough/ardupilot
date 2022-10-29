@@ -1379,7 +1379,8 @@ private:
     yaw_elements extNavYawAngDataDelayed;   // external navigation yaw angle at the fusion time horizon
     yaw_elements extNavYawAngDataNew;   // external navigation yaw angle dara awaiting receipt of covariance data before being pushed to the buffer
     uint32_t last_extnav_yaw_fusion_ms; // system time that external nav yaw was last fused
-    Vector3F extNavOriginNED;           // exernal navigation origin offset wrt EKF's local NED origin
+    Vector3F extNavOriginNED;           // exernal navigation origin offset wrt EKF's internal NED origin
+    uint32_t lastExtNavOriginTime_ms;   // last time we updated the external nav origin offset (msec)
 #endif // EK3_FEATURE_EXTERNAL_NAV
     bool useExtNavVel;                  // true if external nav velocity should be used
 
