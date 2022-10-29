@@ -3288,7 +3288,7 @@ void GCS_MAVLINK::handle_att_pos_mocap(const mavlink_message_t &msg)
     }
     float roll, pitch, yaw;
     Quaternion(m.q).to_euler(roll, pitch, yaw);
-    float covariance[21];
+    float covariance[21]; /*<  Row-major representation of pose 6x6 cross-covariance matrix upper right triangle (states: x_global, y_global, z_global, roll, pitch, yaw; first six entries are the first ROW, next five entries are the second ROW, etc.). If unknown, assign NaN value to first element in the array.*/
     for (uint8_t i=0; i<21; i++) {
         covariance[i] = NAN;
     }
