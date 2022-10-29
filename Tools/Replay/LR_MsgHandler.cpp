@@ -284,6 +284,18 @@ void LR_MsgHandler_REPH::process_message(uint8_t *msgbytes)
     AP::dal().handle_message(msg, ekf2, ekf3);
 }
 
+void LR_MsgHandler_RENP::process_message(uint8_t *msgbytes)
+{
+    MSG_CREATE(RENP, msgbytes);
+    AP::dal().handle_message(msg, ekf2, ekf3);
+}
+
+void LR_MsgHandler_RENC::process_message(uint8_t *msgbytes)
+{
+    MSG_CREATE(RENC, msgbytes);
+    AP::dal().handle_message(msg, ekf2, ekf3);
+}
+
 void LR_MsgHandler_REVH::process_message(uint8_t *msgbytes)
 {
     MSG_CREATE(REVH, msgbytes);
