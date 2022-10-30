@@ -392,7 +392,7 @@ void AP_DAL::writeExtNavCovarianceData(const float posCov[6], const float rpyCov
     _RENC.rpyCov_2 = rpyCov[2];
     _RENC.rpyCov_3 = rpyCov[3];
     _RENC.rpyCov_4 = rpyCov[4];
-    _RENC.rpyCov_4 = rpyCov[5];
+    _RENC.rpyCov_5 = rpyCov[5];
     _RENC.timeStamp_ms = timeStamp_ms;
     WRITE_REPLAY_BLOCK_IFCHANGED(RENC, _RENC, old);
 }
