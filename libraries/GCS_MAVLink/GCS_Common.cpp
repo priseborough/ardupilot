@@ -3183,7 +3183,7 @@ void GCS_MAVLINK::handle_vision_position_estimate(const mavlink_message_t &msg)
     mavlink_vision_position_estimate_t m;
     mavlink_msg_vision_position_estimate_decode(&msg, &m);
 
-    handle_common_vision_position_estimate_data(m.usec, m.x, m.y, m.z, m.roll, m.pitch, m.yaw, m.covariance, m.reset_counter,
+    handle_common_vision_position_estimate_data(m.usec, m.x, m.y, m.z, m.roll, m.pitch, m.yaw, m.covariance, m.reset_counter, 0,
                                                 PAYLOAD_SIZE(chan, VISION_POSITION_ESTIMATE));
 }
 
@@ -3192,7 +3192,7 @@ void GCS_MAVLINK::handle_global_vision_position_estimate(const mavlink_message_t
     mavlink_global_vision_position_estimate_t m;
     mavlink_msg_global_vision_position_estimate_decode(&msg, &m);
 
-    handle_common_vision_position_estimate_data(m.usec, m.x, m.y, m.z, m.roll, m.pitch, m.yaw, m.covariance, m.reset_counter,
+    handle_common_vision_position_estimate_data(m.usec, m.x, m.y, m.z, m.roll, m.pitch, m.yaw, m.covariance, m.reset_counter, m.delay,
                                                 PAYLOAD_SIZE(chan, GLOBAL_VISION_POSITION_ESTIMATE));
 }
 
@@ -3202,7 +3202,7 @@ void GCS_MAVLINK::handle_vicon_position_estimate(const mavlink_message_t &msg)
     mavlink_msg_vicon_position_estimate_decode(&msg, &m);
 
     // vicon position estimate does not include reset counter
-    handle_common_vision_position_estimate_data(m.usec, m.x, m.y, m.z, m.roll, m.pitch, m.yaw, m.covariance, 0,
+    handle_common_vision_position_estimate_data(m.usec, m.x, m.y, m.z, m.roll, m.pitch, m.yaw, m.covariance, 0, 0,
                                                 PAYLOAD_SIZE(chan, VICON_POSITION_ESTIMATE));
 }
 
@@ -3254,11 +3254,12 @@ void GCS_MAVLINK::handle_common_vision_position_estimate_data(const uint64_t use
                                                               const float yaw,
                                                               const float covariance[21],
                                                               const uint8_t reset_counter,
+                                                              const uint16_t delay_ms,
                                                               const uint16_t payload_size)
 {
 #if HAL_VISUALODOM_ENABLED
     // correct offboard timestamp to be in local ms since boot
-    uint32_t timestamp_ms = correct_offboard_timestamp_usec_to_ms(usec, payload_size);
+    uint32_t timestamp_ms = correct_offboard_timestamp_usec_to_ms(usec, payload_size) - delay_ms;
 
     AP_VisualOdom *visual_odom = AP::visualodom();
     if (visual_odom == nullptr) {
