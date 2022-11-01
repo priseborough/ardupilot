@@ -934,7 +934,7 @@ private:
         bool active;
     } alternative;
 
-    JitterCorrection lag_correction;
+    JitterCorrection lag_correction{8000};
     
     // we cache the current location and send it even if the AHRS has
     // no idea where we are:
