@@ -68,6 +68,15 @@ const AP_Param::Info Plane::var_info[] = {
     // @User: Standard
     GSCALAR(kff_rudder_mix,         "KFF_RDDRMIX",    RUDDER_MIX),
 
+    // @Param: KFF_ACRO_AILMIX
+    // @DisplayName: Acro Mode Aileron Mix
+    // @Description: Amount of opposite aileron to add proportional to rudder movement. Increase if wings roll in the direction of rudder. Reduces roll coupling during aerobatic manoeuvres due to dihedral effect.
+    // @Range: 0 1
+    // @Increment: 0.01
+    // @User: Standard
+    GSCALAR(kff_acro_aileron_mix,         "KFF_ACRO_AILMIX",    0.0f),
+
+
     // @Param: KFF_THR2PTCH
     // @DisplayName: Throttle to Pitch Mix
     // @Description: Pitch up to add in proportion to throttle. 100% throttle will add this number of degrees to the pitch target.

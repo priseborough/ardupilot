@@ -458,6 +458,14 @@ void Plane::stabilize_acro(float speed_scaler)
         */
         steering_control.rudder = steering_control.steering;
     }
+
+    // decouple roll from yaw using feed forward from rudder to aileron
+    if (is_positive(g.kff_acro_aileron_mix)) {
+        float commanded_aileron_cd = SRV_Channels::get_output_scaled(SRV_Channel::k_aileron);
+        // A correction in the opposite direction to rudder to counteract dihedral effect.
+        commanded_aileron_cd -= g.kff_acro_aileron_mix * (float)steering_control.rudder;
+        SRV_Channels::set_output_scaled(SRV_Channel::k_aileron, commanded_aileron_cd);
+    }
 }
 
 /*
@@ -617,6 +625,7 @@ void Plane::calc_nav_yaw_coordinated(float speed_scaler)
         // add in rudder mixing from roll
         commanded_rudder += SRV_Channels::get_output_scaled(SRV_Channel::k_aileron) * g.kff_rudder_mix;
         commanded_rudder += rudder_in;
+
     }
 
     steering_control.rudder = constrain_int16(commanded_rudder, -4500, 4500);
