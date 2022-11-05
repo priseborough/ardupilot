@@ -389,9 +389,8 @@ void NavEKF3_core::CorrectExtNavForSensorOffset(ext_nav_elements &ext_nav_data)
         if ((dt_msec > 5000 || posxy_source == AP_NavEKF_Source::SourceXY::GPS) && !gpsCheckStatus.bad_hAcc)  {
             extNavOriginNED = stateStruct.position - extNavDataDelayed.pos;
         } else {
-            const ftype tconst = 10.0f;
             const ftype dt_sec = 0.001f * (float)dt_msec;
-            const ftype alpha = dt_sec / (dt_sec + tconst);
+            const ftype alpha = dt_sec / (dt_sec + frontend->_extNavOriginTconst);
             extNavOriginNED = extNavOriginNED * (1.0f - alpha) + (stateStruct.position - extNavDataDelayed.pos) * alpha;
         }
         lastExtNavOriginTime_ms = imuDataDelayed.time_ms;

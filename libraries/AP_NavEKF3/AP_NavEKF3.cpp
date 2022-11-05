@@ -719,7 +719,15 @@ const AP_Param::GroupInfo NavEKF3::var_info2[] = {
     // @Increment: 1
     // @User: Advanced
     AP_GROUPINFO("PRIMARY", 8, NavEKF3, _primary_core, EK3_PRIMARY_DEFAULT),
-    
+
+    // @Param: EXT_TCONST
+    // @DisplayName: External navigation origin time constant (sec)
+    // @Description: This sets the time constant used to align the external navigation source NED origin with the EKF origin when a global position reference source such as GPS is available.
+    // @Range: 1.0 100.0
+    // @User: Advanced
+    // @Units: s
+    AP_GROUPINFO("EXT_TCONST", 9, NavEKF3, _extNavOriginTconst, 10.0f),
+
     AP_GROUPEND
 };
 
