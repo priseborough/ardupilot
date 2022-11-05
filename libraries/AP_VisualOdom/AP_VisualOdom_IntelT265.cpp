@@ -35,24 +35,44 @@ void AP_VisualOdom_IntelT265::handle_vision_position_estimate(uint64_t remote_ti
     const float scale_factor = _frontend.get_pos_scale();
     Vector3f pos = position * scale_factor;
 
-    Quaternion att;
-    att.from_euler(rpy);
-
-    // handle user request to align camera
-    if (_align_camera) {
-        if (align_sensor_to_vehicle(pos, att)) {
-            _align_camera = false;
+    float roll;
+    float pitch;
+    float yaw;
+    uint64_t time_stamp_corrected_us = time_ms;
+    if (isnanf(rpy.x)) {
+        if (is_positive(covariance[20])) {
+            // hack to re-purpose last element in covariance matrix to send time delay
+            // in micro seconds when rpy accuracy data is not required
+            time_stamp_corrected_us -= (uint64_t)(covariance[20]);
         }
-    }
-    if (_align_posxy || _align_posz) {
-        if (align_position_to_ahrs(pos, _align_posxy, _align_posz)) {
-            _align_posxy = _align_posz = false;
+        roll = pitch = yaw = NAN;
+    } else {
+        Quaternion att;
+        att.from_euler(rpy);
+
+        // handle user request to align camera
+        if (_align_camera) {
+            if (align_sensor_to_vehicle(pos, att)) {
+                _align_camera = false;
+            }
         }
+        if (_align_posxy || _align_posz) {
+            if (align_position_to_ahrs(pos, _align_posxy, _align_posz)) {
+                _align_posxy = _align_posz = false;
+            }
+        }
+
+        // rotate position and attitude to align with vehicle
+        rotate_and_correct_position(pos);
+        rotate_attitude(att);
+
+        // store corrected attitude for use in pre-arm checks
+        _attitude_last = att;
+
+        // calculate euler orientation for logging
+        att.to_euler(roll, pitch, yaw);
     }
 
-    // rotate position and attitude to align with vehicle
-    rotate_and_correct_position(pos);
-    rotate_attitude(att);
 
     float cov[21];
     memcpy(cov, covariance, sizeof(cov));
@@ -91,20 +111,11 @@ void AP_VisualOdom_IntelT265::handle_vision_position_estimate(uint64_t remote_ti
     bool consume = should_consume_sensor_data(true, reset_counter);
     if (consume) {
         // send attitude and position to EKF
-        AP::ahrs().writeExtNavData(pos, rpy, cov, time_ms, _frontend.get_delay_ms(), get_reset_timestamp_ms(reset_counter));
+        AP::ahrs().writeExtNavData(pos, rpy, cov, time_stamp_corrected_us, _frontend.get_delay_ms(), get_reset_timestamp_ms(reset_counter));
     }
 
-    // calculate euler orientation for logging
-    float roll;
-    float pitch;
-    float yaw;
-    att.to_euler(roll, pitch, yaw);
-
     // log sensor data
-    Write_VisualPosition(remote_time_us, time_ms, pos.x, pos.y, pos.z, degrees(roll), degrees(pitch), wrap_360(degrees(yaw)), posErr, angErr, reset_counter, !consume);
-
-    // store corrected attitude for use in pre-arm checks
-    _attitude_last = att;
+    Write_VisualPosition(remote_time_us, time_stamp_corrected_us, pos.x, pos.y, pos.z, degrees(roll), degrees(pitch), wrap_360(degrees(yaw)), posErr, angErr, reset_counter, !consume);
 
     // record time for health monitoring
     _last_update_ms = AP_HAL::millis();
