@@ -728,6 +728,14 @@ const AP_Param::GroupInfo NavEKF3::var_info2[] = {
     // @Units: s
     AP_GROUPINFO("EXT_TCONST", 9, NavEKF3, _extNavOriginTconst, 10.0f),
 
+    // @Param: EXT_M_NSE
+    // @DisplayName: External navigation error growth minimum (m)
+    // @Description: When set to a positive value, the external naivigation position data will be assumed to be from an odometry source that accumulates error over time and reports the uncertainty growth in the covariance. The EKF will then use the increase in position variance to set the observation variance, but with a lower bound set by this parameter.
+    // @Range: 0.0 10.0
+    // @User: Advanced
+    // @Units: m
+    AP_GROUPINFO("EXT_M_NSE", 10, NavEKF3, _extNavPosNoiseMin, 0.0f),
+
     AP_GROUPEND
 };
 

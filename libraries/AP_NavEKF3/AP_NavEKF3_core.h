@@ -1381,6 +1381,7 @@ private:
     uint32_t last_extnav_yaw_fusion_ms; // system time that external nav yaw was last fused
     Vector3F extNavOriginNED;           // exernal navigation origin offset wrt EKF's internal NED origin
     uint32_t lastExtNavOriginTime_ms;   // last time we updated the external nav origin offset (msec)
+    ftype extNavPosCovPrev[6];          // previous value of the external navigation position covairance data.
 #endif // EK3_FEATURE_EXTERNAL_NAV
     bool useExtNavVel;                  // true if external nav velocity should be used
 

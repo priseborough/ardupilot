@@ -405,6 +405,9 @@ void NavEKF3_core::InitialiseVariables()
     extNavVelToFuse = false;
     useExtNavVel = false;
     extNavVelMeasTime_ms = 0;
+    extNavOriginNED.zero();
+    lastExtNavOriginTime_ms = 0;
+    memset(&extNavPosCovPrev, 0, sizeof(extNavPosCovPrev));
 #endif
 
     // zero data buffers

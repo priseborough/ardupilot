@@ -460,6 +460,7 @@ private:
     AP_Float _baroGndEffectDeadZone;// Dead zone applied to positive baro height innovations when in ground effect (m)
     AP_Int8 _primary_core;          // initial core number
     AP_Float _extNavOriginTconst;   // time constant used to align the external position origin
+    AP_Float _extNavPosNoiseMin;    // minimum 1-sigma external nav position noise that will be allowed
 
 // Possible values for _flowUse
 #define FLOW_USE_NONE    0

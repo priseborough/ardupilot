@@ -681,8 +681,15 @@ void NavEKF3_core::FuseVelPosNED()
             // Use GPS reported position accuracy if available and floor at value set by GPS position noise parameter
 #if EK3_FEATURE_EXTERNAL_NAV
             if (extNavUsedForPos) {
-                R_OBS[3] = constrain_ftype(extNavDataDelayed.posCov[0], sq(0.01f), sq(10.0f));
-                R_OBS[4] = constrain_ftype(extNavDataDelayed.posCov[3], sq(0.01f), sq(10.0f));
+                // Check if configured to use external nav data as an odometry source
+                if (is_positive(frontend->_extNavPosNoiseMin)) {
+                    R_OBS[3] = MAX(extNavDataDelayed.posCov[0] - extNavPosCovPrev[0], sq(frontend->_extNavPosNoiseMin));
+                    R_OBS[4] = MAX(extNavDataDelayed.posCov[3] - extNavPosCovPrev[3], sq(frontend->_extNavPosNoiseMin));
+                    memcpy(extNavPosCovPrev, extNavDataDelayed.posCov, sizeof(extNavPosCovPrev));
+                } else {
+                    R_OBS[3] = constrain_ftype(extNavDataDelayed.posCov[0], sq(0.01f), sq(10.0f));
+                    R_OBS[4] = constrain_ftype(extNavDataDelayed.posCov[3], sq(0.01f), sq(10.0f));
+                }
             } else
 #endif
             {
