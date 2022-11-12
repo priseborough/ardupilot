@@ -291,6 +291,13 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("FLARE_ACC", 34, AP_TECS, _flarePullupAccel, 0.5f),
 
+    // @Param: ACCEL_GF
+    // @DisplayName: Vertical acceleration gain factor.
+    // @Description: Factor applied to the calculation of vertical acceleration demand
+    // @Range: 1.0 10.0
+    // @User: Advanced
+    AP_GROUPINFO("ACCEL_GF", 35, AP_TECS, _accel_gf, 7.0),
+
     AP_GROUPEND
 };
 
@@ -555,14 +562,20 @@ void AP_TECS::_update_height_demand(void)
             // Don't allow height demand to get too far ahead of the vehicles current height
             // if vehicle is unable to follow the demanded climb or descent
             bool max_climb_condition   = (_pitch_dem_unc > _PITCHmaxf) ||
+                                            (_vert_accel_clip == clipStatus::MAX) ||
                                             (_SEBdot_dem_clip == clipStatus::MAX);
             bool max_descent_condition = (_pitch_dem_unc < _PITCHminf) ||
+                                            (_vert_accel_clip == clipStatus::MIN) ||
                                             (_SEBdot_dem_clip == clipStatus::MIN);
             if (_using_airspeed_for_throttle) {
                 // large height errors will result in the throttle saturating
                 max_climb_condition   |= (_thr_clip_status == clipStatus::MAX) &&
                                             !((_flight_stage == AP_FixedWing::FlightStage::TAKEOFF) || (_flight_stage == AP_FixedWing::FlightStage::ABORT_LANDING));
                 max_descent_condition |= (_thr_clip_status == clipStatus::MIN);
+            } else {
+                max_climb_condition   |= (_vert_accel_dem >= _vertAccLim) &&
+                                            !((_flight_stage == AP_FixedWing::FlightStage::TAKEOFF) || (_flight_stage == AP_FixedWing::FlightStage::ABORT_LANDING));
+                max_descent_condition |= (_vert_accel_dem <= - _vertAccLim);
             }
             const float hgt_dem_alpha = _DT / MAX(_DT + _hgt_dem_tconst, _DT);
             if (max_climb_condition && _hgt_dem > _hgt_dem_prev) {
@@ -1215,8 +1228,8 @@ void AP_TECS::_update_pitch(void)
     _pitch_dem_unc = (SEBdot_dem_total + _integSEBdot + integSEB_delta + _integKE) / gainInv;
 
     // integrate SEB rate error and apply integrator state limits
-    const bool inhibit_integrator = ((_pitch_dem_unc > _PITCHmaxf) && integSEB_delta > 0.0f) ||
-                                    ((_pitch_dem_unc < _PITCHminf) && integSEB_delta < 0.0f);
+    const bool inhibit_integrator = ((_pitch_dem_unc > _PITCHmaxf || _vert_accel_clip == clipStatus::MAX) && integSEB_delta > 0.0f) ||
+                                    ((_pitch_dem_unc < _PITCHminf || _vert_accel_clip == clipStatus::MIN) && integSEB_delta < 0.0f);
     if (!inhibit_integrator) {
         _integSEBdot += integSEB_delta;
         _integKE += (_SKE_est - _SKE_dem) * _SKE_weighting * _DT / timeConstant();
@@ -1238,6 +1251,13 @@ void AP_TECS::_update_pitch(void)
         _pitch_dem_unc += (_TAS_dem_adj - _pitch_ff_v0) * _pitch_ff_k;
     }
 
+    // calculate a demanded vertical velocity
+    const float energy_loop_tconst = timeConstant();
+    const float vel_dem = constrain_float(_pitch_dem_unc * _TAS_state, -_sink_rate_limit, _climb_rate_limit);
+
+    // calculate a demanded vertical acceleration
+    _vert_accel_dem = constrain_float((vel_dem - _climb_rate) * (_accel_gf / energy_loop_tconst) , -_vertAccLim, _vertAccLim);
+
     // Constrain pitch demand
     _pitch_dem = constrain_float(_pitch_dem_unc, _PITCHminf, _PITCHmaxf);
 
@@ -1254,8 +1274,8 @@ void AP_TECS::_update_pitch(void)
     _last_pitch_dem = _pitch_dem;
 
     if (AP::logger().should_log(_log_bitmask)){
-        AP::logger().WriteStreaming("TEC2","TimeUS,PEW,EBD,EBE,EBDD,EBDE,EBDDT,Imin,Imax,I,KI,pmin,pmax",
-                                    "Qffffffffffff",
+        AP::logger().WriteStreaming("TEC2","TimeUS,PEW,EBD,EBE,EBDD,EBDE,EBDDT,Imin,Imax,I,KI,VAD,pmin,pmax",
+                                    "Qfffffffffffff",
                                     AP_HAL::micros64(),
                                     (double)SPE_weighting,
                                     (double)SEB_dem,
@@ -1267,6 +1287,7 @@ void AP_TECS::_update_pitch(void)
                                     (double)integSEBdot_max,
                                     (double)_integSEBdot,
                                     (double)_integKE,
+                                    (double)_vert_accel_dem,
                                     (double)_PITCHminf,
                                     (double)_PITCHmaxf);
     }
