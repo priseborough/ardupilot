@@ -66,6 +66,31 @@ public:
         return int32_t(_pitch_dem * 5729.5781f);
     }
 
+    // get upper pitch angle limit in radians
+    float get_pitch_max(void) {
+        return _PITCHmaxf;
+    }
+
+    // get lower pitch angle limit in radians
+    float get_pitch_min(void) {
+        return _PITCHminf;
+    }
+
+    // demanded vertical acceleration in m/s/s - up is positive
+    // set clipping to 1 when acceleration response is clipping in the up direction
+    // set clipping is -1 when acceleration response is clipping in the down direction
+    // set clipping to 0 when acceleration response is not clipping
+    float get_vert_accel_demand(int8_t clipping_status_in) {
+        if (clipping_status_in > 0) {
+            _vert_accel_clip = clipStatus::MAX;
+        } else if (clipping_status_in < 0)  {
+            _vert_accel_clip = clipStatus::MIN;
+        } else {
+            _vert_accel_clip = clipStatus::NONE;
+        }
+        return _vert_accel_dem;
+    }
+
     // Rate of change of velocity along X body axis in m/s^2
     float get_VXdot(void) {
         return _vel_dot;
@@ -197,7 +222,7 @@ private:
     AP_Float _hgt_dem_tconst;
 
     enum {
-        OPTION_GLIDER_ONLY=(1<<0)
+        OPTION_GLIDER_ONLY=(1<<0),
     };
 
     AP_Float _pitch_ff_v0;
@@ -379,7 +404,7 @@ private:
     float _SPEdot;
     float _SKEdot;
 
-    // variables used for precision landing pitch control
+    // misc variables used for alternative precision landing pitch control
     float _hgt_at_start_of_flare;
     float _hgt_rate_at_flare_entry;
     float _hgt_afe;
@@ -391,6 +416,14 @@ private:
 
     // Specific energy error quantities
     float _STE_error;
+
+    // demanded vertical acceleration in m/s/s - up is positive
+    float _vert_accel_dem;
+
+    // 1 when acceleration is clipping externally in the up direction
+    // -1 when acceleration is clipping externally in the down direction
+    // 0 when not clipping
+    clipStatus _vert_accel_clip;
 
     // 1 when specific energy balance rate demand is clipping in the up direction
     // -1 when specific energy balance rate demand is clipping in the down direction
