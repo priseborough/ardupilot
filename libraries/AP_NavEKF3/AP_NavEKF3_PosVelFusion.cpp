@@ -376,7 +376,7 @@ void NavEKF3_core::CorrectExtNavForSensorOffset(ext_nav_elements &ext_nav_data)
     ext_nav_data.pos.z -= posOffsetEarth.z;
 #endif
 
-    // When simultaneously using PGS and external nav data, adjust external nav slowly to prevent
+    // When simultaneously using GPS and external nav data, adjust external nav slowly to prevent
     // the external nav fighting the GPS as it drifts,
     // TODO calculate the correction using covariance ad other data after we get replay logs
     const AP_NavEKF_Source::SourceXY posxy_source = frontend->sources.getPosXYSource();
