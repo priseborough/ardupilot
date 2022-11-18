@@ -413,7 +413,11 @@ void NavEKF3_core::setAidingMode()
 #if EK3_FEATURE_EXTERNAL_NAV
             } else if (readyToUseExtNav()) {
                 // we are commencing aiding using external nav
-                posResetSource = resetDataSource::EXTNAV;
+                if (frontend->sources.getPosXYSource() == AP_NavEKF_Source::SourceXY::GPSANDEXTNAV) {
+                    posResetSource = resetDataSource::GPSANDEXTNAV;
+                } else {
+                    posResetSource = resetDataSource::EXTNAV;
+                }
                 GCS_SEND_TEXT(MAV_SEVERITY_INFO, "EKF3 IMU%u is using external nav data",(unsigned)imu_index);
                 GCS_SEND_TEXT(MAV_SEVERITY_INFO, "EKF3 IMU%u initial pos NED = %3.1f,%3.1f,%3.1f (m)",(unsigned)imu_index,(double)extNavDataDelayed.pos.x,(double)extNavDataDelayed.pos.y,(double)extNavDataDelayed.pos.z);
                 if (useExtNavVel) {
@@ -546,11 +550,10 @@ bool NavEKF3_core::readyToUseRangeBeacon(void) const
 bool NavEKF3_core::readyToUseExtNav(void) const
 {
 #if EK3_FEATURE_EXTERNAL_NAV
-    if (frontend->sources.getPosXYSource() != AP_NavEKF_Source::SourceXY::EXTNAV ||
+    if (frontend->sources.getPosXYSource() != AP_NavEKF_Source::SourceXY::EXTNAV &&
         frontend->sources.getPosXYSource() != AP_NavEKF_Source::SourceXY::GPSANDEXTNAV) {
         return false;
     }
-
     return tiltAlignComplete && extNavDataToFuse;
 #else
     return false;

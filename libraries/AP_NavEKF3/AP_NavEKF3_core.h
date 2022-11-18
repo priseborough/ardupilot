@@ -627,7 +627,8 @@ private:
         BARO=4,         // Use Baro height
         MAG=5,          // Use magnetometer data
         RNGFND=6,       // Use rangefinder data
-        EXTNAV=7        // Use external nav data
+        EXTNAV=7,       // Use external nav data
+        GPSANDEXTNAV=8  // Use GPs as first priority else use external nav
     };
 
     // specifies the method to be used when fusing yaw observations
