@@ -119,8 +119,8 @@ void NavEKF3_core::ResetPosition(resetDataSource posResetSource)
             stateStruct.position.x = extNavDataDelayed.pos.x;
             stateStruct.position.y = extNavDataDelayed.pos.y;
             // set the variances as received from external nav system data
-            P[7][7] = extNavDataDelayed.posCov[0];
-            P[8][8] = extNavDataDelayed.posCov[3];
+            P[7][7] = extNavDataDelayed.posCov[0] + extNavDataNew.hposVarIncr;
+            P[8][8] = extNavDataDelayed.posCov[3] + extNavDataNew.hposVarIncr;
 #endif // EK3_FEATURE_EXTERNAL_NAV
         }
     }
@@ -690,6 +690,8 @@ void NavEKF3_core::FuseVelPosNED()
                     R_OBS[3] = constrain_ftype(extNavDataDelayed.posCov[0], sq(0.01f), sq(10.0f));
                     R_OBS[4] = constrain_ftype(extNavDataDelayed.posCov[3], sq(0.01f), sq(10.0f));
                 }
+                R_OBS[3] += extNavDataNew.hposVarIncr;
+                R_OBS[4] += extNavDataNew.hposVarIncr;
             } else
 #endif
             {

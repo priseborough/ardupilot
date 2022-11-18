@@ -461,6 +461,7 @@ private:
     AP_Int8 _primary_core;          // initial core number
     AP_Float _extNavOriginTconst;   // time constant used to align the external position origin
     AP_Float _extNavPosNoiseMin;    // minimum 1-sigma external nav position noise that will be allowed
+    AP_Float _extNavMaxTshift;      // maximum number of seconds that the external nav positoin data will be time shifted and adjusted using velocity estimates
 
 // Possible values for _flowUse
 #define FLOW_USE_NONE    0

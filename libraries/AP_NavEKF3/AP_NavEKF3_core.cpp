@@ -786,6 +786,11 @@ void NavEKF3_core::UpdateStrapdownEquationsNED()
     accNavMag = velDotNEDfilt.length();
     accNavMagHoriz = velDotNEDfilt.xy().length();
 
+    // update a peak hold filtered horizontal acceleration
+    const ftype alpha = imuDataDelayed.delVelDT / (imuDataDelayed.delVelDT + frontend->_extNavMaxTshift);
+    accNavMagHorizPHF = MAX(accNavMagHorizPHF , accNavMagHoriz);
+    accNavMagHorizPHF *= (1.0F - alpha);
+
     // if we are not aiding, then limit the horizontal magnitude of acceleration
     // to prevent large manoeuvre transients disturbing the attitude
     if ((PV_AidingMode == AID_NONE) && (accNavMagHoriz > 5.0f)) {

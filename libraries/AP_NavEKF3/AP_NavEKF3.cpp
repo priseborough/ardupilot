@@ -736,6 +736,14 @@ const AP_Param::GroupInfo NavEKF3::var_info2[] = {
     // @Units: m
     AP_GROUPINFO("EXT_M_NSE", 10, NavEKF3, _extNavPosNoiseMin, 0.0f),
 
+    // @Param: EXT_TSHIFT
+    // @DisplayName: External navigsation time shift limit (sec)
+    // @Description: This sets the maximum number of seconds the external navigation data will be time shifted using current accelerationo and velocity estimates when it is time stamped behind the EKF fusion time horizon.
+    // @Range: 0.0 10.0
+    // @User: Advanced
+    // @Units: s
+    AP_GROUPINFO("EXT_TSHIFT", 11, NavEKF3, _extNavMaxTshift, 5.0f),
+
     AP_GROUPEND
 };
 

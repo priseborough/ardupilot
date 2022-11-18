@@ -595,6 +595,7 @@ private:
     struct ext_nav_elements : EKF_obs_element_t {
         Vector3F    pos;            // XYZ position measured in a RH navigation frame (m)
         ftype       posCov[6];      // top right diagonal covariance matrix in descending row order
+        ftype       hposVarIncr;    // increment added to horizontal position observation variance to account for time shifting induced errors (m^2)
         bool        posReset;       // true when the position measurement has been reset
         bool        corrected;      // true when the position has been corrected for sensor position
         uint32_t    timeStamp_ms;   // time stamp of message as received by the EKF and before correction for delays
@@ -1003,6 +1004,7 @@ private:
     Matrix3F prevTnb;               // previous nav to body transformation used for INS earth rotation compensation
     ftype accNavMag;                // magnitude of navigation accel - used to adjust GPS obs variance (m/s^2)
     ftype accNavMagHoriz;           // magnitude of navigation accel in horizontal plane (m/s^2)
+    ftype accNavMagHorizPHF;        // peak hold filtered magnitude of navigation accel in horizontal plane (m/s^2)
     Vector3F earthRateNED;          // earths angular rate vector in NED (rad/s)
     ftype dtIMUavg;                 // expected time between IMU measurements (sec)
     ftype dtEkfAvg;                 // expected time between EKF updates (sec)

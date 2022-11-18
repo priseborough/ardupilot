@@ -1030,8 +1030,22 @@ void NavEKF3_core::writeExtNavPoseData(const Vector3f &pos, const Vector3f &rpy,
     // don't try to write to buffer until the filter has been initialised
     if (((timeStamp_ms - extNavMeasTime_ms) < frontend->extNavIntervalMin_ms) || !statesInitialised) {
         return;
+    }
+
+    extNavDataNew.pos = pos.toftype();
+    extNavMeasTime_ms = timeStamp_ms;
+    // If this data is timestamped further behind that the current EKF fusion time horizon, correct using
+    // velocity state estimates back to the fusion time horizon.
+    if (is_positive(frontend->_extNavMaxTshift) && extNavMeasTime_ms < imuDataDelayed.time_ms) {
+        const float timeShift = 1E-3f * (ftype)(imuDataDelayed.time_ms - extNavMeasTime_ms);
+        if (timeShift > frontend->_extNavMaxTshift) {
+            // data is too old to correct
+            return;
+        }
+        extNavDataNew.pos += stateStruct.velocity * timeShift;
+        extNavDataNew.hposVarIncr = sq(0.5F * accNavMagHorizPHF * sq(timeShift)) + (P[4][4] + P[5][5]) * sq(timeShift);
     } else {
-        extNavMeasTime_ms = timeStamp_ms;
+        extNavDataNew.hposVarIncr = 0.0F;
     }
 
     if (resetTime_ms != extNavLastPosResetTime_ms) {
@@ -1040,8 +1054,6 @@ void NavEKF3_core::writeExtNavPoseData(const Vector3f &pos, const Vector3f &rpy,
     } else {
         extNavDataNew.posReset = false;
     }
-
-    extNavDataNew.pos = pos.toftype();
 
     extNavDataNew.timeStamp_ms = timeStamp_ms;
 
