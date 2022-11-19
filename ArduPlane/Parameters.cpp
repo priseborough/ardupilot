@@ -1240,8 +1240,35 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("AUTOTUNE_AXES", 34, ParametersG2, axis_bitmask, 7),
 
+    // @Param: PROP_DSKLD
+    // @DisplayName: Propeller disk loading
+    // @Description: This is the vehicle weight in kg divided by the total disk area of all propellers in m^2. It is used to adjust control surface effectiveness to allow for propwash.
+    // @Units: kg/m/m
+    // @Range: 0 50
+    // @User: Standard
+    AP_GROUPINFO("PROP_DSKLD", 35, ParametersG2, prop_disc_loading, 0),
 
-    
+    // @Param: PROP_RLL_GAIN
+    // @DisplayName: Propwash roll effect
+    // @Description: This is a scaling factor applied to the theoretical calculation of aileron effectiveness variation with propeller thrust. The PROP_DSKLD parameter must be set for this to work,
+    // @Range: 0 1
+    // @User: Standard
+    AP_GROUPINFO("PROP_RLL_GAIN", 36, ParametersG2, propwash_roll_gain, 0),
+
+    // @Param: PROP_PIT_GAIN
+    // @DisplayName: Propwash roll effect
+    // @Description: This is a scaling factor applied to the theoretical calculation of elevator effectiveness variation with propeller thrust. The PROP_DSKLD parameter must be set for this to work,
+    // @Range: 0 1
+    // @User: Standard
+    AP_GROUPINFO("PROP_PIT_GAIN", 37, ParametersG2, propwash_pitch_gain, 0.1),
+
+    // @Param: PROP_YAW_GAIN
+    // @DisplayName: Propwash yaw effect
+    // @Description: This is a scaling factor applied to the theoretical calculation of rudder effectiveness variation with propeller thrust. The PROP_DSKLD parameter must be set for this to work,
+    // @Range: 0 1
+    // @User: Standard
+    AP_GROUPINFO("PROP_YAW_GAIN", 38, ParametersG2, propwash_yaw_gain, 0.2),
+
     AP_GROUPEND
 };
 
