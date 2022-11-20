@@ -155,8 +155,30 @@ void Vicon::update_vicon_position_estimate(const Location &loc,
     uint32_t delay_ms = 25 + unsigned(random()) % 100;
     uint64_t time_send_us = now_us + delay_ms * 1000UL;
 
-    // send vision position estimate message
+    // send global vision position estimate message
     uint8_t msg_buf_index;
+    if (should_send(ViconTypeMask::GLOBAL_VISION_POSITION_ESTIMATE) && get_free_msg_buf_index(msg_buf_index)) {
+        // TODO simulate delay jitter
+        float delay_usec = 0; // delay of measurement wrt mavlink transmission
+        float covariance[21] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,delay_usec};
+        mavlink_msg_global_vision_position_estimate_pack_chan(
+            system_id,
+            component_id,
+            mavlink_ch,
+            &msg_buf[msg_buf_index].obs_msg,
+            now_us + time_offset_us,
+            pos_corrected.x,
+            pos_corrected.y,
+            pos_corrected.z,
+            NAN,
+            NAN,
+            NAN,
+            covariance,
+            0);
+        msg_buf[msg_buf_index].time_send_us = time_send_us;
+    }
+
+    // send vision position estimate message
     if (should_send(ViconTypeMask::VISION_POSITION_ESTIMATE) && get_free_msg_buf_index(msg_buf_index)) {
         mavlink_msg_vision_position_estimate_pack_chan(
             system_id,
