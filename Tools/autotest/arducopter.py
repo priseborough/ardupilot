@@ -2832,6 +2832,90 @@ class AutoTestCopter(AutoTest):
         if ex is not None:
             raise ex
 
+    def fly_gps_vicon_combined(self):
+        """Fly GPS and Vicon Combination """
+        self.customise_SITL_commandline(["--uartF=sim:vicon:"])
+
+        """Setup parameters including switching to EKF3"""
+        self.context_push()
+        ex = None
+        try:
+            self.set_parameters({
+                "VISO_TYPE": 2,      # enable vicon
+                "SERIAL5_PROTOCOL": 2,
+                "EK3_ENABLE": 1,
+                "EK3_SRC1_POSXY": 8, # GPS and External Nav
+                "EK2_ENABLE": 0,
+                "AHRS_EKF_TYPE": 3,
+                "SIM_VICON_TMASK": 32, # send global position messages
+                "SIM_VICON_FAIL": 1, # vicon doesn't work until airborne
+                "LOG_REPLAY": 1,
+                "LOG_DISARMED": 1,
+            })
+            self.reboot_sitl()
+
+            # ensure we can get a global position:
+            self.poll_home_position(timeout=120)
+
+            # record starting position
+            old_pos = self.get_global_position_int()
+            print("old_pos=%s" % str(old_pos))
+
+            # takeoff to 10m in Loiter
+            self.progress("Moving to ensure location is tracked")
+            self.takeoff(10, mode="LOITER", require_absolute=True, timeout=720)
+
+            # enable vicon and wait 5 seconds before moving
+            self.set_parameter("SIM_VICON_FAIL", 0)
+            self.delay_sim_time(5)
+
+            # fly forward in Loiter
+            self.set_rc(2, 1300)
+
+            # disable vicon after moving for 5 seconds
+            self.delay_sim_time(5)
+            self.set_parameter("SIM_VICON_FAIL", 1)
+
+            # ensure vehicle remains in Loiter for 10 seconds
+            tstart = self.get_sim_time()
+            while self.get_sim_time() - tstart < 15:
+                if not self.mode_is('LOITER'):
+                    raise NotAchievedException("Expected to stay in loiter for >10 seconds")
+
+            # re-enable vicon
+            self.set_parameter("SIM_VICON_FAIL", 0)
+
+            # ensure vehicle remains in Loiter for 10 seconds
+            tstart = self.get_sim_time()
+            while self.get_sim_time() - tstart < 10:
+                if not self.mode_is('LOITER'):
+                    raise NotAchievedException("Expected to stay in loiter for >10 seconds")
+
+            # disable GPS
+            self.set_parameter("SIM_GPS_DISABLE", 1)
+
+            # ensure vehicle remains in Loiter for 10 seconds
+            tstart = self.get_sim_time()
+            while self.get_sim_time() - tstart < 10:
+                if not self.mode_is('LOITER'):
+                    raise NotAchievedException("Expected to stay in loiter for >10 seconds")
+
+            # enable GPS
+            self.set_parameter("SIM_GPS_DISABLE", 0)
+
+            # RTL and check vehicle arrives within 10m of home
+            self.set_rc(2, 1500)
+            self.do_RTL()
+
+        except Exception as e:
+            self.print_exception_caught(e)
+            ex = e
+        self.context_pop()
+        self.disarm_vehicle(force=True)
+        self.reboot_sitl()
+        if ex is not None:
+            raise ex
+
     def fly_rtl_speed(self):
         """Test RTL Speed parameters"""
         rtl_speed_ms = 7
@@ -8662,6 +8746,14 @@ class AutoTestCopter(AutoTest):
         ])
         return ret
 
+    def testExtNav(self):
+        ret = ([
+            ("GPSViconCombination",
+             "Fly GPS and Vicon Combination",
+             self.fly_gps_vicon_combined),
+        ])
+        return ret
+
     def testcan(self):
         ret = ([
             ("CANGPSCopterMission",
@@ -8730,6 +8822,9 @@ class AutoTestCopterTests2b(AutoTestCopter):
     def tests(self):
         return self.tests2b()
 
+class AutoTestCopterTestExtNav(AutoTestCopter):
+    def tests(self):
+        return self.testExtNav()
 
 class AutoTestCAN(AutoTestCopter):
 
