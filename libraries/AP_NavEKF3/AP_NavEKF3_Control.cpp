@@ -531,7 +531,7 @@ bool NavEKF3_core::readyToUseBodyOdm(void) const
 // return true if the filter to be ready to use gps
 bool NavEKF3_core::readyToUseGPS(void) const
 {
-    if (frontend->sources.getPosXYSource() != AP_NavEKF_Source::SourceXY::GPS) {
+    if (frontend->sources.getPosXYSource() != AP_NavEKF_Source::SourceXY::GPS && frontend->sources.getPosXYSource() != AP_NavEKF_Source::SourceXY::GPSANDEXTNAV) {
         return false;
     }
 
