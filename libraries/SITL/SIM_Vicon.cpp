@@ -102,13 +102,15 @@ void Vicon::update_vicon_position_estimate(const Location &loc,
         return;
     }
 
-    if (now_us - last_observation_usec < 20000) {
-        // create observations at 20ms intervals (matches EKF max rate)
+    const uint64_t dt_usec = 200000;
+    if (now_us - last_observation_usec < dt_usec) {
+        // create observations at 200ms intervals
         return;
     }
 
     // failure simulation
     if (_sitl->vicon_fail.get() != 0) {
+        posNE_variance = 0.0f; // reset variance calculation
         return;
     }
 
@@ -159,8 +161,15 @@ void Vicon::update_vicon_position_estimate(const Location &loc,
     uint8_t msg_buf_index;
     if (should_send(ViconTypeMask::GLOBAL_VISION_POSITION_ESTIMATE) && get_free_msg_buf_index(msg_buf_index)) {
         // TODO simulate delay jitter
-        float delay_usec = 0; // delay of measurement wrt mavlink transmission
-        float covariance[21] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,delay_usec};
+        const float delay_usec = 0.f; // delay of measurement wrt mavlink transmission
+        posNE_variance += sq(vel_error * 1E-6f * (float)dt_usec);
+        const float hgt_variance = sq(hgt_error);
+        float covariance[21] = {posNE_variance, 0,              0,              0,  0,  0,
+                                                posNE_variance, 0,              0,  0,  0,
+                                                                hgt_variance,   0,  0,  0,
+                                                                                0,  0,  0,
+                                                                                    0,  0,
+                                                                                        delay_usec};
         mavlink_msg_global_vision_position_estimate_pack_chan(
             system_id,
             component_id,

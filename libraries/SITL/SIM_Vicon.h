@@ -41,6 +41,8 @@ private:
     // TODO: make these parameters:
     const uint8_t system_id = 17;
     const uint8_t component_id = 18;
+    const float vel_error = 0.25f; // 1-sigma horizontal velocity error
+    const float hgt_error = 5.0f; // 1-sigma height error
 
     // we share channels with the ArduPilot binary!
     // Beware: the mavlink rangefinder shares this channel.
@@ -48,6 +50,7 @@ private:
 
     uint64_t last_observation_usec; // time last observation was sent
     uint64_t time_offset_us;        // simulated timeoffset between external system and autopilot
+    float posNE_variance;           // simulated NE position variance (m^2)
 
     // buffer of messages to send
     struct {
