@@ -2841,6 +2841,7 @@ class AutoTestCopter(AutoTest):
         ex = None
         try:
             self.set_parameters({
+                "SIM_SPEEDUP": 1,
                 "VISO_TYPE": 2,      # enable vicon
                 "SERIAL5_PROTOCOL": 2,
                 "EK3_ENABLE": 1,
@@ -2848,6 +2849,7 @@ class AutoTestCopter(AutoTest):
                 "EK2_ENABLE": 0,
                 "AHRS_EKF_TYPE": 3,
                 "SIM_VICON_TMASK": 32, # send global position messages
+                "SIM_VICON_FAIL": 0,
                 "LOG_REPLAY": 1,
                 "LOG_DISARMED": 1,
             })
