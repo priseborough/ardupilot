@@ -1086,6 +1086,7 @@ void NavEKF3_core::writeExtNavCovarianceData(const float posCov[6], const float 
         for (uint8_t i=0; i<6; i++) {
             extNavDataNew.posCov[i] = ftype(posCov[i]);
         }
+        extNavDataNew.corrected = false;
         storedExtNav.push(extNavDataNew);
         extNavDataNew.timeStamp_ms = 0;
     }
