@@ -2875,18 +2875,18 @@ class AutoTestCopter(AutoTest):
             # fly forward in Loiter
             self.set_rc(2, 1300)
 
-            # disable vicon after moving for 5 seconds
-            self.delay_sim_time(5)
-            # self.set_parameter("SIM_VICON_FAIL", 1)
+            # disable vicon after moving for 30 seconds
+            self.delay_sim_time(30)
+            self.set_parameter("SIM_VICON_FAIL", 1)
 
             # ensure vehicle remains in Loiter for 10 seconds
             tstart = self.get_sim_time()
-            while self.get_sim_time() - tstart < 15:
+            while self.get_sim_time() - tstart < 10:
                 if not self.mode_is('LOITER'):
                     raise NotAchievedException("Expected to stay in loiter for >10 seconds")
 
             # re-enable vicon
-            # self.set_parameter("SIM_VICON_FAIL", 0)
+            self.set_parameter("SIM_VICON_FAIL", 0)
 
             # ensure vehicle remains in Loiter for 10 seconds
             tstart = self.get_sim_time()
@@ -2895,7 +2895,7 @@ class AutoTestCopter(AutoTest):
                     raise NotAchievedException("Expected to stay in loiter for >10 seconds")
 
             # disable GPS
-            # self.set_parameter("SIM_GPS_DISABLE", 1)
+            self.set_parameter("SIM_GPS_DISABLE", 1)
 
             # ensure vehicle remains in Loiter for 10 seconds
             tstart = self.get_sim_time()
@@ -2903,8 +2903,8 @@ class AutoTestCopter(AutoTest):
                 if not self.mode_is('LOITER'):
                     raise NotAchievedException("Expected to stay in loiter for >10 seconds")
 
-            # enable GPS
-            # self.set_parameter("SIM_GPS_DISABLE", 0)
+            # re-enable GPS
+            self.set_parameter("SIM_GPS_DISABLE", 0)
 
             # RTL and check vehicle arrives within 10m of home
             self.set_rc(2, 1500)
