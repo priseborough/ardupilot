@@ -28,27 +28,36 @@ extern const AP_HAL::HAL& hal;
 // consume vision position estimate data and send to EKF. distances in meters
 void AP_VisualOdom_IntelT265::handle_vision_position_estimate(uint64_t remote_time_us, uint32_t time_ms,
                                                               const Vector3f position,
-                                                              const Vector3f rpy,
+                                                              const Vector3f rpy_in,
                                                               const float covariance[21],
                                                               uint8_t reset_counter)
 {
     const float scale_factor = _frontend.get_pos_scale();
     Vector3f pos = position * scale_factor;
 
-    float roll;
-    float pitch;
-    float yaw;
+    Vector3f rpy_out; 
+    float roll; // used for logging
+    float pitch; // used for logging
+    float yaw; // used for logging
     uint64_t time_stamp_corrected_us = time_ms;
-    if (isnanf(rpy.x)) {
+    const bool rpy_invalid = (_frontend.get_options() & OPTIONS_IGNORE_RPY) || (is_zero(rpy_in.x) && is_zero(rpy_in.y) && is_zero(rpy_in.z)) || isnanf(rpy_in.x) || isnanf(rpy_in.y) || isnanf(rpy_in.z);
+    if (rpy_invalid) {
         if (is_positive(covariance[20])) {
             // hack to re-purpose last element in covariance matrix to send time delay
             // in micro seconds when rpy accuracy data is not required
             time_stamp_corrected_us -= (uint64_t)(covariance[20]);
         }
-        roll = pitch = yaw = NAN;
+        // setting these data to nanf will stop the yaw being used or checked elsewhere
+        rpy_out.x = NAN;
+        rpy_out.y = NAN;
+        rpy_out.z = NAN;
+        // these data are logged with a unit covnersion so cannot tolerate NAN
+        roll = 0.0f;
+        pitch = 0.0f;
+        yaw = 0.0f;
     } else {
         Quaternion att;
-        att.from_euler(rpy);
+        att.from_euler(rpy_in);
 
         // handle user request to align camera
         if (_align_camera) {
@@ -71,6 +80,8 @@ void AP_VisualOdom_IntelT265::handle_vision_position_estimate(uint64_t remote_ti
 
         // calculate euler orientation for logging
         att.to_euler(roll, pitch, yaw);
+
+        rpy_out = rpy_in;
     }
 
 
@@ -111,7 +122,7 @@ void AP_VisualOdom_IntelT265::handle_vision_position_estimate(uint64_t remote_ti
     bool consume = should_consume_sensor_data(true, reset_counter);
     if (consume) {
         // send attitude and position to EKF
-        AP::ahrs().writeExtNavData(pos, rpy, cov, time_stamp_corrected_us, _frontend.get_delay_ms(), get_reset_timestamp_ms(reset_counter));
+        AP::ahrs().writeExtNavData(pos, rpy_out, cov, time_stamp_corrected_us, _frontend.get_delay_ms(), get_reset_timestamp_ms(reset_counter));
     }
 
     // log sensor data
@@ -282,6 +293,10 @@ bool AP_VisualOdom_IntelT265::pre_arm_check(char *failure_msg, uint8_t failure_m
     if (!AP::ahrs().get_quaternion(ahrs_quat)) {
         hal.util->snprintf(failure_msg, failure_msg_len, "waiting for AHRS attitude");
         return false;
+    }
+
+    if (_frontend.get_options() & OPTIONS_IGNORE_RPY) {
+        return true;
     }
 
     // check if roll and pitch is different by > 10deg (using NED so cannot determine whether roll or pitch specifically)

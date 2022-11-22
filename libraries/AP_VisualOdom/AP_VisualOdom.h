@@ -32,6 +32,8 @@ class AP_VisualOdom_Backend;
 
 #define AP_VISUALODOM_TIMEOUT_MS 300
 
+#define OPTIONS_IGNORE_RPY (1<<0)
+
 class AP_VisualOdom
 {
 public:
@@ -81,6 +83,8 @@ public:
     // return yaw measurement noise in rad
     float get_yaw_noise() const { return _yaw_noise; }
 
+    int8_t get_options() const { return _options; }
+
 #if HAL_GCS_ENABLED
     // consume vision_position_delta mavlink messages
     void handle_vision_position_delta_msg(const mavlink_message_t &msg);
@@ -127,6 +131,7 @@ private:
     AP_Float _vel_noise;        // velocity measurement noise in m/s
     AP_Float _pos_noise;        // position measurement noise in meters
     AP_Float _yaw_noise;        // yaw measurement noise in radians
+    AP_Int8 _options;           // bitmask of misc processing options
 
     // reference to backends
     AP_VisualOdom_Backend *_driver;
