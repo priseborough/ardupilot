@@ -2843,6 +2843,7 @@ class AutoTestCopter(AutoTest):
             self.set_parameters({
                 "SIM_SPEEDUP": 1,
                 "VISO_TYPE": 2,      # enable vicon
+                "VISO_OPTIONS": 1,   # ignore rpy data
                 "SERIAL5_PROTOCOL": 2,
                 "EK3_ENABLE": 1,
                 "EK3_SRC1_POSXY": 8, # GPS and External Nav
@@ -2850,7 +2851,8 @@ class AutoTestCopter(AutoTest):
                 "EK2_ENABLE": 0,
                 "AHRS_EKF_TYPE": 3,
                 "SIM_VICON_TMASK": 32, # send global position messages
-                "SIM_VICON_FAIL": 0,
+                "SIM_VICON_FAIL": 1,
+                "SIM_VICON_YAW": 0,
                 "LOG_REPLAY": 1,
                 "LOG_DISARMED": 1,
             })
@@ -2859,9 +2861,12 @@ class AutoTestCopter(AutoTest):
             # ensure we can get a global position:
             self.poll_home_position(timeout=120)
 
-            # record starting position
+            # record starting position using GPS
             old_pos = self.get_global_position_int()
             print("old_pos=%s" % str(old_pos))
+
+            # enable vicon
+            self.set_parameter("SIM_VICON_FAIL", 0)
 
             # takeoff to 10m in Loiter
             self.progress("Moving to ensure location is tracked")
@@ -2872,7 +2877,7 @@ class AutoTestCopter(AutoTest):
 
             # disable vicon after moving for 5 seconds
             self.delay_sim_time(5)
-            self.set_parameter("SIM_VICON_FAIL", 1)
+            # self.set_parameter("SIM_VICON_FAIL", 1)
 
             # ensure vehicle remains in Loiter for 10 seconds
             tstart = self.get_sim_time()
@@ -2881,7 +2886,7 @@ class AutoTestCopter(AutoTest):
                     raise NotAchievedException("Expected to stay in loiter for >10 seconds")
 
             # re-enable vicon
-            self.set_parameter("SIM_VICON_FAIL", 0)
+            # self.set_parameter("SIM_VICON_FAIL", 0)
 
             # ensure vehicle remains in Loiter for 10 seconds
             tstart = self.get_sim_time()
@@ -2890,7 +2895,7 @@ class AutoTestCopter(AutoTest):
                     raise NotAchievedException("Expected to stay in loiter for >10 seconds")
 
             # disable GPS
-            self.set_parameter("SIM_GPS_DISABLE", 1)
+            # self.set_parameter("SIM_GPS_DISABLE", 1)
 
             # ensure vehicle remains in Loiter for 10 seconds
             tstart = self.get_sim_time()
@@ -2899,7 +2904,7 @@ class AutoTestCopter(AutoTest):
                     raise NotAchievedException("Expected to stay in loiter for >10 seconds")
 
             # enable GPS
-            self.set_parameter("SIM_GPS_DISABLE", 0)
+            # self.set_parameter("SIM_GPS_DISABLE", 0)
 
             # RTL and check vehicle arrives within 10m of home
             self.set_rc(2, 1500)
