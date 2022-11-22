@@ -2848,7 +2848,6 @@ class AutoTestCopter(AutoTest):
                 "EK2_ENABLE": 0,
                 "AHRS_EKF_TYPE": 3,
                 "SIM_VICON_TMASK": 32, # send global position messages
-                "SIM_VICON_FAIL": 1, # vicon doesn't work until airborne
                 "LOG_REPLAY": 1,
                 "LOG_DISARMED": 1,
             })
@@ -2864,10 +2863,6 @@ class AutoTestCopter(AutoTest):
             # takeoff to 10m in Loiter
             self.progress("Moving to ensure location is tracked")
             self.takeoff(10, mode="LOITER", require_absolute=True, timeout=720)
-
-            # enable vicon and wait 5 seconds before moving
-            self.set_parameter("SIM_VICON_FAIL", 0)
-            self.delay_sim_time(5)
 
             # fly forward in Loiter
             self.set_rc(2, 1300)
