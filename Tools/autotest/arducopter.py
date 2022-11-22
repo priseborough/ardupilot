@@ -2846,6 +2846,7 @@ class AutoTestCopter(AutoTest):
                 "SERIAL5_PROTOCOL": 2,
                 "EK3_ENABLE": 1,
                 "EK3_SRC1_POSXY": 8, # GPS and External Nav
+                "EK3_IMU_MASK": 1,
                 "EK2_ENABLE": 0,
                 "AHRS_EKF_TYPE": 3,
                 "SIM_VICON_TMASK": 32, # send global position messages
