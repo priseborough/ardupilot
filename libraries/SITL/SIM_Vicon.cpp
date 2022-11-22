@@ -164,7 +164,7 @@ void Vicon::update_vicon_position_estimate(const Location &loc,
         const float delay_usec = 0.f; // delay of measurement wrt mavlink transmission
         posNE_variance += sq(vel_error * 1E-6f * (float)dt_usec);
         const float hgt_variance = sq(hgt_error);
-        float covariance[21] = {posNE_variance, 0,              0,              0,  0,  0,
+        const float covariance[21] = {posNE_variance, 0,        0,              0,  0,  0,
                                                 posNE_variance, 0,              0,  0,  0,
                                                                 hgt_variance,   0,  0,  0,
                                                                                 0,  0,  0,
@@ -179,9 +179,9 @@ void Vicon::update_vicon_position_estimate(const Location &loc,
             pos_corrected.x,
             pos_corrected.y,
             pos_corrected.z,
-            NAN,
-            NAN,
-            NAN,
+            NULL,
+            NULL,
+            NULL,
             covariance,
             0);
         msg_buf[msg_buf_index].time_send_us = time_send_us;
