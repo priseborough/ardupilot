@@ -161,7 +161,7 @@ void Vicon::update_vicon_position_estimate(const Location &loc,
     uint8_t msg_buf_index;
     if (should_send(ViconTypeMask::GLOBAL_VISION_POSITION_ESTIMATE) && get_free_msg_buf_index(msg_buf_index)) {
         // TODO simulate delay jitter
-        const float delay_usec = 0.f; // delay of measurement wrt mavlink transmission
+        const float delay_usec = 1E3f * (float)delay_ms; // delay of measurement wrt mavlink transmission
         posNE_variance += sq(vel_error * 1E-6f * (float)dt_usec);
         const float hgt_variance = sq(hgt_error);
         const float covariance[21] = {posNE_variance, 0,        0,              0,  0,  0,
