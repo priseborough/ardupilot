@@ -39,13 +39,13 @@ void AP_VisualOdom_IntelT265::handle_vision_position_estimate(uint64_t remote_ti
     float roll; // used for logging
     float pitch; // used for logging
     float yaw; // used for logging
-    uint64_t time_stamp_corrected_us = time_ms;
+    uint32_t time_stamp_corrected_ms = time_ms;
     const bool rpy_invalid = (_frontend.get_options() & OPTIONS_IGNORE_RPY) || (is_zero(rpy_in.x) && is_zero(rpy_in.y) && is_zero(rpy_in.z)) || isnanf(rpy_in.x) || isnanf(rpy_in.y) || isnanf(rpy_in.z);
     if (rpy_invalid) {
         if (is_positive(covariance[20])) {
             // hack to re-purpose last element in covariance matrix to send time delay
             // in micro seconds when rpy accuracy data is not required
-            time_stamp_corrected_us -= (uint64_t)(covariance[20]);
+            time_stamp_corrected_ms -= uint32_t(covariance[20]) / 1000;
         }
         // setting these data to nanf will stop the yaw being used or checked elsewhere
         rpy_out.x = NAN;
@@ -122,11 +122,11 @@ void AP_VisualOdom_IntelT265::handle_vision_position_estimate(uint64_t remote_ti
     bool consume = should_consume_sensor_data(true, reset_counter);
     if (consume) {
         // send attitude and position to EKF
-        AP::ahrs().writeExtNavData(pos, rpy_out, cov, time_stamp_corrected_us, _frontend.get_delay_ms(), get_reset_timestamp_ms(reset_counter));
+        AP::ahrs().writeExtNavData(pos, rpy_out, cov, time_stamp_corrected_ms, _frontend.get_delay_ms(), get_reset_timestamp_ms(reset_counter));
     }
 
     // log sensor data
-    Write_VisualPosition(remote_time_us, time_stamp_corrected_us, pos.x, pos.y, pos.z, degrees(roll), degrees(pitch), wrap_360(degrees(yaw)), posErr, angErr, reset_counter, !consume);
+    Write_VisualPosition(remote_time_us, time_stamp_corrected_ms, pos.x, pos.y, pos.z, degrees(roll), degrees(pitch), wrap_360(degrees(yaw)), posErr, angErr, reset_counter, !consume);
 
     // record time for health monitoring
     _last_update_ms = AP_HAL::millis();
