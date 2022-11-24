@@ -85,6 +85,9 @@ private:
     // position delta message 
     Quaternion _attitude_prev; // Rotation to previous MAV_FRAME_BODY_FRD from MAV_FRAME_LOCAL_NED
     Vector3d _position_prev;  // previous position from origin (m) MAV_FRAME_LOCAL_NED
+
+    float expRandVar(float lambda);
+
 };
 
 }

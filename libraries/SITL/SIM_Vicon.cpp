@@ -153,9 +153,10 @@ void Vicon::update_vicon_position_estimate(const Location &loc,
     // add yaw error reported to vehicle
     yaw = wrap_PI(yaw + radians(_sitl->vicon_yaw_error.get()));
 
-    // 25ms to 124ms delay before sending
-    uint32_t delay_ms = 25 + unsigned(random()) % 100;
-    uint64_t time_send_us = now_us + delay_ms * 1000UL;
+    // model time delay as fixed value of 50 msec plus a random variable from an exponential distribution.
+    // 50% of samples are less than 250 msec
+    float delay_ms = 50.0f + 200.0f * expRandVar(1.0f);
+    uint64_t time_send_us = now_us + (uint64_t)(1E3f * delay_ms);
 
     // send global vision position estimate message
     uint8_t msg_buf_index;
@@ -320,4 +321,10 @@ void Vicon::update(const Location &loc, const Vector3d &position, const Vector3f
 
     maybe_send_heartbeat();
     update_vicon_position_estimate(loc, position, velocity, attitude);
+}
+
+float Vicon::expRandVar(float lambda) {
+    double U = (float)rand()/ (float)RAND_MAX;
+    float T  = -log(U) / lambda;
+    return T;
 }
