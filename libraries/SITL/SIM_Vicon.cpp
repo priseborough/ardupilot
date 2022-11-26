@@ -161,8 +161,15 @@ void Vicon::update_vicon_position_estimate(const Location &loc,
     // send global vision position estimate message
     uint8_t msg_buf_index;
     if (should_send(ViconTypeMask::GLOBAL_VISION_POSITION_ESTIMATE) && get_free_msg_buf_index(msg_buf_index)) {
-        // TODO simulate delay jitter
+        // Use last the element in covariance to send the delay of the measurement with respect to transmission time
+        // in micro seconds. This is a temporary solution.
+        // This enables the message to be time stamped at transmission  which allows the autopilots clock offset
+        // estimation to work when there is a large range of measurement delays.
+        // TODO extend the MAVLink message definition to send this time delay as a uint32 type and
+        // coordinate with community providing evidence for why this is necessary.
         const float delay_usec = 1E3f * (float)delay_ms; // delay of measurement wrt mavlink transmission
+        // Mimic a simple position error variance growth assuming a velocity error in an underlying odometry process
+        // that is un-correlated from frame to frame.
         posNE_variance += sq(vel_error * 1E-6f * (float)dt_usec);
         const float hgt_variance = sq(hgt_error);
         const float covariance[21] = {posNE_variance, 0,        0,              0,  0,  0,

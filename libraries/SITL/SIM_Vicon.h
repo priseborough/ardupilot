@@ -41,16 +41,16 @@ private:
     // TODO: make these parameters:
     const uint8_t system_id = 17;
     const uint8_t component_id = 18;
-    const float vel_error = 0.25f; // 1-sigma horizontal velocity error
-    const float hgt_error = 5.0f; // 1-sigma height error
+    const float vel_error = 0.25f; // 1-sigma horizontal drift rate (m/s) - TODO make this tuneable and set based on flight test data
+    const float hgt_error = 5.0f; // 1-sigma height error (m) - TODO make this tuneable and set based on flight test data
 
     // we share channels with the ArduPilot binary!
     // Beware: the mavlink rangefinder shares this channel.
     const mavlink_channel_t mavlink_ch = (mavlink_channel_t)(MAVLINK_COMM_0+5);
 
     uint64_t last_observation_usec; // time last observation was sent
-    uint64_t time_offset_us;        // simulated timeoffset between external system and autopilot
-    float posNE_variance;           // simulated NE position variance (m^2)
+    uint64_t time_offset_us;        // simulated time offset between external system and autopilot
+    float posNE_variance;           // simulated NE position variance calculation (m^2)
 
     // buffer of messages to send
     struct {
