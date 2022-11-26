@@ -22,7 +22,6 @@ AEROM_KE_ANG = bind_add_param('KE_ANG', 3, 0)
 THR_PIT_FF = bind_add_param('THR_PIT_FF', 4, 80)
 SPD_P = bind_add_param('SPD_P', 5, 5)
 SPD_I = bind_add_param('SPD_I', 6, 25)
-ERR_CORR_TC = bind_add_param('ERR_COR_TC', 7, 3)
 ROLL_CORR_TC = bind_add_param('ROL_COR_TC', 8, 0.25)
 -- removed 9 and 10
 TIME_CORR_P = bind_add_param('TIME_COR_P', 11, 1.0)
@@ -37,6 +36,8 @@ AEROM_YAW_ACCEL = bind_add_param('YAW_ACCEL', 19, 1500)
 AEROM_LKAHD = bind_add_param('LKAHD', 20, 0.5)
 AEROM_PATH_SCALE = bind_add_param('PATH_SCALE', 21, 1.0)
 AEROM_BOX_WIDTH = bind_add_param('BOX_WIDTH', 22, 400)
+AEROM_STALL_THR = bind_add_param('STALL_THR', 23, 40)
+AEROM_STALL_PIT = bind_add_param('STALL_PIT', 24, -20)
 
 -- cope with old param values
 if AEROM_ANG_ACCEL:get() < 100 and AEROM_ANG_ACCEL:get() > 0 then
@@ -47,10 +48,16 @@ if AEROM_ANG_TC:get() > 1.0 then
 end
 
 ACRO_ROLL_RATE = Parameter("ACRO_ROLL_RATE")
+ACRO_YAW_RATE = Parameter('ACRO_YAW_RATE')
 ARSPD_FBW_MIN = Parameter("ARSPD_FBW_MIN")
 SCALING_SPEED = Parameter("SCALING_SPEED")
 
 local GRAVITY_MSS = 9.80665
+
+--[[
+   list of attributes that can be added to a path element
+--]]
+local path_attribs = { "roll_ref", "set_orient", "rate_override", "thr_boost", "pos_corr", "message", "shift_xy" }
 
 --[[
    Aerobatic tricks on a switch support - allows for tricks to be initiated outside AUTO mode
@@ -71,6 +78,15 @@ local TRICKS = nil
 local TRIK_SEL_FN = nil
 local TRIK_ACT_FN = nil
 local TRIK_COUNT  = nil
+
+--[[
+   find our rudder channel for stall turns
+--]]
+local K_RUDDER = 21
+local rudder_chan = SRV_Channels:find_channel(K_RUDDER)
+local RUDD_REVERSED = Parameter(string.format("SERVO%u_REVERSED", rudder_chan+1))
+local RUDD_MIN = Parameter(string.format("SERVO%u_MIN", rudder_chan+1))
+local RUDD_MAX = Parameter(string.format("SERVO%u_MAX", rudder_chan+1))
 
 local function TrickDef(id, arg1, arg2, arg3, arg4)
    local self = {}
@@ -120,7 +136,7 @@ local NAV_SCRIPT_TIME = 42702
 
 local MODE_AUTO = 10
 
-local LOOP_RATE = 20
+local LOOP_RATE = 40
 local DO_JUMP = 177
 local k_throttle = 70
 local NAME_FLOAT_RATE = 2
@@ -170,6 +186,19 @@ function calc_lowpass_alpha(dt, time_constant)
    return dt/(dt+rc)
 end
 
+--[[ get the c.y element of the DCM body to earth matrix, which gives
+   the projection of the vehicle y axis in the down direction
+--]]
+function get_ahrs_dcm_c_y()
+   local ahrs_quat = ahrs:get_quaternion()
+   local q1 = ahrs_quat:q1()
+   local q2 = ahrs_quat:q2()
+   local q3 = ahrs_quat:q3()
+   local q4 = ahrs_quat:q4()
+   local q3q4 = q3 * q4
+   local q1q2 = q1 * q2
+   return 2*(q3q4 + q1q2)
+end
 
 -- a PI controller implemented as a Lua object
 local function PI_controller(kP,kI,iMax,min,max)
@@ -524,8 +553,9 @@ function PathComponent()
    function self.get_roll_correction(t)
       return 0
    end
-   function self.get_throttle_boost(t)
-      return self.thr_boost or false
+
+   function self.get_attribute(t, attrib)
+      return self[attrib]
    end
 
    --[[ get the extents of the path on x axis. Can be overridden by a
@@ -589,6 +619,26 @@ function path_straight(_distance)
    end
    function self.get_length()
       return distance
+   end
+   return self
+end
+
+--[[
+   path component that does a straight line then reverses direction
+--]]
+function path_reverse(_distance)
+   local self = PathComponent()
+   self.name = "path_straight"
+   local distance = _distance
+   function self.get_pos(t)
+      if t < 0.5 then
+         return makeVector3f(distance*t*2, 0, 0)
+      else
+         return makeVector3f(distance-(distance*(t-0.5)*2), 0, 0)
+      end
+   end
+   function self.get_length()
+      return distance*2
    end
    return self
 end
@@ -788,18 +838,16 @@ function Path(_path_component, _roll_component)
    function self.get_pos(t)
       return path_component.get_pos(t)
    end
-   function self.get_speed(t)
-      return nil
-   end
    function self.get_length()
       return path_component.get_length()
    end
    function self.get_final_orientation()
       return path_component.get_final_orientation()
    end
-   function self.get_throttle_boost(t)
-      return self.thr_boost or false
+   function self.get_attribute(t, attrib)
+      return self[attrib]
    end
+
    function self.set_next_extents(extents, start_pos, start_orientation)
       path_component.set_next_extents(extents, start_pos, start_orientation)
    end
@@ -822,8 +870,6 @@ function path_composer(_name, _subpaths)
    local start_pos = {}
    local start_angle = {}
    local start_roll_correction = {}
-   local end_speed = {}
-   local start_speed = {}
    local total_length = 0
    local num_sub_paths = #subpaths
    local last_subpath_t = { -1, 0, 0 }
@@ -836,7 +882,6 @@ function path_composer(_name, _subpaths)
    local highest_i = 0
    local cache_i = -1
    local cache_sp = nil
-   local message = nil
 
    -- return the subpath with index i. Used to cope with two ways of calling path_composer
    function self.subpath(i)
@@ -848,13 +893,14 @@ function path_composer(_name, _subpaths)
       if sp.name then
          -- we are being called with a list of Path objects
          cache_sp = sp
-         message = sp.message
       else
          -- we are being called with a list function/argument tuples
          local args = subpaths[i][2]
          cache_sp = subpaths[i][1](args[1], args[2], args[3], args[4], start_pos[i], start_orientation[i])
-         message = subpaths[i].message
-         cache_sp.thr_boost = subpaths[i].thr_boost
+         -- copy over path attributes
+         for k, v in pairs(path_attribs) do
+            cache_sp[v] = subpaths[i][v]
+         end
       end
       return cache_sp
    end
@@ -870,7 +916,6 @@ function path_composer(_name, _subpaths)
 
       lengths[i] = sp.get_length()
       if lengths[i] == nil and i < num_sub_paths then
-         local saved_message = message
          local sp2 = self.subpath(i+1)
          local next_extents = sp2.get_extents_x()
          if next_extents ~= nil then
@@ -878,7 +923,6 @@ function path_composer(_name, _subpaths)
             lengths[i] = sp.get_length()
             -- solidify this subpath now that it has its length calculated
             subpaths[i] = sp
-            subpaths[i].message = saved_message
          end
       end
 
@@ -892,13 +936,6 @@ function path_composer(_name, _subpaths)
 
       angle = angle + sp.get_roll(1.0, lengths[i]/speed)
       roll_correction = roll_correction + sp.get_roll_correction(1.0)
-
-      start_speed[i] = speed
-      end_speed[i] = sp.get_speed(1.0)
-      if end_speed[i] == nil then
-         end_speed[i] = target_groundspeed()
-      end
-      speed = end_speed[i]
 
       if sp.set_orient ~= nil then
          -- override orientation at this point in the sequence
@@ -942,8 +979,8 @@ function path_composer(_name, _subpaths)
       local sp = self.subpath(i)
       if i > highest_i and t < 1.0 and t > 0 then
          highest_i = i
-         if message ~= nil then
-            gcs:send_text(0, message)
+         if sp.message ~= nil then
+            gcs:send_text(0, sp.message)
          end
          if AEROM_DEBUG:get() > 0 then
             gcs:send_text(0, string.format("starting %s[%d] %s", self.name, i, sp.name))
@@ -962,10 +999,7 @@ function path_composer(_name, _subpaths)
    -- return angle for the composed path at time t
    function self.get_roll(t, time_s)
       local subpath_t, i = self.get_subpath_t(t)
-      local speed = self.get_speed(t)
-      if speed == nil then
-         speed = target_groundspeed()
-      end
+      local speed = target_groundspeed()
       local sp = self.subpath(i)
       angle = sp.get_roll(subpath_t, lengths[i]/speed)
       return angle + start_angle[i]
@@ -977,12 +1011,6 @@ function path_composer(_name, _subpaths)
       return sp.get_roll_correction(subpath_t) + start_roll_correction[i]
    end
    
-   -- return speed for the composed path at time t
-   function self.get_speed(t)
-      local subpath_t, i = self.get_subpath_t(t)
-      return start_speed[i] + subpath_t * (end_speed[i] - start_speed[i])
-   end
-
    function self.get_length()
       return total_length
    end
@@ -991,13 +1019,10 @@ function path_composer(_name, _subpaths)
       return final_orientation
    end
 
-   function self.get_throttle_boost(t)
+   function self.get_attribute(t, attrib)
       local subpath_t, i = self.get_subpath_t(t)
       local sp = self.subpath(i)
-      if sp.thr_boost ~= nil then
-         return sp.thr_boost
-      end
-      return sp.get_throttle_boost(t)
+      return sp[attrib] or sp.get_attribute(subpath_t, attrib)
    end
 
    local extents = nil
@@ -1007,6 +1032,18 @@ function path_composer(_name, _subpaths)
       end
       extents = get_extents_x(self.get_pos)
       return extents
+   end
+
+   --[[
+      get the time that the next segment starts
+   --]]
+   function self.get_next_segment_start(t)
+      local subpath_t, i = self.get_subpath_t(t)
+      local sp = self.subpath(i)
+      if sp.get_next_segment_start ~= nil then
+         return start_time[i] + (sp.get_next_segment_start(subpath_t) * (end_time[i] - start_time[i]))
+      end
+      return end_time[i]
    end
    
    return self
@@ -1024,13 +1061,10 @@ function make_paths(name, paths)
       else
          p[i] = Path(paths[i][1], paths[i][2])
       end
-      if paths[i].roll_ref then
-         p[i].roll_ref = paths[i].roll_ref
+      -- copy over path attributes
+      for k, v in pairs(path_attribs) do
+         p[i][v] = paths[i][v]
       end
-      if paths[i].set_orient then
-         p[i].set_orient = paths[i].set_orient
-      end
-      p[i].thr_boost = paths[i].thr_boost
    end
    return path_composer(name, p)
 end
@@ -1133,22 +1167,6 @@ function humpty_bump(r, h, arg3, arg4)
             { path_straight(h-2*rabs),              roll_angle(0) },
             { path_vertical_arc(-r, 90),            roll_angle(0) },
             { path_straight(2*rabs),                roll_angle(0) },
-   })
-end
-
-function crossbox_humpty(r, h, arg3, arg4)
-   assert(h >= 2*r)
-   local rabs = math.abs(r)
-   return make_paths("crossbox_humpty", {
-            { path_vertical_arc(r, 90),          roll_angle(0) },
-            { path_straight((h-2*rabs)/3),       roll_angle(0) },
-            { path_straight((h-2*rabs)/3),       roll_angle(90),  roll_ref=90 },
-            { path_straight((h-2*rabs)/3),       roll_angle(0) },
-            { path_vertical_arc(-r, 180),        roll_angle(0) },
-            { path_straight((h-2*rabs)/3),       roll_angle(0) },
-            { path_straight((h-2*rabs)/3),       roll_angle(90), roll_ref=-90 },
-            { path_straight((h-2*rabs)/3),       roll_angle(0) },
-            { path_vertical_arc(r, 90),          roll_angle(0), roll_ref=180 },
    })
 end
 
@@ -1284,6 +1302,160 @@ end
 
 
 --[[
+   perform a rudder over maneuver
+--]]
+function rudder_over(_direction, _min_speed)
+   local self = {}
+   local direction = _direction
+   local min_speed = _min_speed
+   local reached_speed = false
+   local kick_started = false
+   local pitch2_done = false
+   local descent_done = false
+   local target_q = nil
+   local initial_q = nil
+   local last_t = nil
+   local initial_z = nil
+
+   --[[
+      the update() method is called during the rudder over, it
+      should return true when the maneuver is completed
+   --]]
+   function self.update(path, t, target_speed)
+      if descent_done then
+         -- we're all done
+         return true
+      end
+
+      local ahrs_quat = ahrs:get_quaternion()
+      local ahrs_pos = ahrs:get_relative_position_NED_origin()
+      local ahrs_gyro = ahrs:get_gyro()
+      local now = millis():tofloat() * 0.001
+      local pitch_threshold = 60.0
+
+      if target_q == nil then
+         -- initialising
+         initial_z = ahrs_pos:z()
+         target_q = quat_copy(ahrs_quat)
+         initial_q = quat_copy(target_q)
+         last_t = now
+      end
+
+      local dt = now - last_t
+      last_t = now
+
+      local error_quat = ahrs_quat:inverse() * target_q
+      local rate_rads = Vector3f()
+      error_quat:to_axis_angle(rate_rads)
+      local tc = ROLL_CORR_TC:get()
+      local rate_dps = rate_rads:scale(math.deg(1)/tc)
+
+      -- use user set throttle for achieving the stall
+      local throttle = AEROM_STALL_THR:get()
+      local pitch_deg = math.deg(ahrs:get_pitch())
+      if reached_speed and not kick_started and math.abs(math.deg(ahrs_gyro:z())) > ACRO_YAW_RATE:get()/3 then
+         kick_started = true
+      end
+      if kick_started then
+         -- when we have established some yaw rate cut the throttle to minimum
+         throttle = AEROM_THR_MIN:get()
+      end
+
+      vehicle:set_target_throttle_rate_rpy(throttle, rate_dps:x(), rate_dps:y(), rate_dps:z())
+
+      log_pose('POSM', ahrs_pos, ahrs:get_quaternion())
+      log_pose('POST', ahrs_pos, target_q)
+
+      local current_speed_up = -ahrs:get_velocity_NED():z()
+      if not reached_speed and current_speed_up <= min_speed then
+         reached_speed = true
+      end
+
+      if not reached_speed then
+         return false
+      end
+
+      -- integrate desired attitude through yaw
+      local q_rate_rads = makeVector3f(0,0,ahrs_gyro:z())
+      if pitch2_done then
+         -- stop adding yaw
+         q_rate_rads:z(0)
+      end
+      local rotation = Quaternion()
+      rotation:from_angular_velocity(q_rate_rads, dt)
+      target_q = target_q * rotation
+      target_q:normalize()
+
+      --[[
+         override rudder to maximum, basing PWM on the MIN/MAX of the channel
+         according to the desired direction
+      --]]
+      local rudd_pwm = nil
+      local desired_direction = direction
+      if desired_direction == 0 then
+         local c_y = get_ahrs_dcm_c_y()
+         if c_y > 0 then
+            desired_direction = 1
+         else
+            desired_direction = -1
+         end
+      end
+      if desired_direction * (RUDD_REVERSED:get()*2-1) < 0 then
+         rudd_pwm = RUDD_MAX:get()
+      else
+         rudd_pwm = RUDD_MIN:get()
+      end
+      if not pitch2_done then
+         SRV_Channels:set_output_pwm_chan_timeout(rudder_chan, rudd_pwm, math.floor(4*1000/LOOP_RATE))
+      end
+
+      if not kick_started then
+         return false
+      end
+
+      -- see if we are nose down
+      if kick_started and pitch_deg < AEROM_STALL_PIT:get() and not pitch2_done then
+         -- lock onto a descent path
+         pitch2_done = true
+         target_q = initial_q * qorient(0, 0, 180)
+         --[[ correct the attitude to the opposite correction that we
+            had at the start of the slowdown, so we fight the wind on
+            the way down
+         --]]
+         local error_q = initial_q:inverse() * qorient(0, 90, math.deg(initial_q:get_euler_yaw()))
+         local error_pitch = error_q:get_euler_pitch()
+         local error_yaw = error_q:get_euler_yaw()
+         target_q = target_q * qorient(0, math.deg(-2*error_pitch), math.deg(2*error_yaw))
+         target_q:normalize()
+         return false
+      end
+
+      if not pitch2_done or ahrs_pos:z() < initial_z then
+         -- haven't finished the descent
+         return false
+      end
+
+      -- all done, update state
+      descent_done = true
+      path_var.tangent = path_var.tangent:scale(-1)
+      path_var.path_t = path.get_next_segment_start(t)
+      path_var.accumulated_orientation_rel_ef = path_var.accumulated_orientation_rel_ef * qorient(0,0,180)
+      path_var.last_time = now
+      path_var.last_ang_rate_dps = ahrs_gyro:scale(math.deg(1))
+      path_var.pos = rotate_path(path, path_var.path_t, path_var.initial_ori, path_var.initial_ef_pos)
+      -- ensure that the path will move fwd on the next step
+      path_var.pos:z(path_var.pos:z()-10)
+
+      -- cancel rudder override
+      SRV_Channels:set_output_pwm_chan_timeout(rudder_chan, rudd_pwm, 0)
+
+      return false
+   end
+
+   return self
+end
+
+--[[
    stall turn is not really correct, as we don't fully stall. Needs to be
    reworked
 --]]
@@ -1292,10 +1464,10 @@ function stall_turn(radius, height, direction, min_speed)
    assert(h >= 0)
    return make_paths("stall_turn", {
          { path_vertical_arc(radius, 90),          roll_angle(0) },
-         { path_straight(h),                       roll_angle(0), min_speed },
-         { path_horizontal_arc(5*direction, 180),  roll_angle(0), min_speed },
          { path_straight(h),                       roll_angle(0) },
-         { path_vertical_arc(radius, 90),          roll_angle(0) },
+         { path_reverse(h/4),                      roll_angle(0), rate_override=rudder_over(direction,min_speed), set_orient=qorient(0,-90,0) },
+         { path_straight(h),                       roll_angle(0), pos_corr=0.5, shift_xy=true },
+         { path_vertical_arc(-radius, 90),         roll_angle(0), set_orient=qorient(0,0,180) },
    })
 end
 
@@ -1885,63 +2057,6 @@ function air_show3()
    })
 end
 
-function test_all_paths()
-   return path_composer("test_all_paths", {
-          { figure_eight,             { 100,  45 } },
-          { straight_roll,            { 20,    0 } },
-          { loop,                     { 30,    0,  1 } },
-          { straight_roll,            { 20,    0 } },
-          { horizontal_rectangle,     { 100, 100, 20, 45 } },
-          { straight_roll,            { 20,    0 } },
-          { climbing_circle,          { 100,  20, 45 } },
-          { straight_roll,            { 20,    0 } },
-          { vertical_aerobatic_box,   { 100, 100, 20,  0 } },
-          { straight_roll,            { 20,    0 } },
-          { rolling_circle,           { 100,   2,  0,  0 } },
-          { straight_roll,            { 20,    0 } },
-          { half_cuban_eight,         { 30,      } },
-          { straight_roll,            { 20,    0 } },
-          { half_reverse_cuban_eight, { 30,      } },
-          { straight_roll,            { 20,    0 } },
-          { cuban_eight,              { 30,      } },
-          { straight_roll,            { 20,    0 } },
-          { humpty_bump,              { 30,  100 } },
-          { straight_flight,          { 100,  45 } },
-          { scale_figure_eight,       { 100,  45 } },
-          { straight_roll,            { 20,    0 } },
-          { immelmann_turn,           { 30,   60 } },
-          { straight_roll,            { 20,    0 } },
-          { split_s,                  { 30,   60 } },
-          { straight_roll,            { 20,    0 } },
-          { upline_45,                { 20,   50 } },
-          { straight_roll,            { 20,    0 } },
-          { downline_45,              { 20,   50 } },
-          { straight_roll,            { 20,    0 } },
-          { procedure_turn,           { 40, 45, 20 } },
-          { straight_roll,            { 20,    0 } }, 
-          { two_point_roll,           { 100      } },
-          { straight_roll,            { 20,    0 } },
-          { derry_turn,               { 40,   60 } },
-          { straight_roll,            { 20,    0 } },
-          { half_climbing_circle,     { -65, 0, -60 } },
-          { straight_roll,            { 20,    0 } },
-          --[[
-          { p23_1,                    { 20, 150, 150 } }, 
-          { straight_roll,            { 20,    0 } },
-          { p23_2,                    { 20,  150 } },      
-          { straight_roll,            { 20,    0 } },
-          { p23_3,                    { 20,  150 } },      
-          { straight_roll,            { 20,    0 } },
-          { p23_4,                    { 20,  150 } },      
-          { straight_roll,            { 20,    0 } },
-          { p23_5,                    { 20,  150 } },   
-          { straight_roll,            { 20,    0 } },
-          { p23_6,                    { 20,  150 } },       -- now inverted :-)
-          { straight_roll,            { 20,    0 } },
-          --]]
-   })
-end
-
 ---------------------------------------------------
 
 --[[
@@ -1972,8 +2087,12 @@ function rotate_path(path_f, t, orientation, offset)
    local point = path_f.get_pos(t)
    local angle = path_f.get_roll(t)
    local roll_correction = path_f.get_roll_correction(t)
-   local speed = path_f.get_speed(t)
-   local thr_boost = path_f.get_throttle_boost(t)
+
+   local attrib = {}
+   for k, v in pairs(path_attribs) do
+      attrib[v] = path_f.get_attribute(t, v)
+   end
+   point = point + path_var.path_shift
    local point = quat_earth_to_body(orientation, point)
 
    local scale = AEROM_PATH_SCALE:get()
@@ -1988,7 +2107,7 @@ function rotate_path(path_f, t, orientation, offset)
       point = quat_body_to_earth((orient * orient), point)
    end
 
-   return point+offset, math.rad(angle+roll_correction), speed, thr_boost
+   return point+offset, math.rad(angle+roll_correction), attrib
 end
 
 --Given vec1, vec2, returns an (rotation axis, angle) tuple that rotates vec1 to be parallel to vec2
@@ -2090,6 +2209,7 @@ function quat_projection_ground_plane(q)
    return 2.0 * (q3q4 + q1q2)
 end
 
+
 path_var.count = 0
 
 function do_path()
@@ -2136,7 +2256,6 @@ function do_path()
 
       speed_PI.reset()
 
-
       path_var.accumulated_orientation_rel_ef = path_var.initial_ori
 
       path_var.time_correction = 0.0 
@@ -2153,11 +2272,12 @@ function do_path()
 
       path_var.pos = path_var.initial_ef_pos:copy()
       path_var.roll = 0.0
-      path_var.speed = nil
+      path_var.last_shift_xy = nil
+      path_var.path_shift = Vector3f()
 
       -- get initial tangent
-      local p1, r1, s1 = rotate_path(path, path_var.path_t + 0.1/(path_var.total_time*LOOP_RATE),
-                                     path_var.initial_ori, path_var.initial_ef_pos)
+      local p1, r1 = rotate_path(path, path_var.path_t + 0.1/(path_var.total_time*LOOP_RATE),
+                                 path_var.initial_ori, path_var.initial_ef_pos)
       path_var.tangent = p1 - path_var.pos
       return true
    end
@@ -2172,7 +2292,7 @@ function do_path()
 
    path_var.last_time = now
 
-   local local_n_dt = actual_dt/path_var.total_time
+   local local_n_dt = (1.0/LOOP_RATE)/path_var.total_time
 
    if path_var.path_t + local_n_dt > 1.0 then
       -- all done
@@ -2188,11 +2308,38 @@ function do_path()
 
    local p0 = path_var.pos:copy()
    local r0 = path_var.roll
-   local s0 = path_var.speed
-   local p1, r1, s1 = rotate_path(path, path_var.path_t + local_n_dt,
-                                  path_var.initial_ori, path_var.initial_ef_pos)
+   local p1, r1, attrib = rotate_path(path, path_var.path_t + local_n_dt,
+                                      path_var.initial_ori, path_var.initial_ef_pos)
 
    local current_measured_pos_ef = ahrs_pos_NED:copy()
+
+   if attrib.rate_override ~= nil then
+      if not attrib.rate_override.update(path, path_var.path_t + local_n_dt, path_var.target_speed) then
+         -- not done yet
+         path_var.pos = current_measured_pos_ef
+         return true
+      end
+   end
+
+   --[[
+      see if this path element has a shift_xy attribute
+   --]]
+   local shift_xy = attrib.shift_xy
+   if shift_xy and not path_var.last_shift_xy then
+      --[[
+         we have entered a new sub-element with a shift_xy
+      --]]
+      local curpos_mf = quat_body_to_earth(path_var.initial_ori, current_measured_pos_ef)
+      local pathpos_mf = quat_body_to_earth(path_var.initial_ori, p1)
+      local shift = curpos_mf - pathpos_mf
+      shift:z(0)
+      path_var.path_shift = path_var.path_shift + shift
+      local shift_ef = quat_earth_to_body(path_var.initial_ori, shift)
+      p1 = p1 + shift_ef
+      p0:y(p1:y())
+      p0:x(p1:x())
+   end
+   path_var.last_shift_xy = shift_xy
 
    --[[
       get tangents to the path
@@ -2226,10 +2373,9 @@ function do_path()
    --[[
       recalculate the current path position and angle based on actual delta time
    --]]
-   local p1, r1, s1, thr_boost = rotate_path(path,
-                                             constrain(path_var.path_t + path_t_delta, 0, 1),
-                                             path_var.initial_ori, path_var.initial_ef_pos)
-
+   local p1, r1, attrib = rotate_path(path,
+                                      constrain(path_var.path_t + path_t_delta, 0, 1),
+                                      path_var.initial_ori, path_var.initial_ef_pos)
    local last_path_t = path_var.path_t
    path_var.path_t = path_var.path_t + path_t_delta
 
@@ -2258,10 +2404,9 @@ function do_path()
    path_var.path_t = path_var.path_t + TIME_CORR_P:get() * path_err_t
 
    -- get the path again with the corrected time
-   p1, r1, s1 = rotate_path(path,
-                            constrain(path_var.path_t, 0, 1),
-                            path_var.initial_ori, path_var.initial_ef_pos)
-
+   p1, r1, attrib = rotate_path(path,
+                                constrain(path_var.path_t, 0, 1),
+                                path_var.initial_ori, path_var.initial_ef_pos)
    -- recalculate the tangent to match the amount we advanced the path time
    tangent2_ef = p1 - p0
 
@@ -2277,7 +2422,6 @@ function do_path()
    path_var.tangent = tangent2_ef:copy()
    path_var.pos = p1:copy()
    path_var.roll = r1
-   path_var.speed = s1
 
    
    --[[
@@ -2294,6 +2438,9 @@ function do_path()
 
    -- gains for error correction.
    local acc_err_ef = B:scale(ERR_CORR_P:get()) + B_dot:scale(ERR_CORR_D:get())
+
+   -- scale by per-maneuver error correction scale factor
+   acc_err_ef = acc_err_ef:scale(attrib.pos_corr or 1.0)
 
    local acc_err_bf = quat_earth_to_body(ahrs_quat, acc_err_ef)
 
@@ -2464,12 +2611,7 @@ function do_path()
 
    --[[
       run the throttle based speed controller
-   --]]
-   if s1 == nil then
-      s1 = path_var.target_speed
-   end
 
-   --[[
       get the anticipated pitch at the throttle lookahead time
       we use the maximum of the current path pitch and the anticipated pitch
    --]]
@@ -2478,9 +2620,9 @@ function do_path()
    local qnew = qchange * orientation_rel_ef_with_roll_angle
    local anticipated_pitch_rad = math.max(qnew:get_euler_pitch(), orientation_rel_ef_with_roll_angle:get_euler_pitch())
 
-   local throttle = speed_PI.update(s1, anticipated_pitch_rad)
+   local throttle = speed_PI.update(path_var.target_speed, anticipated_pitch_rad)
    local thr_min = AEROM_THR_MIN:get()
-   if thr_boost then
+   if attrib.thr_boost then
       thr_min = math.max(thr_min, AEROM_THR_BOOST:get())
    end
    throttle = constrain(throttle, thr_min, 100.0)
@@ -2534,7 +2676,7 @@ command_table[20]= PathFunction(procedure_turn, "Procedure Turn")
 command_table[21]= PathFunction(derry_turn, "Derry Turn")
 -- 22 was Two Point Roll - use multi point roll instead
 command_table[23]= PathFunction(half_climbing_circle, "Half Climbing Circle")
-command_table[24]= PathFunction(crossbox_humpty, "Crossbox Humpty")
+-- 24 was crossbox-humpty
 command_table[25]= PathFunction(laydown_humpty, "Laydown Humpty")
 command_table[26]= PathFunction(barrel_roll, "Barrel Roll")
 command_table[27]= PathFunction(straight_flight, "Straight Hold")
@@ -2543,7 +2685,6 @@ command_table[28]= PathFunction(partial_circle, "Partial Circle")
 -- 30 was Eight Point Roll - use multi point roll instead
 command_table[31]= PathFunction(multi_point_roll, "Multi Point Roll")
 command_table[32]= PathFunction(side_step, "Side Step")
-command_table[200] = PathFunction(test_all_paths, "Test Suite")
 command_table[201] = PathFunction(nz_clubman, "NZ Clubman")
 command_table[202] = PathFunction(f3a_p23_l_r, "FAI F3A P23 L to R")
 command_table[203] = PathFunction(f4c_example_l_r, "FAI F4C Example L to R")
@@ -2578,7 +2719,6 @@ load_table["procedure_turn"] = procedure_turn
 load_table["derry_turn"] = derry_turn
 load_table["two_point_roll"] = two_point_roll
 load_table["half_climbing_circle"] = half_climbing_circle
-load_table["crossbox_humpty"] = crossbox_humpty
 load_table["laydown_humpty"] = laydown_humpty
 load_table["straight_align"] = straight_align
 load_table["figure_eight"] = figure_eight
@@ -2598,6 +2738,54 @@ load_table["funny_loop"] = funny_loop
 load_table["align_box"] = align_box
 load_table["align_center"] = align_center
 
+--[[
+   interpret an attribute value, coping with special cases
+--]]
+function interpret_attrib(v)
+   if v == "true" then
+      return true
+   end
+   if v == "false" then
+      return false
+   end
+   -- could be a number
+   local n = tonumber(v)
+   if n ~= nil then
+      return n
+   end
+   -- assume a string
+   return v
+end
+
+--[[
+   parse a function definition in a txt load file, adding it to the load table so
+   it can be used in schedules
+--]]
+function parse_function(line, file)
+   _, _, funcname, args = string.find(line, "^function%s*([%w_]+)(.*)$")
+   if not funcname then
+      gcs:send_text(0, string.format("Parse error: %s", line))
+      return
+   end
+   local funcstr = "function" .. args .. "\n"
+   while true do
+      local line = file:read()
+      if not line then
+         gcs:send_text(0, string.format("Error: end of file in %s", funcname))
+         break
+      end
+      funcstr = funcstr .. line .. "\n"
+      if string.sub(line,1,3) == "end" then
+         break
+      end
+   end
+   local f, errloc, err = load("return " .. funcstr, funcname, "t", _ENV)
+   if not f then
+      gcs:send_text(0,string.format("Error %s: %s", errloc, err))
+      return
+   end
+   load_table[funcname] = f()
+end
 
 --[[
    load a trick description from a text file
@@ -2622,26 +2810,29 @@ function load_trick(id)
       return
    end
    local name = string.format("Trick%u", id)
+   local attrib = {}
    local paths = {}
-   local message = nil
-   local thr_boost = nil
    while true do
       local line = file:read()
       if not line then
          break
       end
+      -- trim trailing spaces
+      line = string.gsub(line, '^(.-)%s*$', '%1')
       local _, _, cmd, arg1, arg2, arg3, arg4 = string.find(line, "^([%w_:]+)%s*([-.%d]*)%s*([-.%d]*)%s*([-.%d]*)%s*([-.%d]*)")
       if cmd == "" or cmd == nil or string.sub(cmd,1,1) == "#" then
          -- ignore comments
       elseif cmd == "name:" then
          _, _, name = string.find(line, "^name:%s*([%w_]+)$")
-      elseif cmd == "thr_boost:" then
-         _, _, next_thr_boost = string.find(line, "^thr_boost:%s*(.+)$")
-         if next_thr_boost == "true" then
-            thr_boost = true
+      elseif string.sub(cmd,-1) == ":" then
+         _, _, a, s = string.find(line, "^([%w_]+):%s*([%w_%s-]+)$")
+         if a ~= nil then
+            attrib[a] = interpret_attrib(s)
+         else
+            gcs:send_text(0,"Bad line: '%s'", line)
          end
-      elseif cmd == "message:" then
-         _, _, message = string.find(line, "^message:%s*(.+)$")
+      elseif cmd == "function" then
+         parse_function(line, file)
       elseif cmd ~= nil then
          arg1 = tonumber(arg1) or 0
          arg2 = tonumber(arg2) or 0
@@ -2652,14 +2843,10 @@ function load_trick(id)
             gcs:send_text(0,string.format("Unknown command '%s' in %s", cmd, fname))
          else
             paths[#paths+1] = { f, { arg1, arg2, arg3, arg4 }}
-            if message ~= nil then
-               paths[#paths].message = message
-               message = nil
+            for k, v in pairs(attrib) do
+               paths[#paths][k] = v
             end
-            if thr_boost ~= nil then
-               paths[#paths].thr_boost = thr_boost
-               thr_boost = nil
-            end
+            attrib = {}
          end
       end
    end
@@ -2669,7 +2856,7 @@ function load_trick(id)
 end
 
 function PathTask(fn, name, id, initial_yaw_deg, arg1, arg2, arg3, arg4)
-   self = {}
+   local self = {}
    if type(fn) == "table" then
       self.fn = fn
    else

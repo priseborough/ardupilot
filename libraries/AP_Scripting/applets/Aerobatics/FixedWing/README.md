@@ -43,7 +43,6 @@ the ground track.
 | 20 | Procedure Turn           | radius | bank angle  | step-out    |            | Yes        |
 | 21 | Derry Turn               | radius | bank angle  |             |            | No         |
 | 23 | Half Climbing Circle     | radius | height      | bank angle  |            | Yes        |
-| 24 | Crossbox Humpty          | radius | height      |             |            | Yes        |
 | 25 | Laydown Humpty           | radius | height      |             |            | Yes        |
 | 25 | Barrel Roll              | radius | length      | num spirals |            | No         |
 | 26 | Straight Hold            | length | bank angle  |             |            | No         |
@@ -72,7 +71,6 @@ modify it during the trick, like rolling circles and figure eights)
 
 | ID  | Name
 | --  | ------------------------
-| 200 | Test Suite (dont fly!)
 | 201 | NZ Clubman Schedule
 | 202 | FAI F3A P-23 (left to right)
 | 203 | FAI F3C Scale Example (left to right)
