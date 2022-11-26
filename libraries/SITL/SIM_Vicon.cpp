@@ -176,7 +176,7 @@ void Vicon::update_vicon_position_estimate(const Location &loc,
             component_id,
             mavlink_ch,
             &msg_buf[msg_buf_index].obs_msg,
-            now_us + time_offset_us,
+            time_send_us + time_offset_us, // note that we time stamp the message at transmission time
             pos_corrected.x,
             pos_corrected.y,
             pos_corrected.z,
