@@ -2841,18 +2841,18 @@ class AutoTestCopter(AutoTest):
         ex = None
         try:
             self.set_parameters({
-                "SIM_SPEEDUP": 1,
-                "VISO_TYPE": 2,      # enable vicon
+                "SIM_SPEEDUP": 1,    # slow down to prevent posible loss of MAVLink messages
+                "VISO_TYPE": 2,      # use Intel RealSense T265 interface
                 "VISO_OPTIONS": 1,   # ignore rpy data
                 "SERIAL5_PROTOCOL": 2,
                 "EK3_ENABLE": 1,
-                "EK3_SRC1_POSXY": 8, # GPS and External Nav
-                "EK3_IMU_MASK": 1,
-                "EK2_ENABLE": 0,
+                "EK3_SRC1_POSXY": 8, # Enables combined use of GPS and external nav
+                "EK3_IMU_MASK": 1,   # only use 1 EKF lane to speed up analysis
+                "EK2_ENABLE": 0,     # EKF2 doesn't support combined use of GPS and External Nav
                 "AHRS_EKF_TYPE": 3,
-                "SIM_VICON_TMASK": 32, # send global position messages
-                "SIM_VICON_FAIL": 1,
-                "SIM_VICON_YAW": 0,
+                "SIM_VICON_TMASK": 32, # send global position messages only
+                "SIM_VICON_FAIL": 1, # simulate taking off without external nav
+                "SIM_VICON_YAW": 0,  # external nav uses NE reference frame so no yaw misalignment
                 "LOG_REPLAY": 1,
                 "LOG_DISARMED": 1,
             })
