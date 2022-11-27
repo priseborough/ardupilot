@@ -1044,6 +1044,7 @@ void NavEKF3_core::writeExtNavPoseData(const Vector3f &pos, const Vector3f &rpy,
         }
         extNavDataNew.pos += stateStruct.velocity * timeShift;
         extNavDataNew.hposVarIncr = sq(0.5F * accNavMagHorizPHF * sq(timeShift)) + (P[4][4] + P[5][5]) * sq(timeShift);
+        extNavMeasTime_ms = imuDataDelayed.time_ms;
     } else {
         extNavDataNew.hposVarIncr = 0.0F;
     }
@@ -1055,7 +1056,8 @@ void NavEKF3_core::writeExtNavPoseData(const Vector3f &pos, const Vector3f &rpy,
         extNavDataNew.posReset = false;
     }
 
-    extNavDataNew.timeStamp_ms = timeStamp_ms;
+    extNavDataNew.timeStamp_ms = extNavMeasTime_ms;
+
 
     // calculate timestamp
     extNavDataNew.time_ms = timeStamp_ms - delay_ms;
