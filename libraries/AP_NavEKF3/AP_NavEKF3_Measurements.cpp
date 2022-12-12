@@ -1033,7 +1033,7 @@ void NavEKF3_core::writeExtNavPoseData(const Vector3f &pos, const Vector3f &rpy,
     }
 
     extNavDataNew.pos = pos.toftype();
-    extNavMeasTime_ms = timeStamp_ms;
+    extNavMeasTime_ms = timeStamp_ms - delay_ms; // compensate for the delay parameter in the time shift if it happens
     // If this data is timestamped further behind that the current EKF fusion time horizon, correct using
     // velocity state estimates back to the fusion time horizon.
     if (is_positive(frontend->_extNavMaxTshift) && extNavMeasTime_ms < imuDataDelayed.time_ms) {
@@ -1056,17 +1056,14 @@ void NavEKF3_core::writeExtNavPoseData(const Vector3f &pos, const Vector3f &rpy,
         extNavDataNew.posReset = false;
     }
 
-    extNavDataNew.timeStamp_ms = extNavMeasTime_ms;
-
+    extNavDataNew.timeStamp_ms = timeStamp_ms; // needed to keep this measurement in sync with the covariance measurement
 
     // calculate timestamp
-    extNavDataNew.time_ms = timeStamp_ms - delay_ms;
+    extNavDataNew.time_ms = extNavMeasTime_ms; // already includes the delay parameter
     // Correct for the average intersampling delay due to the filter update rate
     extNavDataNew.time_ms -= localFilterTimeStep_ms/2;
     // Prevent time delay exceeding age of oldest IMU data in the buffer
     extNavDataNew.time_ms = MAX(extNavDataNew.time_ms, imuDataDelayed.time_ms);
-
-    extNavDataNew.time_ms = timeStamp_ms;
 
     // protect against yaw angle being NaN
     if (!isnan(rpy.z)) {
