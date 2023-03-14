@@ -238,8 +238,8 @@ Vector3f Plane::getForce(float inputAileron, float inputElevator, float inputRud
     }
 
 #if 1
-    const float Cl = CN * cosf(alpharad) - CA * sinf(alphaRad);
-    const float Cd = CN * sinf(alphaRad) + CA * cosf(alphaRad);
+    const float Cl = CN * cosf(alpharad) - CA * sinf(alpharad);
+    const float Cd = CN * sinf(alpharad) + CA * cosf(alpharad);
     AP::logger().Write("DBG1", "TimeUS,alpha,Cl,Cd",
                                            "Qfff",
                                            AP_HAL::micros64(),
