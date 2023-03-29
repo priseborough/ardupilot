@@ -32,7 +32,7 @@ void AP_DAL_Airspeed::start_frame()
         RASI.healthy = true;
         RASI.use = true;
         RASI.airspeed = airspeed->get_apparent_wind_speed_raw();
-        RASI.direction = degrees(airspeed->get_apparent_wind_direction_rad_raw());
+        RASI.direction = wrap_360(degrees(airspeed->get_apparent_wind_direction_rad_raw()));
         WRITE_REPLAY_BLOCK_IFCHANGED(RASI, RASI, old_RASI);
     }
 #endif
