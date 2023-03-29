@@ -250,6 +250,24 @@ def declination_observation(P,state,ix,iy):
 
     return
 
+# derive equations for fusion of X,Y body frame airspeed measurement vector
+def body_frame_aspd_observation(P,state,R_to_body,vx,vy,vz,wx,wy):
+    obs_var = symbols("R_OBS", real=True) # measurement noise variance
+    vrel = R_to_body*Matrix([vx-wx,vy-wy,vz]) # predicted wind relative velocity
+    observation = Matrix([vrel[0],vrel[1]])
+    aspd_bf_code_generator  = CodeGenerator("./generated/tas_bf_generated.cpp")
+    H = observation.jacobian(state)
+    K = zeros(24,2)
+    axes = [0,1]
+    for index in axes:
+        equations = generate_observation_equations(P,state,observation[index],obs_var)
+        aspd_bf_code_generator.print_string("Axis %i equations" % index)
+        write_equations_to_file(equations,aspd_bf_code_generator,1)
+
+    aspd_bf_code_generator.close()
+
+    return
+
 # derive equations for fusion of lateral body acceleration (multirotors only)
 def body_frame_accel_observation(P,state,R_to_body,vx,vy,vz,wx,wy):
     obs_var = symbols("R_ACC", real=True) # measurement noise variance
@@ -693,6 +711,8 @@ def generate_code():
     body_frame_velocity_observation(P,state,R_to_body,vx,vy,vz)
     print('Generating body frame acceleration observation code ...')
     body_frame_accel_observation(P,state,R_to_body,vx,vy,vz,wx,wy)
+    print('Generating body frame airspeed observation code ...')
+    body_frame_aspd_observation(P,state,R_to_body,vx,vy,vz,wx,wy)
     print('Generating yaw estimator code ...')
     yaw_estimator()
     print('Code generation finished!')
