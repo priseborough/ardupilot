@@ -716,6 +716,7 @@ private:
 
     // fuse true airspeed measurements
     void FuseAirspeed();
+    void FuseAirspeed2D();
 
     // fuse synthetic sideslip measurement of zero
     void FuseSideslip();
