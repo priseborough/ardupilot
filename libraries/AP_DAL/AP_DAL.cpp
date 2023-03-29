@@ -6,6 +6,7 @@
 #include <AP_Vehicle/AP_Vehicle.h>
 #include <AP_OpticalFlow/AP_OpticalFlow.h>
 #include <AP_WheelEncoder/AP_WheelEncoder.h>
+#include <AP_WindVane/AP_WindVane.h>
 
 #if APM_BUILD_TYPE(APM_BUILD_Replay)
 #include <AP_NavEKF2/AP_NavEKF2.h>
