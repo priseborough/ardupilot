@@ -835,6 +835,7 @@ void NavEKF3_core::readAirSpdData()
     if (airspeed &&
         (airspeed->last_update_ms(selected_airspeed) - timeTasReceived_ms) > frontend->sensorIntervalMin_ms) {
         tasDataNew.tas = airspeed->get_airspeed(selected_airspeed) * EAS2TAS;
+        tasDataNew.direction = airspeed->get_direction(selected_airspeed);
         timeTasReceived_ms = airspeed->last_update_ms(selected_airspeed);
         tasDataNew.time_ms = timeTasReceived_ms - frontend->tasDelay_ms;
         tasDataNew.tasVariance = sq(MAX(frontend->_easNoise * EAS2TAS, 0.5f));

@@ -585,6 +585,7 @@ private:
 
     struct tas_elements : EKF_obs_element_t {
         ftype       tas;            // true airspeed measurement (m/sec)
+        ftype       direction;      // angle of arrival of airflow wrt X body axis where Y direction is positive (deg) and valid range is 0 - 360 is valid (deg)
         ftype       tasVariance;    // variance of true airspeed measurement (m/sec)^2
         bool        allowFusion;    // true if measurement can be allowed to modify EKF states.
     };
