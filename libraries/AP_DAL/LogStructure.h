@@ -229,6 +229,7 @@ struct log_RASH {
 // Replay Data Structure - Airspeed Sensor instance
 struct log_RASI {
     float airspeed;
+    float direction;
     uint32_t last_update_ms;
     bool healthy;
     bool use;
@@ -388,7 +389,7 @@ struct log_RBOH {
     { LOG_RASH_MSG, RLOG_SIZE(RASH),                                   \
       "RASH", "BB", "Primary,NumInst", "--", "--" },  \
     { LOG_RASI_MSG, RLOG_SIZE(RASI),                                   \
-      "RASI", "fIBBB", "pd,UpdateMS,H,Use,I", "----#", "-----" }, \
+      "RASI", "ffIBBB", "pd,dir,UpdateMS,H,Use,I", "-----#", "------" }, \
     { LOG_RBRH_MSG, RLOG_SIZE(RBRH),                                   \
       "RBRH", "BB", "Primary,NumInst", "--", "--" },  \
     { LOG_RBRI_MSG, RLOG_SIZE(RBRI),                                   \

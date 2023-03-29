@@ -3,6 +3,7 @@
 #include <AP_Logger/LogStructure.h>
 
 #include <AP_Airspeed/AP_Airspeed.h>
+#include <AP_WindVane/AP_WindVane.h>
 
 class AP_DAL_Airspeed {
 public:
@@ -32,6 +33,14 @@ public:
     }
     float get_airspeed() const {
         return get_airspeed(get_primary());
+    }
+
+    // return the current airspeed direction in deg wrt X body axis (RH positive to right of X)
+    float get_direction(uint8_t i) const {
+        return _RASI[i].direction;
+    }
+    float get_direction() const {
+        return get_direction(get_primary());
     }
 
     // return time in ms of last update
