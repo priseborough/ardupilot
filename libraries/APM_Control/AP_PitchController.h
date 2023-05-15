@@ -15,6 +15,7 @@ public:
 
     float get_rate_out(float desired_rate, float scaler);
     float get_servo_out(int32_t angle_err, float scaler, bool disable_integrator, bool ground_mode);
+    void set_ff_rate_demand(float desired_rate);
 
     // setup a one loop FF scale multiplier. This replaces any previous scale applied
     // so should only be used when only one source of scaling is needed
@@ -61,6 +62,8 @@ private:
     AC_PID rate_pid{0.04, 0.15, 0, 0.345, 0.666, 3, 0, 12, 150, 1};
     float angle_err_deg;
     float ff_scale = 1.0;
+    float ff_rate_demand; // feed forward rate demand in deg/sec
+    uint32_t ff_rate_demand_time_ms; // last time in msec rate_demand_ff was updated
 
     AP_PIDInfo _pid_info;
 
