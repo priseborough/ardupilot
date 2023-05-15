@@ -245,6 +245,16 @@ float AP_PitchController::get_rate_out(float desired_rate, float scaler)
 }
 
 /*
+ Sets the feed forward rate offset in deg/sec.
+ This rate offset will be applied for the next 150 msec or until the next value is received.
+*/
+void AP_PitchController::set_ff_rate_demand(float desired_rate)
+{
+    ff_rate_demand = desired_rate;
+    ff_rate_demand_time_ms = AP_HAL::millis();
+}
+
+/*
   get the rate offset in degrees/second needed for pitch in body frame
   to maintain height in a coordinated turn.
 
@@ -279,6 +289,7 @@ float AP_PitchController::_get_coordination_rate_offset(float &aspeed, bool &inv
     } else {
         rate_offset = cosf(_ahrs.pitch)*fabsf(ToDeg((GRAVITY_MSS / MAX((aspeed * _ahrs.get_EAS2TAS()), MAX(aparm.airspeed_min, 1))) * tanf(bank_angle) * sinf(bank_angle))) * _roll_ff;
     }
+    rate_offset += ff_rate_demand;
     if (inverted) {
         rate_offset = -rate_offset;
     }
@@ -308,6 +319,10 @@ float AP_PitchController::get_servo_out(int32_t angle_err, float scaler, bool di
     }
 
     rate_offset = _get_coordination_rate_offset(aspeed, inverted);
+
+    if (AP_HAL::millis() - ff_rate_demand_time_ms < 150) {
+        rate_offset = inverted ? rate_offset - ff_rate_demand : rate_offset + ff_rate_demand;
+    }
 
     // Calculate the desired pitch rate (deg/sec) from the angle error
     angle_err_deg = angle_err * 0.01;
