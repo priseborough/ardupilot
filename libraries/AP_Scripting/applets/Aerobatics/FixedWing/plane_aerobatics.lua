@@ -796,6 +796,55 @@ function path_vertical_arc(radius, angle)
 end
 
 --[[
+   path component that does a vertical ellipse
+--]]
+local _path_vertical_ellipse = inheritsFrom(_PathComponent, "path_vertical_ellipse")
+function _path_vertical_ellipse:get_pos(t)
+   -- internal calculations are done using a coordinate system where x is aligned with the major axis
+   -- and y with the minor axis, alpha is the elevation angle of the major axis positive up
+   -- trom horizontal and theta is the polar angle up from the major axis to a point on the ellipse
+   local start_gradient = - math.tan(self.alpha)
+   local start_theta = math.pi + math.atan(-self.B , (self.A * start_gradient))
+   local theta = t * 2 * math.pi + self.start_theta
+   local radius = self.B / math.sqrt(1 - sq(self.e * math.cos(theta)))
+   local x = radius * math.cos(theta) - self.x0
+   local y = radius * math.sin(theta) - self.y0
+   -- rotate x and y back into horizontal, down axes
+   local x_out = x * math.cos(self.alpha) - y * math.sin(self.alpha)
+   local y_out = - y * math.cos(self.alpha) - x * math.sin(self.alpha)
+   return makeVector3f(x_out , 0, y_out)
+end
+function _path_vertical_ellipse:get_length()
+   return math.abs(self.radius) * 2 * math.pi * math.abs(self.angle) / 360.0
+end
+function _path_vertical_ellipse:get_final_orientation()
+   local q = Quaternion()
+   return q
+end
+function path_vertical_ellipse(width, height, alpha)
+   local self = _path_vertical_ellipse:create()
+   if (width >= height) then
+      self.A = width
+      self.B = height
+      self.alpha = math.rad(alpha)
+   else
+      self.B = width
+      self.A = height
+      self.alpha = math.rad(alpha+90) -- elevation of major axis wrt horizontal
+   end
+   -- internal calculations are done using a coordinate system where x is aligned with the major axis
+   -- and y with the minor axis, alpha is the elevation angle of the major axis positive up
+   -- trom horizontal and theta is the polar angle up from the major axis to a point on the ellipse
+   local start_gradient = - math.tan(self.alpha)
+   self.start_theta = math.pi + math.atan(-self.B , (self.A * start_gradient))
+   self.e = math.sqrt(1 - sq(self.B)/sq(self.A)) --eccentricity
+   local start_radius = self.B / math.sqrt(1 - sq(self.e * math.cos(self.start_theta)))
+   self.x0 = start_radius * math.sin(self.start_theta) --starting x coordinate
+   self.y0 = start_radius * math.sin(self.start_theta) -- starting y coordinate
+   return self
+end
+
+--[[
    path component that does a horizontal arc over a given angle
 --]]
 local _path_horizontal_arc = inheritsFrom(_PathComponent, "path_horizontal_arc")
