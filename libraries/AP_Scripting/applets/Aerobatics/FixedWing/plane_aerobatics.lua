@@ -803,8 +803,6 @@ function _path_vertical_ellipse:get_pos(t)
    -- internal calculations are done using a coordinate system where x is aligned with the major axis
    -- and y with the minor axis, alpha is the elevation angle of the major axis positive up
    -- trom horizontal and theta is the polar angle up from the major axis to a point on the ellipse
-   local start_gradient = - math.tan(self.alpha)
-   local start_theta = math.pi + math.atan(-self.B , (self.A * start_gradient))
    local theta = t * 2 * math.pi + self.start_theta
    local radius = self.B / math.sqrt(1 - sq(self.e * math.cos(theta)))
    local x = radius * math.cos(theta) - self.x0
@@ -815,7 +813,9 @@ function _path_vertical_ellipse:get_pos(t)
    return makeVector3f(x_out , 0, y_out)
 end
 function _path_vertical_ellipse:get_length()
-   return math.abs(self.radius) * 2 * math.pi * math.abs(self.angle) / 360.0
+   -- use Ramanajan appeoximation
+   local t = sq((self.A-self.B)/(self.A+self.B))
+   return math.pi*(self.A+self.B)*(1 + 3*t/(10 + math.sqrt(4 - 3*t)))
 end
 function _path_vertical_ellipse:get_final_orientation()
    local q = Quaternion()
