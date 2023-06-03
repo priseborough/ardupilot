@@ -818,6 +818,7 @@ function _path_vertical_ellipse:get_length()
    return math.pi*(self.A+self.B)*(1 + 3*t/(10 + math.sqrt(4 - 3*t)))
 end
 function _path_vertical_ellipse:get_final_orientation()
+   -- always enter and leave from horizontal level flight
    local q = Quaternion()
    return q
 end
@@ -826,17 +827,21 @@ function path_vertical_ellipse(width, height, alpha)
    if (width >= height) then
       self.A = width
       self.B = height
-      self.alpha = math.rad(alpha)
+      self.alpha = math.rad(math.wrap_180(alpha))
    else
       self.B = width
       self.A = height
-      self.alpha = math.rad(alpha+90) -- elevation of major axis wrt horizontal
+      self.alpha = math.rad(math.wrap_180(alpha+90)) -- elevation of major axis wrt horizontal
    end
    -- internal calculations are done using a coordinate system where x is aligned with the major axis
    -- and y with the minor axis, alpha is the elevation angle of the major axis positive up
-   -- trom horizontal and theta is the polar angle up from the major axis to a point on the ellipse
-   local start_gradient = - math.tan(self.alpha)
-   self.start_theta = math.pi + math.atan(-self.B , (self.A * start_gradient))
+   -- from horizontal and theta is the polar angle up from the major axis to a point on the ellipse
+   if math.abs(self.alpha-math.pi) < 1E-6 then
+      self.start_theta = math.pi
+   else
+      local start_gradient = - math.tan(self.alpha)
+      self.start_theta = math.pi + math.atan(- self.A * start_gradient, self.B)
+   end
    self.e = math.sqrt(1 - sq(self.B)/sq(self.A)) --eccentricity
    local start_radius = self.B / math.sqrt(1 - sq(self.e * math.cos(self.start_theta)))
    self.x0 = start_radius * math.sin(self.start_theta) --starting x coordinate
