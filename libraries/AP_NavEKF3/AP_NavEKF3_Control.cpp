@@ -153,9 +153,9 @@ void NavEKF3_core::setWindMagStateLearningMode()
     }
 
     // inhibit delta velocity bias learning if we have not yet aligned the tilt
-    if (tiltAlignComplete && inhibitDelVelBiasStates) {
+    if (tiltAlignComplete && inhibitAccelBiasStates) {
         // activate the states
-        inhibitDelVelBiasStates = false;
+        inhibitAccelBiasStates = false;
         updateStateIndexLim();
 
         // set the initial covariance values
@@ -164,9 +164,9 @@ void NavEKF3_core::setWindMagStateLearningMode()
         P[15][15] = P[13][13];
     }
 
-    if (tiltAlignComplete && inhibitDelAngBiasStates) {
+    if (tiltAlignComplete && inhibitGyroBiasStates) {
         // activate the states
-        inhibitDelAngBiasStates = false;
+        inhibitGyroBiasStates = false;
         updateStateIndexLim();
 
         // set the initial covariance values
@@ -192,8 +192,8 @@ void NavEKF3_core::updateStateIndexLim()
 {
     if (inhibitWindStates) {
         if (inhibitMagStates) {
-            if (inhibitDelVelBiasStates) {
-                if (inhibitDelAngBiasStates) {
+            if (inhibitAccelBiasStates) {
+                if (inhibitGyroBiasStates) {
                     stateIndexLim = 9;
                 } else {
                     stateIndexLim = 12;
