@@ -54,7 +54,7 @@ const AP_Param::GroupInfo AP_Landing::var_info[] = {
 
     // @Param: FLARE_ALT
     // @DisplayName: Landing flare altitude
-    // @Description: Altitude in autoland at which to lock heading and flare to the LAND_PITCH_CD pitch. Note that this option is secondary to LAND_FLARE_SEC. For a good landing it preferable that the flare is triggered by LAND_FLARE_SEC.
+    // @Description: Altitude in autoland at which to lock heading and flare to the LAND_PITCH_CD pitch. Note that this option is secondary to LAND_FLARE_SEC. For a good landing it preferable that the flare is triggered by LAND_FLARE_SEC. If TECS_LAND_ACC is set to a positive number, TECS will control the flare and changing this parameter will have no effect.
     // @Units: m
     // @Range: 0 30
     // @Increment: 0.1
@@ -63,7 +63,7 @@ const AP_Param::GroupInfo AP_Landing::var_info[] = {
 
     // @Param: FLARE_SEC
     // @DisplayName: Landing flare time
-    // @Description: Vertical time before landing point at which to lock heading and flare with the motor stopped. This is vertical time, and is calculated based solely on the current height above the ground and the current descent rate.  Set to 0 if you only wish to flare based on altitude (see LAND_FLARE_ALT).
+    // @Description: Vertical time before landing point at which to lock heading and flare with the motor stopped. This is vertical time, and is calculated based solely on the current height above the ground and the current descent rate.  Set to 0 if you only wish to flare based on altitude (see LAND_FLARE_ALT). If TECS_LAND_ACC is set to a positive number, TECS will control the flare and changing this parameter will have no effect.
     // @Units: s
     // @Range: 0 10
     // @Increment: 0.1
