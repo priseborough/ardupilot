@@ -506,20 +506,20 @@ const AP_Param::GroupInfo QuadPlane::var_info2[] = {
 
     // @Param: FWD_THR_GAIN
     // @DisplayName: Q mode fwd throttle gain
-    // @Description: Gain from forward accel/tilt to forward throttle that is used in all VTOL modes except autotune. Set to 1/(thrust to weight ratio). When using this method of forward throttle control, the forward tilt angle limit is controlled by the Q_FWD_TILT_LIM parameter and the Q_VFWD_GAIN parameter should be set to 0 to dsable the alternative method that works through the velocity controller. Set Q_FWD_THR_GAIN to 0 to disable this function.
+    // @Description: Gain from forward accel/tilt to forward throttle that is used in all VTOL modes except autotune. Vehicles using separate forward thrust motors, eg quadplanes, should set this parameter to (all up weight) / (maximum combined thrust of forward motors). Vehicles that tilt lifting rotors to provide forward thrust should set this parameter to (all up weight) / (weight lifted by tilting rotors) which for most aircraft can be approximnated as (total number of lifting rotors) / (number of lifting rotors that tilt). When using this method of forward throttle control, the forward tilt angle limit is controlled by the Q_FWD_PIT_LIM parameter and the Q_VFWD_GAIN parameter should be set to 0 to disable the alternative method that works through the velocity controller. Set Q_FWD_THR_GAIN to 0 to disable this function.
     // @Range: 0.0 5.0
     // @Increment: 0.1
     // @User: Standard
     AP_GROUPINFO("FWD_THR_GAIN", 35, QuadPlane, q_fwd_thr_gain, 2.0f),
 
-    // @Param: FWD_TILT_LIM
-    // @DisplayName: Q mode fwd tilt limit
-    // @Description: Forward tilt limit applied when forward throttle controlled by the Q_FWD_THR_GAIN parameter is used in Q modes. Set initially to the amount of forward tilt required to remove wing lift.
+    // @Param: FWD_PIT_LIM
+    // @DisplayName: Q mode forward pitch limit
+    // @Description: When forward throttle is being controlled by the Q_FWD_THR_GAIN parameter in Q modes, the vehicle forward (nose down) pitch rotation will be limited to the value specified by this parameter and the any additional forward acceleration required will be produced by use of the forward thrust motor(s) or tilting of moveable rotors. Larger values allow the vehicle to pitch more nose down. Set initially to the amount of nose down pitch required to remove wing lift.
     // @Units: centi-deg
     // @Range: 0 500
     // @Increment: 10
     // @User: Standard
-    AP_GROUPINFO("FWD_TILT_LIM", 36, QuadPlane, q_fwd_tilt_lim, 300),
+    AP_GROUPINFO("FWD_PIT_LIM", 36, QuadPlane, q_fwd_tilt_lim, 300),
     AP_GROUPEND
 };
 
