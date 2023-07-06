@@ -580,85 +580,79 @@ class AutoTestPlane(AutoTest):
         '''Test mavlink EXTERNAL_POSITION_ESTIMATE command'''
         if not hasattr(mavutil.mavlink, 'MAV_CMD_EXTERNAL_POSITION_ESTIMATE'):
             raise OldpymavlinkException("pymavlink too old; upgrade pymavlink to get MAV_CMD_EXTERNAL_POSITION_ESTIMATE")  # noqa
+            return
+
+        # start with light wind from the West:
+        self.set_parameter("SIM_WIND_DIR", 270)
+        self.set_parameter("SIM_WIND_SPD", 5)
+
         self.change_mode("TAKEOFF")
         self.wait_ready_to_arm()
         self.arm_vehicle()
         self.wait_altitude(48, 52, relative=True)
 
-        loc = self.mav.location()
-        self.location_offset_ne(loc, 2000, 2000)
-
         # setting external position fail while we have GPS lock
         self.progress("set new position with GPS")
+        simstate_loc = self.sim_location()
         self.run_cmd_int(
             mavutil.mavlink.MAV_CMD_EXTERNAL_POSITION_ESTIMATE,
-            p1=self.get_sim_time()-1, # transmit time
-            p2=0.5, # processing delay
-            p3=50, # accuracy
-            p5=int(loc.lat * 1e7),
-            p6=int(loc.lng * 1e7),
-            p7=float("NaN"),    # alt
+            self.get_sim_time()-1, # transmit time
+            0.5, # processing delay
+            50, # accuracy
+            0,
+            int(simstate_loc.lat * 1e7),
+            int(simstate_loc.lng * 1e7),
+            float("NaN"),    # alt
             frame=mavutil.mavlink.MAV_FRAME_GLOBAL,
             want_result=mavutil.mavlink.MAV_RESULT_FAILED,
         )
 
-        self.progress("disable the GPS")
-        self.run_auxfunc(
-            65,
-            2,
-            want_result=mavutil.mavlink.MAV_RESULT_ACCEPTED
-        )
+        # fail GPS and test sending position updates every 60 seconds
+        self.set_parameter("SIM_GPS_DISABLE", 1)
+        self.set_parameter("SIM_WIND_SPD", 8)
+        self.progress("GPS disabled")
+        self.delay_sim_time(60)
+        start_time = self.get_sim_time()
+        last_fix_time = 0
+        while self.get_sim_time() - start_time < 600:
+            now_time = self.get_sim_time()
+            if (now_time - last_fix_time > 30):
+                last_fix_time = now_time
+                simstate_loc = self.sim_location()
+                self.run_cmd_int(
+                    mavutil.mavlink.MAV_CMD_EXTERNAL_POSITION_ESTIMATE,
+                    self.get_sim_time()-1, # transmit time
+                    0.5, # processing delay
+                    50, # accuracy
+                    0,
+                    int(simstate_loc.lat * 1e7),
+                    int(simstate_loc.lng * 1e7),
+                    float("NaN"),    # alt
+                    frame=mavutil.mavlink.MAV_FRAME_GLOBAL,
+                    want_result=mavutil.mavlink.MAV_RESULT_ACCEPTED,
+                )
 
-        # fly for a bit to get into non-aiding state
-        self.progress("waiting 20 seconds")
-        tstart = self.get_sim_time()
-        while self.get_sim_time() < tstart + 20:
-            self.wait_heartbeat()
-
-        self.progress("getting base position")
-        gpi = self.mav.recv_match(
+        # wait 60 seconds before checking position accuracy so that the effect of
+        # a bad wind drift estimate will be detectable
+        wait_time = start_time + 60 - self.get_sim_time()
+        self.delay_sim_time(wait_time)
+        simstate_loc_int = self.sim_location_int()
+        estimated_loc_int = self.mav.recv_match(
             type='GLOBAL_POSITION_INT',
             blocking=True,
             timeout=5
         )
-        loc = mavutil.location(gpi.lat*1e-7, gpi.lon*1e-7, 0, 0)
+        if estimated_loc_int is None:
+            raise NotAchievedException("Did not receive GLOBAL_POSITION_INT message")
+        divergence = self.get_distance_int(simstate_loc_int, estimated_loc_int)
+        self.progress("Position error dist = %.1f m" % divergence)
 
-        self.progress("set new position with no GPS")
-        self.run_cmd_int(
-            mavutil.mavlink.MAV_CMD_EXTERNAL_POSITION_ESTIMATE,
-            p1=self.get_sim_time()-1, # transmit time
-            p2=0.5, # processing delay
-            p3=50, # accuracy
-            p5=gpi.lat+1,
-            p6=gpi.lon+1,
-            p7=float("NaN"),    # alt
-            frame=mavutil.mavlink.MAV_FRAME_GLOBAL,
-            want_result=mavutil.mavlink.MAV_RESULT_ACCEPTED
-        )
-
-        self.progress("waiting 3 seconds")
-        tstart = self.get_sim_time()
-        while self.get_sim_time() < tstart + 3:
-            self.wait_heartbeat()
-
-        gpi2 = self.mav.recv_match(
-            type='GLOBAL_POSITION_INT',
-            blocking=True,
-            timeout=5
-        )
-        loc2 = mavutil.location(gpi2.lat*1e-7, gpi2.lon*1e-7, 0, 0)
-        dist = self.get_distance(loc, loc2)
-
-        self.progress("dist is %.1f" % dist)
-        if dist > 200:
-            raise NotAchievedException("Position error dist=%.1f" % dist)
+        # allow for up to 1 m/s of drift rate
+        if divergence > 60:
+            raise NotAchievedException("Position error dist = %.1f m" % divergence)
 
         self.progress("re-enable the GPS")
-        self.run_auxfunc(
-            65,
-            0,
-            want_result=mavutil.mavlink.MAV_RESULT_ACCEPTED
-        )
+        self.set_parameter("SIM_GPS_DISABLE", 0)
 
         self.progress("flying home")
         self.fly_home_land_and_disarm()
