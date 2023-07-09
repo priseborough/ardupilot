@@ -1295,6 +1295,14 @@ bool AP_AHRS::handle_external_position_estimate(const Location &loc, float pos_a
 #endif
     return false;
 }
+
+bool AP_AHRS::handle_external_wind_estimate(float speed, float direction)
+{
+#if HAL_NAVEKF3_AVAILABLE
+    return EKF3.setWind(speed, direction);
+#endif
+    return false;
+}
 #endif
 
 // return true if inertial navigation is active
