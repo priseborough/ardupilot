@@ -761,3 +761,23 @@ void NavEKF3_core::FuseDragForces()
 *                   MISC FUNCTIONS                      *
 ********************************************************/
 
+#if EK3_FEATURE_POSITION_RESET
+bool NavEKF3_core::setWind(float speed, float direction)
+{
+    // reset the corresponding covariances
+    zeroRows(P,22,23);
+    zeroCols(P,22,23);
+
+    // set the variances
+    P[22][22] = P[23][23] = sq(WIND_SPD_UNCERTAINTY);
+
+    // reset the NE wind velocity states to the measurement
+    stateStruct.wind_vel.x = -speed * cosF(radians(direction));
+    stateStruct.wind_vel.y = -speed * sinF(radians(direction));
+
+    lastExtWindVelSet_ms = imuSampleTime_ms;
+
+    return true;
+
+}
+#endif // EK3_FEATURE_POSITION_RESET
