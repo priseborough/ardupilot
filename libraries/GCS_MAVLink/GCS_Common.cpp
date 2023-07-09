@@ -4883,6 +4883,7 @@ bool GCS_MAVLINK::command_long_stores_location(const MAV_CMD command)
     case MAV_CMD_NAV_TAKEOFF:
     case MAV_CMD_DO_REPOSITION:
     case MAV_CMD_EXTERNAL_POSITION_ESTIMATE:
+    case MAV_CMD_EXTERNAL_WIND_ESTIMATE:
         return true;
     default:
         return false;
@@ -5057,6 +5058,17 @@ MAV_RESULT GCS_MAVLINK::handle_command_int_external_position_estimate(const mavl
     }
     return MAV_RESULT_ACCEPTED;
 }
+
+MAV_RESULT GCS_MAVLINK::handle_command_int_external_wind_estimate(const mavlink_command_int_t &packet)
+{
+    mavlink_command_int_t p2 = packet;
+    const float speed = p2.param1;
+    const float direction = p2.param2;
+    if (!AP::ahrs().handle_external_wind_estimate(speed, direction)) {
+        return MAV_RESULT_FAILED;
+    }
+    return MAV_RESULT_ACCEPTED;
+}
 #endif // AP_AHRS_POSITION_RESET_ENABLED
 
 MAV_RESULT GCS_MAVLINK::handle_command_do_set_roi_none()
@@ -5167,6 +5179,8 @@ MAV_RESULT GCS_MAVLINK::handle_command_int_packet(const mavlink_command_int_t &p
 #if AP_AHRS_POSITION_RESET_ENABLED
     case MAV_CMD_EXTERNAL_POSITION_ESTIMATE:
         return handle_command_int_external_position_estimate(packet);
+    case MAV_CMD_EXTERNAL_WIND_ESTIMATE:
+        return handle_command_int_external_wind_estimate(packet);
 #endif
 
 #if AP_SCRIPTING_ENABLED
