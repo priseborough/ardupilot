@@ -647,8 +647,8 @@ class AutoTestPlane(AutoTest):
         divergence = self.get_distance_int(simstate_loc_int, estimated_loc_int)
         self.progress("Position error dist = %.1f m" % divergence)
 
-        # allow for up to 1 m/s of drift rate
-        if divergence > 60:
+        # allow for up to 0.5 m/s of drift rate
+        if divergence > 30:
             raise NotAchievedException("Position error dist = %.1f m" % divergence)
 
         self.progress("re-enable the GPS")
