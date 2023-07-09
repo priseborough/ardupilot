@@ -65,6 +65,9 @@ void NavEKF3_core::setWindMagStateLearningMode()
     if (!inhibitWindStates && !canEstimateWind) {
         inhibitWindStates = true;
         updateStateIndexLim();
+#if EK3_FEATURE_POSITION_RESET
+        lastExtWindVelSet_ms = 0;
+#endif // EK3_FEATURE_POSITION_RESET
     } else if (inhibitWindStates && canEstimateWind &&
                (sq(stateStruct.velocity.x) + sq(stateStruct.velocity.y) > sq(5.0f) || dragFusionEnabled)) {
         inhibitWindStates = false;
@@ -80,9 +83,15 @@ void NavEKF3_core::setWindMagStateLearningMode()
             const bool haveAirspeedMeasurement = usingDefaultAirspeed || (tasDataDelayed.allowFusion && (imuDataDelayed.time_ms - tasDataDelayed.time_ms < 500) && useAirspeed());
             if (haveAirspeedMeasurement) {
                 trueAirspeedVariance = constrain_ftype(tasDataDelayed.tasVariance, WIND_VEL_VARIANCE_MIN, WIND_VEL_VARIANCE_MAX);
-                const ftype windSpeed =  sqrtF(sq(stateStruct.velocity.x) + sq(stateStruct.velocity.y)) - tasDataDelayed.tas;
-                stateStruct.wind_vel.x = windSpeed * cosF(tempEuler.z);
-                stateStruct.wind_vel.y = windSpeed * sinF(tempEuler.z);
+                // handle specials case where we have received prior wind speed data
+#if EK3_FEATURE_POSITION_RESET
+                if (lastExtWindVelSet_ms == 0)
+#endif // EK3_FEATURE_POSITION_RESET
+                {
+                    const ftype windSpeed =  sqrtF(sq(stateStruct.velocity.x) + sq(stateStruct.velocity.y)) - tasDataDelayed.tas;
+                    stateStruct.wind_vel.x = windSpeed * cosF(tempEuler.z);
+                    stateStruct.wind_vel.y = windSpeed * sinF(tempEuler.z);
+                }
             } else {
                 trueAirspeedVariance = sq(WIND_VEL_VARIANCE_MAX); // use 2-sigma for faster initial convergence
             }
@@ -90,7 +99,12 @@ void NavEKF3_core::setWindMagStateLearningMode()
             // set the wind state variances to the measurement uncertainty
             zeroCols(P, 22, 23);
             zeroRows(P, 22, 23);
-            P[22][22] = P[23][23] = trueAirspeedVariance;
+#if EK3_FEATURE_POSITION_RESET
+            if (lastExtWindVelSet_ms == 0)
+#endif // EK3_FEATURE_POSITION_RESET
+            {
+                P[22][22] = P[23][23] = trueAirspeedVariance;
+            }
 
             windStatesAligned = true;
 
@@ -98,8 +112,14 @@ void NavEKF3_core::setWindMagStateLearningMode()
             // set the variances using a typical max wind speed for small UAV operation
             zeroCols(P, 22, 23);
             zeroRows(P, 22, 23);
-            for (uint8_t index=22; index<=23; index++) {
-                P[index][index] = sq(WIND_VEL_VARIANCE_MAX);
+#if EK3_FEATURE_POSITION_RESET
+            // preserve previously set state variances
+            if (lastExtWindVelSet_ms == 0)
+#endif // EK3_FEATURE_POSITION_RESET
+            {
+                for (uint8_t index=22; index<=23; index++) {
+                    P[index][index] = sq(WIND_VEL_VARIANCE_MAX);
+                }
             }
         }
     }
