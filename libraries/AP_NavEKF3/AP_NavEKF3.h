@@ -157,6 +157,11 @@ public:
     // Returns true if the set was successful
     bool setLatLng(const Location &loc, float posErr, uint32_t timestamp_ms);
 
+    // Set the EKF's wind velocity states using the supplied wind speed and direction.
+    // Wind speed is true speed measured in m/s
+    // Wind direction is the azimuth angle in degrees from true north that the wind is coming from
+    bool setWind(float speed, float direction);
+
     // return estimated height above ground level
     // return false if ground height is not being estimated.
     bool getHAGL(float &HAGL) const;
