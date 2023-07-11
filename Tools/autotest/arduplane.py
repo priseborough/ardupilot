@@ -611,7 +611,36 @@ class AutoTestPlane(AutoTest):
         self.set_parameter("SIM_GPS_DISABLE", 1)
         self.set_parameter("SIM_WIND_SPD", 8)
         self.progress("GPS disabled")
-        self.delay_sim_time(60)
+        self.delay_sim_time(5)
+
+        # Send wind estimate to flight vehicle and check that the wind state has been updated
+        self.run_cmd_int(
+            mavutil.mavlink.MAV_CMD_EXTERNAL_WIND_ESTIMATE,
+            8, # wind speed
+            270, # wind direction
+            0, # not assigned
+            0, # not assigned
+            0, # not assigned
+            0, # not assigned
+            0, # not assigned
+            frame=mavutil.mavlink.MAV_FRAME_GLOBAL,
+            want_result=mavutil.mavlink.MAV_RESULT_ACCEPTED,
+        )
+        self.delay_sim_time(5)
+        m = self.mav.recv_match(
+            type='WIND',
+            blocking=True,
+            timeout=5
+        )
+        if m is None:
+            raise NotAchievedException("Did not receive WIND message")
+        if (abs(m.speed-8) > 0.5 or abs(m.direction+90) > 15):
+            raise NotAchievedException("Wind spd and dirn was %.1f m/s and %.1f deg" % (m.speed,m.direction))
+
+        # change the wind speed back and check that the change can be learned with multiple position fixes
+        self.set_parameter("SIM_WIND_SPD", 5)
+        self.delay_sim_time(5)
+
         start_time = self.get_sim_time()
         last_fix_time = 0
         while self.get_sim_time() - start_time < 600:
