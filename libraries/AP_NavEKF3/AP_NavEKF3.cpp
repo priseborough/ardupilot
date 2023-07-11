@@ -1430,16 +1430,15 @@ bool NavEKF3::setLatLng(const Location &loc, float posAccuracy, uint32_t timesta
 bool NavEKF3::setWind(float speed, float direction)
 {
 #if EK3_FEATURE_POSITION_RESET
-
     AP::dal().log_SetWind(speed, direction);
     if (!core) {
         return false;
     }
     bool ret = false;
     for (uint8_t i=0; i<num_cores; i++) {
-        ret &= core[i].setWind(speed, direction);
+        ret |= core[i].setWind(speed, direction);
     }
-    // return false if any core rejects the operation
+    // return true if any core accepts the new origin
     return ret;
 #else
     return false;
