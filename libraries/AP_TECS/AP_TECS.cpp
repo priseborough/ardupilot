@@ -698,7 +698,11 @@ void AP_TECS::_update_throttle_with_airspeed(void)
     _SPEdot_dem = (_SPE_dem - _SPE_est) / timeConstant();
 
     // Calculate total energy error
-    _STE_error = constrain_float((_SPE_dem - _SPE_est), SPE_err_min, SPE_err_max) + _SKE_dem - _SKE_est;
+    // Weight the result so that throttle complements how pitch is being used
+    const float SPE_weight = _SKE_weighting;
+    const float SKE_weight = 1.0f - _SKE_weighting;
+    _STE_error = SPE_weight * constrain_float((_SPE_dem - _SPE_est), SPE_err_min, SPE_err_max) +
+                 SKE_weight * (_SKE_dem - _SKE_est);
     float STEdot_dem = constrain_float((_SPEdot_dem + _SKEdot_dem), _STEdot_min, _STEdot_max);
     float STEdot_error = STEdot_dem - _SPEdot - _SKEdot;
 
