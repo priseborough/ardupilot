@@ -143,6 +143,41 @@ const AP_Param::GroupInfo AP_YawController::var_info[] = {
     // @Increment: 0.5
     // @User: Advanced
 
+    // @Param: _RATE_D_FF
+    // @DisplayName: Yaw Derivative FeedForward Gain
+    // @Description: FF D Gain which produces an output that is proportional to the rate of change of the error
+    // @Range: 0 3.0
+    // @Increment: 0.001
+    // @User: Advanced
+
+    // @Param: _RATE_NTFQ
+    // @DisplayName: Yaw Target notch Filter center frequency
+    // @Description: Yaw Target notch Filter center frequency in Hz.
+    // @Range: 10 495
+    // @Units: Hz
+    // @User: Advanced
+
+    // @Param: _RATE_NTBW
+    // @DisplayName: Yaw Target notch Filter bandwidth
+    // @Description: Yaw Target notch Filter bandwidth in Hz.
+    // @Range: 5 250
+    // @Units: Hz
+    // @User: Advanced
+
+    // @Param: _RATE_NEFQ
+    // @DisplayName: Yaw Error notch Filter center frequency
+    // @Description: Yaw Error notch Filter center frequency in Hz.
+    // @Range: 10 495
+    // @Units: Hz
+    // @User: Advanced
+
+    // @Param: _RATE_NEBW
+    // @DisplayName: Yaw Error notch Filter bandwidth
+    // @Description: Yaw Error notch Filter bandwidth in Hz.
+    // @Range: 5 250
+    // @Units: Hz
+    // @User: Advanced
+
     AP_SUBGROUPINFO(rate_pid, "_RATE_", 9, AP_YawController, AC_PID),
 
     AP_GROUPEND
