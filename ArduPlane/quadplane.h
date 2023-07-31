@@ -398,9 +398,11 @@ private:
     AP_Float acro_pitch_rate;
     AP_Float acro_yaw_rate;
 
-    // gain from forwarpitch/accel to forward thrust
+    // gain from forward acceleration to forward throttle
     AP_Float q_fwd_thr_gain;
-    AP_Int32 q_fwd_tilt_lim;
+
+    // limit applied to forward pitch to prevent wing producing negative lift
+    AP_Float q_fwd_tilt_lim;
 
     // time we last got an EKF yaw reset
     uint32_t ekfYawReset_ms;
