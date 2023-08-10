@@ -94,6 +94,38 @@ const AP_Param::GroupInfo AC_CustomControl_PID::var_info[] = {
     // @Range: 0 200
     // @Increment: 0.5
     // @User: Advanced
+
+    // @Param: RAT_RLL_D_FF
+    // @DisplayName: Roll Derivative FeedForward Gain
+    // @Description: FF D Gain which produces an output that is proportional to the rate of change of the error
+
+    // @Param: RAT_RLL_NTFQ
+    // @DisplayName: Roll Target notch Filter center frequency
+    // @Description: Roll Target notch Filter center frequency in Hz.
+    // @Range: 10 495
+    // @Units: Hz
+    // @User: Advanced
+
+    // @Param: RAT_RLL_NTBW
+    // @DisplayName: Roll Target notch Filter bandwidth
+    // @Description: Roll Target notch Filter bandwidth in Hz.
+    // @Range: 5 250
+    // @Units: Hz
+    // @User: Advanced
+
+    // @Param: RAT_RLL_NEFQ
+    // @DisplayName: Roll Error notch Filter center frequency
+    // @Description: Roll Error notch Filter center frequency in Hz.
+    // @Range: 10 495
+    // @Units: Hz
+    // @User: Advanced
+
+    // @Param: RAT_RLL_NEBW
+    // @DisplayName: Roll Error notch Filter bandwidth
+    // @Description: Roll Error notch Filter bandwidth in Hz.
+    // @Range: 5 250
+    // @Units: Hz
+    // @User: Advanced
     AP_SUBGROUPINFO(_pid_atti_rate_roll, "RAT_RLL_", 4, AC_CustomControl_PID, AC_PID),
 
     // @Param: RAT_PIT_P
@@ -161,6 +193,39 @@ const AP_Param::GroupInfo AC_CustomControl_PID::var_info[] = {
     // @Range: 0 200
     // @Increment: 0.5
     // @User: Advanced
+
+    // @Param: RAT_PIT_D_FF
+    // @DisplayName: Pitch Derivative FeedForward Gain
+    // @Description: FF D Gain which produces an output that is proportional to the rate of change of the error
+
+    // @Param: RAT_PIT_NTFQ
+    // @DisplayName: Pitch Target notch Filter center frequency
+    // @Description: Pitch Target notch Filter center frequency in Hz.
+    // @Range: 10 495
+    // @Units: Hz
+    // @User: Advanced
+
+    // @Param: RAT_PIT_NTBW
+    // @DisplayName: Pitch Target notch Filter bandwidth
+    // @Description: Pitch Target notch Filter bandwidth in Hz.
+    // @Range: 5 250
+    // @Units: Hz
+    // @User: Advanced
+
+    // @Param: RAT_PIT_NEFQ
+    // @DisplayName: Pitch Error notch Filter center frequency
+    // @Description: Pitch Error notch Filter center frequency in Hz.
+    // @Range: 10 495
+    // @Units: Hz
+    // @User: Advanced
+
+    // @Param: RAT_PIT_NEBW
+    // @DisplayName: Pitch Error notch Filter bandwidth
+    // @Description: Pitch Error notch Filter bandwidth in Hz.
+    // @Range: 5 250
+    // @Units: Hz
+    // @User: Advanced
+
     AP_SUBGROUPINFO(_pid_atti_rate_pitch, "RAT_PIT_", 5, AC_CustomControl_PID, AC_PID),
 
 
@@ -229,6 +294,39 @@ const AP_Param::GroupInfo AC_CustomControl_PID::var_info[] = {
     // @Range: 0 200
     // @Increment: 0.5
     // @User: Advanced
+
+    // @Param: RAT_YAW_D_FF
+    // @DisplayName: Yaw Derivative FeedForward Gain
+    // @Description: FF D Gain which produces an output that is proportional to the rate of change of the error
+
+    // @Param: RAT_YAW_NTFQ
+    // @DisplayName: Yaw Target notch Filter center frequency
+    // @Description: Yaw Target notch Filter center frequency in Hz.
+    // @Range: 10 495
+    // @Units: Hz
+    // @User: Advanced
+
+    // @Param: RAT_YAW_NTBW
+    // @DisplayName: Yaw Target notch Filter bandwidth
+    // @Description: Yaw Target notch Filter bandwidth in Hz.
+    // @Range: 5 250
+    // @Units: Hz
+    // @User: Advanced
+
+    // @Param: RAT_YAW_NEFQ
+    // @DisplayName: Yaw Error notch Filter center frequency
+    // @Description: Yaw Error notch Filter center frequency in Hz.
+    // @Range: 10 495
+    // @Units: Hz
+    // @User: Advanced
+
+    // @Param: RAT_YAW_NEBW
+    // @DisplayName: Yaw Error notch Filter bandwidth
+    // @Description: Yaw Error notch Filter bandwidth in Hz.
+    // @Range: 5 250
+    // @Units: Hz
+    // @User: Advanced
+
     AP_SUBGROUPINFO(_pid_atti_rate_yaw, "RAT_YAW_", 6, AC_CustomControl_PID, AC_PID),
 
     AP_GROUPEND
