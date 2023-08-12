@@ -1282,7 +1282,6 @@ bool AP_AHRS_DCM::setLatLng(const Location &loc, uint32_t timestamp_ms)
     Location last_loc;
     last_loc.lat = _last_lat;
     last_loc.lng = _last_lng;
-
     _position_offset_NE = last_loc.get_distance_NE(loc) + _last_velocity.xy() * delaySec;
 
     return true;
