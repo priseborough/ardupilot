@@ -1279,10 +1279,18 @@ bool AP_AHRS_DCM::setLatLng(const Location &loc, uint32_t timestamp_ms)
     const int32_t delta_ms = int32_t(now_ms - timeStampConstrained_ms);
     const ftype delaySec = 1E-3F * ftype(delta_ms);
 
-    Location last_loc;
-    last_loc.lat = _last_lat;
-    last_loc.lng = _last_lng;
-    _position_offset_NE = last_loc.get_distance_NE(loc) + _last_velocity.xy() * delaySec;
+    if (!_have_position) {
+        _last_lat = loc.lat;
+        _last_lng = loc.lng;
+        _have_position = true;
+        _position_offset_NE.zero();
+    } else {
+        Location last_loc;
+        last_loc.lat = _last_lat;
+        last_loc.lng = _last_lng;
+        _position_offset_NE = last_loc.get_distance_NE(loc) + _last_velocity.xy() * delaySec;
+    }
+    _last_pos_ms = AP_HAL::millis();
 
     return true;
 }
