@@ -288,7 +288,7 @@ void NavEKF3_core::setAidingMode()
             // GPS aiding is the preferred option unless excluded by the user
             if (readyToUseGPS() || readyToUseRangeBeacon() || readyToUseExtNav()) {
                 PV_AidingMode = AID_ABSOLUTE;
-            } else if (readyToUseOptFlow() || readyToUseBodyOdm()) {
+            } else if (readyToUseOptFlow() || readyToUseBodyOdm() || readyToUseAirData()) {
                 PV_AidingMode = AID_RELATIVE;
             }
             break;
@@ -430,6 +430,12 @@ void NavEKF3_core::setAidingMode()
                  // Reset time stamps
                 lastbodyVelPassTime_ms = imuSampleTime_ms;
                 prevBodyVelFuseTime_ms = imuSampleTime_ms;
+            } else if (readyToUseAirData()) {
+                lastTasPassTime_ms = imuSampleTime_ms;
+                inhibitWindStates = false;
+                updateStateIndexLim();
+                velResetSource = resetDataSource::AIRDATA;
+                posResetSource = resetDataSource::AIRDATA;
             }
             posTimeout = true;
             velTimeout = true;

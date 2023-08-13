@@ -680,7 +680,9 @@ private:
         BARO=4,         // Use Baro height
         MAG=5,          // Use magnetometer data
         RNGFND=6,       // Use rangefinder data
-        EXTNAV=7        // Use external nav data
+        EXTNAV=7,       // Use external nav data
+        AIRDATA=8       // Use air data, eg airspeed and sideslip
+
     };
 
     // specifies the method to be used when fusing yaw observations
