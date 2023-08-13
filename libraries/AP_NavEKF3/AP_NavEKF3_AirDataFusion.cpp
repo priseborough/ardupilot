@@ -776,20 +776,22 @@ bool NavEKF3_core::setWind(float speed, float direction)
     stateStruct.wind_vel.x = -speed * cosF(radians(direction));
     stateStruct.wind_vel.y = -speed * sinF(radians(direction));
 
-    // update the vehicle velocity states to be consistent with the new wind estimate
-    velResetNE = stateStruct.wind_vel - wind_vel_prev;
-    stateStruct.velocity.xy() += velResetNE;
+    // update the vehicle velocity states to be consistent with the new wind estimate if dead reckoning
+    if ((imuSampleTime_ms - lastPosPassTime_ms) > frontend->deadReckonDeclare_ms) {
+        velResetNE = stateStruct.wind_vel - wind_vel_prev;
+        stateStruct.velocity.xy() += velResetNE;
 
-    // update the output buffer
-    for (uint8_t i=0; i<imu_buffer_length; i++) {
-        storedOutput[i].velocity.xy() = stateStruct.velocity.xy();
+        // update the output buffer
+        for (uint8_t i=0; i<imu_buffer_length; i++) {
+            storedOutput[i].velocity.xy() = stateStruct.velocity.xy();
+        }
+        outputDataNew.velocity.xy() = stateStruct.velocity.xy();
+        outputDataDelayed.velocity.xy() = stateStruct.velocity.xy();
+
+        // store the time of the reset
+        lastVelReset_ms = imuSampleTime_ms;
+        lastExtWindVelSet_ms = imuSampleTime_ms;
     }
-    outputDataNew.velocity.xy() = stateStruct.velocity.xy();
-    outputDataDelayed.velocity.xy() = stateStruct.velocity.xy();
-
-    // store the time of the reset
-    lastVelReset_ms = imuSampleTime_ms;
-    lastExtWindVelSet_ms = imuSampleTime_ms;
 
     return true;
 
