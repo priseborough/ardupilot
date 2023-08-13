@@ -600,6 +600,13 @@ bool NavEKF3_core::readyToUseExtNav(void) const
 #endif // EK3_FEATURE_EXTERNAL_NAV
 }
 
+// return true if the filter to be ready to start using air data fusion
+bool NavEKF3_core::readyToUseAirData(void) const
+{
+    const bool hasAirspeed = useAirspeed() || usingDefaultAirspeed;
+    return inFlight && finalInflightYawInit && hasAirspeed && assume_zero_sideslip();
+}
+
 // return true if we should use the compass
 bool NavEKF3_core::use_compass(void) const
 {

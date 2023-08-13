@@ -876,6 +876,9 @@ private:
     // return true if the filter to be ready to use external nav data
     bool readyToUseExtNav(void) const;
 
+    // return true if the filter to be ready to start using air data fusion
+    bool readyToUseAirData(void) const;
+
     // return true if we should use the range finder sensor
     bool useRngFinder(void) const;
 
