@@ -146,13 +146,51 @@ void NavEKF3_core::ResetPosition(resetDataSource posResetSource)
 
 #if EK3_FEATURE_POSITION_RESET
 // Sets the EKF's NE horizontal position states and their corresponding variances from a supplied WGS-84 location and uncertainty
-// The altitude element of the location is not used.
+// The altitude element of the location will be be used if the EKF origin has already been set
+// If the EKF origin has not been set set, then it will be set to the latitude, longitude and height of the supp0lied location.
 // Returns true if the set was successful
 bool NavEKF3_core::setLatLng(const Location &loc, float posAccuracy, uint32_t timestamp_ms)
 {
-    if ((imuSampleTime_ms - lastPosPassTime_ms) < frontend->deadReckonDeclare_ms ||
-        (PV_AidingMode == AID_NONE)
-        || !validOrigin) {
+    bool forcePosStateReset = false;
+    if (!validOrigin) {
+        setOrigin(loc);
+        forcePosStateReset = true;
+    }
+
+    if (PV_AidingMode == AID_NONE) {
+        const bool noConflictingSource = !readyToUseExtNav() && !readyToUseGPS();
+        const bool canUseAirData = readyToUseAirData();
+        if (noConflictingSource && canUseAirData) {
+            PV_AidingMode = AID_ABSOLUTE;
+            // activate wind states and initialise if necessary
+            inhibitWindStates = false;
+            updateStateIndexLim();
+
+            // use airspeed to set wind relative velocity assuming we are flying with zero side slip
+            Vector2F velVarNE = Vector2F(tasDataDelayed.tasVariance, tasDataDelayed.tasVariance);
+            Vector3F tempEuler;
+            stateStruct.quat.to_euler(tempEuler.x, tempEuler.y, tempEuler.z);
+            stateStruct.velocity.x = tasDataDelayed.tas * cosF(tempEuler.z);
+            stateStruct.velocity.y = tasDataDelayed.tas * sinF(tempEuler.z);
+            if (lastExtWindVelSet_ms > 0) {
+                // use previously specified wind to correct for wind drift
+                stateStruct.velocity.xy() += stateStruct.wind_vel;
+                velVarNE.x += P[22][22];
+                velVarNE.y += P[23][23];
+            }
+
+            zeroRows(P,4,5);
+            zeroCols(P,4,5);
+            P[4][4] = velVarNE.x;
+            P[5][5] = velVarNE.y;
+
+        }
+    } else if (PV_AidingMode == AID_RELATIVE) {
+        // already dead reckoning so now we have an origin, an absolute position can be estimated
+        PV_AidingMode = AID_ABSOLUTE;
+    }
+
+    if (!forcePosStateReset && (imuSampleTime_ms - lastPosPassTime_ms) < frontend->deadReckonDeclare_ms) {
         return false;
     }
 
@@ -168,7 +206,7 @@ bool NavEKF3_core::setLatLng(const Location &loc, float posAccuracy, uint32_t ti
     const Vector2F newPosNE = EKF_origin.get_distance_NE_ftype(loc) + stateStruct.velocity.xy() * delaySec;
 
     // If wind states are active, fuse the position as an observation and only modify the wind states
-    if (!inhibitWindStates && is_positive(P[7][7]) && is_positive(P[8][8])) {
+    if (!forcePosStateReset && !inhibitWindStates && is_positive(P[7][7]) && is_positive(P[8][8])) {
         // Apply a 5-sigma circular innovation limit
         Vector2F innovation = posResetNE - newPosNE;
         ftype R_OBS = sq(MAX(posAccuracy,frontend->_gpsHorizPosNoise));
