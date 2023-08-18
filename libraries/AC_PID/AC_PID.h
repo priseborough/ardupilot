@@ -8,11 +8,16 @@
 #include <stdlib.h>
 #include <cmath>
 #include <Filter/SlewLimiter.h>
+#include <Filter/NotchFilter.h>
 
 #define AC_PID_TFILT_HZ_DEFAULT  0.0f   // default input filter frequency
 #define AC_PID_EFILT_HZ_DEFAULT  0.0f   // default input filter frequency
 #define AC_PID_DFILT_HZ_DEFAULT  20.0f   // default input filter frequency
 #define AC_PID_RESET_TC          0.16f   // Time constant for integrator reset decay to zero
+
+#ifndef AP_PID_NOTCH
+#define AP_PID_NOTCH 1
+#endif
 
 #include "AP_PIDInfo.h"
 
@@ -23,7 +28,7 @@ public:
 
     // Constructor for PID
     AC_PID(float initial_p, float initial_i, float initial_d, float initial_ff, float initial_imax, float initial_filt_T_hz, float initial_filt_E_hz, float initial_filt_D_hz,
-           float initial_srmax=0, float initial_srtau=1.0);
+           float initial_srmax=0, float initial_srtau=1.0, float initial_dff=0);
 
     CLASS_NO_COPY(AC_PID);
 
@@ -68,7 +73,7 @@ public:
     void save_gains();
 
     /// operator function call for easy initialisation
-    void operator()(float p_val, float i_val, float d_val, float ff_val, float imax_val, float input_filt_T_hz, float input_filt_E_hz, float input_filt_D_hz);
+    void operator()(float p_val, float i_val, float d_val, float ff_val, float imax_val, float input_filt_T_hz, float input_filt_E_hz, float input_filt_D_hz, float dff_val);
 
     // get accessors
     AP_Float &kP() { return _kp; }
@@ -76,6 +81,7 @@ public:
     AP_Float &kD() { return _kd; }
     AP_Float &kIMAX() { return _kimax; }
     AP_Float &ff() { return _kff;}
+    AP_Float &kDff() { return _kdff; }
     AP_Float &filt_T_hz() { return _filt_T_hz; }
     AP_Float &filt_E_hz() { return _filt_E_hz; }
     AP_Float &filt_D_hz() { return _filt_D_hz; }
@@ -91,6 +97,7 @@ public:
     void kI(const float v) { _ki.set(v); }
     void kD(const float v) { _kd.set(v); }
     void ff(const float v) { _kff.set(v); }
+    void kDff(const float v) { _kdff.set(v); }
     void imax(const float v) { _kimax.set(fabsf(v)); }
     void filt_T_hz(const float v);
     void filt_E_hz(const float v);
@@ -115,6 +122,9 @@ public:
 
     const AP_PIDInfo& get_pid_info(void) const { return _pid_info; }
 
+#if AP_PID_NOTCH
+    void set_notch_sample_rate(float);
+#endif
     // parameter var table
     static const struct AP_Param::GroupInfo var_info[];
 
@@ -131,12 +141,18 @@ protected:
     AP_Float _ki;
     AP_Float _kd;
     AP_Float _kff;
+    AP_Float _kdff;
     AP_Float _kimax;
     AP_Float _filt_T_hz;         // PID target filter frequency in Hz
     AP_Float _filt_E_hz;         // PID error filter frequency in Hz
     AP_Float _filt_D_hz;         // PID derivative filter frequency in Hz
     AP_Float _slew_rate_max;
-
+#if AP_PID_NOTCH
+    AP_Float _notch_T_center_freq_hz;
+    AP_Float _notch_T_bandwidth_hz;
+    AP_Float _notch_E_center_freq_hz;
+    AP_Float _notch_E_bandwidth_hz;
+#endif
     SlewLimiter _slew_limiter{_slew_rate_max, _slew_rate_tau};
 
     // flags
@@ -149,7 +165,12 @@ protected:
     float _target;            // target value to enable filtering
     float _error;             // error value to enable filtering
     float _derivative;        // derivative value to enable filtering
+    float _target_derivative; // target derivative value to enable dff
     int8_t _slew_limit_scale;
+#if AP_PID_NOTCH
+    NotchFilterFloat _target_notch;
+    NotchFilterFloat _error_notch;
+#endif
 
     AP_PIDInfo _pid_info;
 };
