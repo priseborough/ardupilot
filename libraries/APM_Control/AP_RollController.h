@@ -55,6 +55,8 @@ public:
 
     void convert_pid();
 
+    void set_notch_sample_rate(float sample_rate_hz) { rate_pid.set_notch_sample_rate(sample_rate_hz); };
+
 private:
     const AP_Vehicle::FixedWing &aparm;
     AP_AutoTune::ATGains gains;

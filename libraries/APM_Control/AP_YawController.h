@@ -49,6 +49,8 @@ public:
 
     static const struct AP_Param::GroupInfo var_info[];
 
+    void set_notch_sample_rate(float sample_rate_hz) { rate_pid.set_notch_sample_rate(sample_rate_hz); };
+
 private:
     const AP_Vehicle::FixedWing &aparm;
     AP_Float _K_A;
