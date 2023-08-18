@@ -152,6 +152,8 @@ protected:
     AP_Float _notch_T_bandwidth_hz;
     AP_Float _notch_E_center_freq_hz;
     AP_Float _notch_E_bandwidth_hz;
+    AP_Float _notch_T_attenuation_db;
+    AP_Float _notch_E_attenuation_db;
 #endif
     SlewLimiter _slew_limiter{_slew_rate_max, _slew_rate_tau};
 

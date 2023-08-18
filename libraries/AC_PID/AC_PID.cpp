@@ -4,7 +4,7 @@
 #include <AP_Math/AP_Math.h>
 #include "AC_PID.h"
 
-#define AC_PID_DEFAULT_NOTCH_ATTENUATION 20
+#define AC_PID_DEFAULT_NOTCH_ATTENUATION 15
 
 const AP_Param::GroupInfo AC_PID::var_info[] = {
     // @Param: P
@@ -103,6 +103,23 @@ const AP_Param::GroupInfo AC_PID::var_info[] = {
     // @Units: Hz
     // @User: Advanced
     AP_GROUPINFO("NEBW", 17, AC_PID, _notch_E_bandwidth_hz, 0),
+
+    // @Param: NTAT
+    // @DisplayName: PID Target notch Filter attenuation
+    // @Description: PID Target notch Filter attenuation in dB.
+    // @Range: 6 30
+    // @Units: Hz
+    // @User: Advanced
+    AP_GROUPINFO("NTAT", 18, AC_PID, _notch_T_attenuation_db, AC_PID_DEFAULT_NOTCH_ATTENUATION),
+
+    // @Param: NEAT
+    // @DisplayName: PID Error notch Filter attenuation
+    // @Description: PID Error notch Filter attenuation in dB.
+    // @Range: 6 30
+    // @Units: Hz
+    // @User: Advanced
+    AP_GROUPINFO("NEAT", 19, AC_PID, _notch_E_attenuation_db, AC_PID_DEFAULT_NOTCH_ATTENUATION),
+
 #endif
 
     AP_GROUPEND
@@ -392,6 +409,8 @@ void AC_PID::save_gains()
     _notch_T_bandwidth_hz.save();
     _notch_E_center_freq_hz.save();
     _notch_E_bandwidth_hz.save();
+    _notch_T_attenuation_db.save();
+    _notch_E_attenuation_db.save();
 #endif
 }
 
