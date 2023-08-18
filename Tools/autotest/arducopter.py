@@ -5444,6 +5444,12 @@ class AutoTestCopter(AutoTest):
                 "SIM_DRIFT_SPEED": 0,
                 "SIM_DRIFT_TIME": 0,
                 "FFT_THR_REF": self.get_parameter("MOT_THST_HOVER"),
+                "ATC_RAT_RLL_NTFQ": 150,
+                "ATC_RAT_RLL_NTBW": 50,
+                "ATC_RAT_PIT_NTFQ": 200,
+                "ATC_RAT_PIT_NTBW": 50,
+                "ATC_RAT_YAW_NTFQ": 250,
+                "ATC_RAT_YAW_NTBW": 50,
                 "SIM_GYR1_RND": 20,  # enable a noisy gyro
             })
 
@@ -9040,6 +9046,7 @@ class AutoTestCopter(AutoTest):
             Test(self.DynamicNotches, attempts=8),
             self.PositionWhenGPSIsZero,
             Test(self.DynamicRpmNotches, attempts=8),
+            self.PIDNotches,
             self.RefindGPS,
             Test(self.GyroFFT, attempts=8),
             Test(self.GyroFFTHarmonic, attempts=8),
