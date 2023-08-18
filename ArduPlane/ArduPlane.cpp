@@ -347,6 +347,15 @@ void Plane::one_second_loop()
         !is_equal(G_Dt, scheduler.get_loop_period_s())) {
         INTERNAL_ERROR(AP_InternalError::error_t::flow_of_control);
     }
+
+    // slowly update the PID notches with the average loop rate
+    const float loop_rate_hz = AP::scheduler().get_filtered_loop_rate_hz();
+#if HAL_QUADPLANE_ENABLED
+    quadplane.attitude_control->set_notch_sample_rate(loop_rate_hz);
+#endif
+    rollController.set_notch_sample_rate(loop_rate_hz);
+    pitchController.set_notch_sample_rate(loop_rate_hz);
+    yawController.set_notch_sample_rate(loop_rate_hz);
 }
 
 void Plane::three_hz_loop()
