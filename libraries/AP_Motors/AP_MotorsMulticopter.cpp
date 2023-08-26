@@ -781,6 +781,15 @@ bool AP_MotorsMulticopter::arming_checks(size_t buflen, char *buffer) const
     return true;
 }
 
+bool AP_MotorsMulticopter::get_motor_demand(uint8_t index, float &demand)
+{
+    if (index < AP_MOTORS_MAX_NUM_MOTORS && motor_enabled[index]) {
+        demand = _actuator[index];
+        return true;
+    }
+    return false;
+}
+
 #if APM_BUILD_TYPE(APM_BUILD_UNKNOWN)
 // Getters for AP_Motors example, not used by vehicles
 float AP_MotorsMulticopter::get_throttle_avg_max() const

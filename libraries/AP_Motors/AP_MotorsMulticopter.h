@@ -99,6 +99,10 @@ public:
     float get_throttle_avg_max() const;
     int16_t get_yaw_headroom() const;
 
+    // Gets the demand in the range from 0 to 1 for the specified motor index
+    // Returns false if that motor is not enabled
+    bool get_motor_demand(uint8_t index, float &demand);
+
     // Thrust Linearization handling
     Thrust_Linearization thr_lin {*this};
 
