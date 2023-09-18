@@ -471,11 +471,19 @@ bool RC_Channel::in_trim_dz() const
 
 
 /*
-   return trues if input is within deadzone of min
+   return true if input is within deadzone of min
 */
 bool RC_Channel::in_min_dz() const
 {
     return radio_in < radio_min + dead_zone;
+}
+
+/*
+   return true if input is within deadzone of max
+*/
+bool RC_Channel::in_max_dz() const
+{
+    return radio_in > radio_max - dead_zone;
 }
 
 void RC_Channel::set_override(const uint16_t v, const uint32_t timestamp_ms)

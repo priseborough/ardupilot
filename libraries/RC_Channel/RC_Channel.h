@@ -60,6 +60,9 @@ public:
     // returns true if input is within deadzone of min
     bool        in_min_dz() const;
 
+    // returns true if input is within deadzone of max
+    bool        in_max_dz() const;
+
     uint8_t     percent_input() const;
 
     static const struct AP_Param::GroupInfo var_info[];
