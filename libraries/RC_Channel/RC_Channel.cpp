@@ -475,7 +475,11 @@ bool RC_Channel::in_trim_dz() const
 */
 bool RC_Channel::in_min_dz() const
 {
-    return radio_in < radio_min + dead_zone;
+    if (reversed) {
+        return radio_in > radio_max - dead_zone;
+    } else {
+        return radio_in < radio_min + dead_zone;
+    }
 }
 
 /*
@@ -483,7 +487,11 @@ bool RC_Channel::in_min_dz() const
 */
 bool RC_Channel::in_max_dz() const
 {
-    return radio_in > radio_max - dead_zone;
+    if (reversed) {
+        return radio_in < radio_min + dead_zone;
+    } else {
+        return radio_in > radio_max - dead_zone;
+    }
 }
 
 void RC_Channel::set_override(const uint16_t v, const uint32_t timestamp_ms)
