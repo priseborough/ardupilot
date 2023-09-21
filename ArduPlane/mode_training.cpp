@@ -31,6 +31,7 @@ void ModeTraining::update()
     if (plane.fly_inverted()) {
         plane.nav_pitch_cd = -plane.nav_pitch_cd;
     }
+    plane.nav_pitch_rate_cds = 0; // this should only be non zero when doing a FW landing flare maneouvre
 }
 
 /*

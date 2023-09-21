@@ -225,8 +225,9 @@ float Plane::stabilize_pitch_get_pitch_out()
         flare_mode == FlareMode::ENABLED_PITCH_TARGET &&
         throttle_at_zero()) {
         demanded_pitch = landing.get_pitch_cd();
+        nav_pitch_rate_cds = 0;
     }
-
+    pitchController.set_ff_rate_demand(0.01f * (float)nav_pitch_rate_cds);
     return pitchController.get_servo_out(demanded_pitch - ahrs.pitch_sensor, speed_scaler, disable_integrator,
                                          ground_mode && !(plane.flight_option_enabled(FlightOptions::DISABLE_GROUND_PID_SUPPRESSION)));
 }
@@ -580,11 +581,12 @@ int16_t Plane::calc_nav_yaw_ground(void)
 
 
 /*
-  calculate a new nav_pitch_cd from the speed height controller
+  calculate a new nav_pitch_cd and nav_pitch_rate_cds from the speed height controller
  */
 void Plane::calc_nav_pitch()
 {
     int32_t commanded_pitch = TECS_controller.get_pitch_demand();
+    plane.nav_pitch_rate_cds = (int32_t)(100.0f * TECS_controller.get_flare_pitch_rate_demand());
     nav_pitch_cd = constrain_int32(commanded_pitch, pitch_limit_min_cd, aparm.pitch_limit_max_cd.get());
 }
 

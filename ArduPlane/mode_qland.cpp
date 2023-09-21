@@ -19,6 +19,7 @@ bool ModeQLand::_enter()
 #if AP_FENCE_ENABLED
     plane.fence.auto_disable_fence_for_landing();
 #endif
+    plane.nav_pitch_rate_cds = 0; // this should only be non zero when doing a FW landing flare maneouvre
     return true;
 }
 

@@ -24,6 +24,9 @@ bool ModeGuided::_enter()
     active_radius_m = 0;
 
     plane.set_guided_WP(loc);
+
+    plane.nav_pitch_rate_cds = 0; // this should only be non zero when doing a FW landing flare maneouvre
+
     return true;
 }
 

@@ -3,6 +3,8 @@
 
 void ModeFBWA::update()
 {
+    plane.nav_pitch_rate_cds = 0; // this should only be non zero when doing a FW landing flare maneouvre
+
     // set nav_roll and nav_pitch using sticks
     plane.nav_roll_cd  = plane.channel_roll->norm_input() * plane.roll_limit_cd;
     plane.update_load_factor();

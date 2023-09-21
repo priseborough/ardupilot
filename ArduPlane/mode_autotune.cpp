@@ -4,7 +4,7 @@
 bool ModeAutoTune::_enter()
 {
     plane.autotune_start();
-
+    plane.nav_pitch_rate_cds = 0; // this should only be non zero when doing a FW landing flare maneouvre
     return true;
 }
 

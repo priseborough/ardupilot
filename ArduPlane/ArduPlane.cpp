@@ -561,9 +561,9 @@ void Plane::update_alt()
     if (should_run_tecs && !throttle_suppressed) {
 
         float distance_beyond_land_wp = 0;
-        if (flight_stage == AP_FixedWing::FlightStage::LAND &&
-            current_loc.past_interval_finish_line(prev_WP_loc, next_WP_loc)) {
-            distance_beyond_land_wp = current_loc.get_distance(next_WP_loc);
+        if (flight_stage == AP_FixedWing::FlightStage::LAND) {
+            const float wp_separation = prev_WP_loc.get_distance(next_WP_loc);
+            distance_beyond_land_wp = wp_separation * (current_loc.line_path_proportion(prev_WP_loc, next_WP_loc) - 1.0f);
         }
 
         tecs_target_alt_cm = relative_target_altitude_cm();

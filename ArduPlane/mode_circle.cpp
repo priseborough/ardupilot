@@ -5,7 +5,7 @@ bool ModeCircle::_enter()
 {
     // the altitude to circle at is taken from the current altitude
     plane.next_WP_loc.alt = plane.current_loc.alt;
-
+    plane.nav_pitch_rate_cds = 0; // this should only be non zero when doing a FW landing flare maneouvre
     return true;
 }
 

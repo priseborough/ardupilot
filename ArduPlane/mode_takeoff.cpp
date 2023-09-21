@@ -63,7 +63,7 @@ ModeTakeoff::ModeTakeoff() :
 bool ModeTakeoff::_enter()
 {
     takeoff_started = false;
-
+    plane.nav_pitch_rate_cds = 0; // this should only be non zero when doing a FW landing flare maneouvre
     return true;
 }
 

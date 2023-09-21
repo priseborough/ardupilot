@@ -7,6 +7,7 @@
 
 bool ModeQAutotune::_enter()
 {
+    plane.nav_pitch_rate_cds = 0; // this should only be non zero when doing a FW landing flare maneouvre
 #if QAUTOTUNE_ENABLED
     return quadplane.qautotune.init();
 #else

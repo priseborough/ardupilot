@@ -11,6 +11,9 @@ bool ModeQHover::_enter()
     quadplane.set_climb_rate_cms(0);
 
     quadplane.init_throttle_wait();
+
+    plane.nav_pitch_rate_cds = 0; // this should only be non zero when doing a FW landing flare maneouvre
+
     return true;
 }
 

@@ -26,6 +26,7 @@ void ModeManual::update()
 
     plane.nav_roll_cd = ahrs.roll_sensor;
     plane.nav_pitch_cd = ahrs.pitch_sensor;
+    plane.nav_pitch_rate_cds = 0; // this should only be non zero when doing a FW landing flare maneouvre
 }
 
 void ModeManual::run()

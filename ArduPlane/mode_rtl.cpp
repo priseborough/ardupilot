@@ -3,6 +3,7 @@
 
 bool ModeRTL::_enter()
 {
+    plane.nav_pitch_rate_cds = 0; // this should only be non zero when doing a FW landing flare maneouvre
     plane.prev_WP_loc = plane.current_loc;
     plane.do_RTL(plane.get_RTL_altitude_cm());
     plane.rtl.done_climb = false;

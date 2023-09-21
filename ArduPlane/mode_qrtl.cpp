@@ -5,6 +5,8 @@
 
 bool ModeQRTL::_enter()
 {
+    plane.nav_pitch_rate_cds = 0;
+
     // treat QRTL as QLAND if we are in guided wait takeoff state, to cope
     // with failsafes during GUIDED->AUTO takeoff sequence
     if (plane.quadplane.guided_wait_takeoff_on_mode_enter) {

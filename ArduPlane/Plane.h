@@ -619,6 +619,11 @@ private:
     // The instantaneous desired pitch angle.  Hundredths of a degree
     int32_t nav_pitch_cd;
 
+    // The instantaneous desired pitch rate. Hundredths of a degree/second
+    // Can operate in parallel with nav_pitch_cd
+    // Is set to 0 when not in use
+    int32_t nav_pitch_rate_cds;
+
     // the aerodymamic load factor. This is calculated from the demanded
     // roll before the roll is clipped, using 1/sqrt(cos(nav_roll))
     float aerodynamic_load_factor = 1.0f;
