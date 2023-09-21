@@ -4945,6 +4945,41 @@ class AutoTestPlane(AutoTest):
         self._MAV_CMD_DO_FLIGHTTERMINATION(self.run_cmd)
         self._MAV_CMD_DO_FLIGHTTERMINATION(self.run_cmd_int)
 
+    def LandingFlare(self):
+        """Test landing flare manoeuvre"""
+        self.set_parameters({
+            "RTL_AUTOLAND": 1,
+            "SIM_WIND_SPD": 0,
+            "LAND_PF_ALT": 0,
+            "LAND_PF_SEC": 0,
+            "TECS_FLARE_HGT": 0.0,
+            "TECS_LAND_SINK": 0.0,
+            "LAND_PITCH_CD": -200,
+            "TECS_LAND_PMAX": 5,
+        })
+        num_wp = self.load_mission("ap-circuit.txt")
+        self.reboot_sitl()
+        self.wait_ready_to_arm()
+        self.arm_vehicle()
+        # self.fly_mission_waypoints(num_wp-1, mission_timeout=600)
+        self.set_current_waypoint(0, check_afterwards=False)
+        self.context_push()
+        self.context_collect('STATUSTEXT')
+        self.change_mode('AUTO')
+        # Start checking for flare entry height range when 200m out from landing point
+        self.wait_waypoint(1, num_wp-1, max_dist=200, timeout=600)
+        self.wait_altitude(10, 15, relative=True, timeout=30)
+        self.wait_groundspeed(0, 0.5, timeout=60)
+        # distance to waypoint when finished ground slide should be less than 10m
+        msg = self.assert_receive_message('NAV_CONTROLLER_OUTPUT')
+        wp_dist = msg.wp_dist
+        if wp_dist > 10:
+            raise NotAchievedException("Distance from landing point is %.1f m, should be < 10 m" % (wp_dist))
+
+        self.wait_statustext("Auto disarmed", timeout=60, check_context=True)
+        self.context_pop()
+        self.progress("Mission OK")
+
     def tests(self):
         '''return list of all tests'''
         ret = super(AutoTestPlane, self).tests()
@@ -5012,6 +5047,7 @@ class AutoTestPlane(AutoTest):
             self.AHRS_ORIENTATION,
             self.AHRSTrim,
             self.LandingDrift,
+            self.LandingFlare,
             self.ForcedDCM,
             self.DCMFallback,
             self.MAVFTP,
