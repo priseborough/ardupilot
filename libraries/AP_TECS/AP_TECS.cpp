@@ -4,7 +4,7 @@
 #include <AP_Baro/AP_Baro.h>
 #include <AP_Logger/AP_Logger.h>
 #include <AP_Landing/AP_Landing.h>
-
+#include "stdio.h"
 extern const AP_HAL::HAL& hal;
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
@@ -283,6 +283,14 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("HDEM_TCONST", 33, AP_TECS, _hgt_dem_tconst, 3.0f),
 
+    // @Param: FLARE_ACC
+    // @DisplayName: Landing flare vertical acceleration.
+    // @Description: This parameter specifies the magnitude of vertical acceleration that the TECS flare controller will use when planning the landing approach and flare trajectory demanded height profile. When set to a positive value, this parameter enables TECS to take complete control over the height profile of the landing approach, flare pullup and post pullup final descent of a flight path that intersects the landing waypoint and the LAND_FLARE_ALT, LAND_FLARE_SEC and LAND_DECEL_COEF will no longer influence the landing approach demanded height profile and timing of the flare manoeuvre. 
+    // @Range: 0.0 1.0
+    // @Units: m/s/s
+    // @User: Advanced
+    AP_GROUPINFO("FLARE_ACC", 34, AP_TECS, _flarePullupAccel, 0.5f),
+
     AP_GROUPEND
 };
 
@@ -515,113 +523,292 @@ void AP_TECS::_update_height_demand(void)
     }
 
 
-    if (!_landing.is_flaring()) {
-        // Apply 2 point moving average to demanded height
-        const float hgt_dem = 0.5f * (_hgt_dem_in + _hgt_dem_in_prev);
-        _hgt_dem_in_prev = _hgt_dem_in;
+    if (!_update_landing_trajectory()) {
+        if (!_landing.is_flaring()) {
+            // Apply 2 point moving average to demanded height
+            const float hgt_dem = 0.5f * (_hgt_dem_in + _hgt_dem_in_prev);
+            _hgt_dem_in_prev = _hgt_dem_in;
 
-        // Limit height rate of change
-        if ((hgt_dem - _hgt_dem_rate_ltd) > (_climb_rate_limit * _DT)) {
-            _hgt_dem_rate_ltd = _hgt_dem_rate_ltd + _climb_rate_limit * _DT;
-        } else if ((hgt_dem - _hgt_dem_rate_ltd) < (-_sink_rate_limit * _DT)) {
-            _hgt_dem_rate_ltd = _hgt_dem_rate_ltd - _sink_rate_limit * _DT;
+            // Limit height rate of change
+            if ((hgt_dem - _hgt_dem_rate_ltd) > (_climb_rate_limit * _DT)) {
+                _hgt_dem_rate_ltd = _hgt_dem_rate_ltd + _climb_rate_limit * _DT;
+            } else if ((hgt_dem - _hgt_dem_rate_ltd) < (-_sink_rate_limit * _DT)) {
+                _hgt_dem_rate_ltd = _hgt_dem_rate_ltd - _sink_rate_limit * _DT;
+            } else {
+                _hgt_dem_rate_ltd = hgt_dem;
+            }
+
+            // Apply a first order lag to height demand and compensate for lag when commencing height
+            // control after takeoff to prevent plane pushing nose to level before climbing again. Post takeoff
+            // compensation offset is decayed using the same time constant as the height demand filter.
+            const float coef = MIN(_DT / (_DT + MAX(_hgt_dem_tconst, _DT)), 1.0f);
+            _hgt_rate_dem = (_hgt_dem_rate_ltd - _hgt_dem_lpf) / _hgt_dem_tconst;
+            _hgt_dem_lpf = _hgt_dem_rate_ltd * coef + (1.0f - coef) * _hgt_dem_lpf;
+            _post_TO_hgt_offset *= (1.0f - coef);
+            _hgt_dem = _hgt_dem_lpf + _post_TO_hgt_offset;
+
+            // during approach compensate for height filter lag
+            if (_flags.is_doing_auto_land) {
+                _hgt_dem += _hgt_dem_tconst * _hgt_rate_dem;
+            }
+
+            // Don't allow height demand to get too far ahead of the vehicles current height
+            // if vehicle is unable to follow the demanded climb or descent
+            bool max_climb_condition   = (_pitch_dem_unc > _PITCHmaxf) ||
+                                            (_SEBdot_dem_clip == clipStatus::MAX);
+            bool max_descent_condition = (_pitch_dem_unc < _PITCHminf) ||
+                                            (_SEBdot_dem_clip == clipStatus::MIN);
+            if (_using_airspeed_for_throttle) {
+                // large height errors will result in the throttle saturating
+                max_climb_condition   |= (_thr_clip_status == clipStatus::MAX) &&
+                                            !((_flight_stage == AP_FixedWing::FlightStage::TAKEOFF) || (_flight_stage == AP_FixedWing::FlightStage::ABORT_LANDING));
+                max_descent_condition |= (_thr_clip_status == clipStatus::MIN);
+            }
+            const float hgt_dem_alpha = _DT / MAX(_DT + _hgt_dem_tconst, _DT);
+            if (max_climb_condition && _hgt_dem > _hgt_dem_prev) {
+                    _max_climb_scaler *= (1.0f - hgt_dem_alpha);
+            } else if (!_flags.is_doing_auto_land && max_descent_condition && _hgt_dem < _hgt_dem_prev) {
+                _max_sink_scaler *= (1.0f - hgt_dem_alpha);
+            } else {
+                _max_climb_scaler = _max_climb_scaler * (1.0f - hgt_dem_alpha) + hgt_dem_alpha;
+                _max_sink_scaler  =  _max_sink_scaler * (1.0f - hgt_dem_alpha) + hgt_dem_alpha;
+            }
+            _max_climb_scaler = constrain_float(_max_climb_scaler, 0.0f, 1.0f);
+            _max_sink_scaler = constrain_float(_max_sink_scaler, 0.0f, 1.0f);
+
+            _hgt_dem_prev = _hgt_dem;
+
+            _flare_fraction = 0.0f;
+            _legacy_flare_initialised = false;
         } else {
-            _hgt_dem_rate_ltd = hgt_dem;
+            // when flaring force height rate demand to the
+            // configured sink rate and adjust the demanded height to
+            // be kinematically consistent with the height rate.
+
+            // set all height filter states to current height to prevent large pitch transients if flare is aborted
+            _hgt_dem_lpf      = _height;
+            _hgt_dem_rate_ltd = _height;
+            _hgt_dem_in_prev  = _height;
+
+            if (!_legacy_flare_initialised) {
+                _flare_hgt_dem_home = _hgt_dem;
+                _flare_hgt_dem_rwy = _hgt_above_rwy;
+                _hgt_at_start_of_flare = _hgt_above_rwy;
+                _hgt_rate_dem_at_flare_entry = _hgt_rate_dem;
+                _legacy_flare_initialised = true;
+            }
+
+            // adjust the flare sink rate to increase/decrease as your travel further beyond the land wp
+            float land_sink_rate_adj = _land_sink + _land_sink_rate_change * _land_posx;
+
+            // bring it in linearly with height
+            if (_hgt_at_start_of_flare > _flare_holdoff_hgt) {
+                _flare_fraction = constrain_float((_hgt_at_start_of_flare - _hgt_above_rwy) / (_hgt_at_start_of_flare - _flare_holdoff_hgt), 0.0f, 1.0f);
+            } else {
+                _flare_fraction = 1.0f;
+            }
+            _hgt_rate_dem = _hgt_rate_dem_at_flare_entry * (1.0f - _flare_fraction) - land_sink_rate_adj * _flare_fraction;
+
+            _flare_hgt_dem_rwy += _DT * _hgt_rate_dem;
+            _flare_hgt_dem_home  += _DT * _hgt_rate_dem;
+
+            // fade the demanded height from height above home to height above runway as flare progresses
+            // the measured height is faded across from height above home to height above runway in AP_TECS::update_50hz
+            _hgt_dem = _flare_hgt_dem_home * (1.0f - _flare_fraction) + _flare_hgt_dem_rwy * _flare_fraction;
+
+            float dist_below_home_m;
+            _ahrs.get_relative_position_D_home(dist_below_home_m);
+            AP::logger().WriteStreaming("TECF", "TimeUS,h_rwy,h_home,h_blend,hdem_rwy,hdem_home,hdem_blend,frac",
+                                        "s-------",
+                                        "F-------",
+                                        "Qfffffff",
+                                        AP_HAL::micros64(),
+                                        (double)_hgt_above_rwy,
+                                        (double)-dist_below_home_m,
+                                        (double)_height,
+                                        (double)_flare_hgt_dem_rwy,
+                                        (double)_flare_hgt_dem_home,
+                                        (double)_hgt_dem,
+                                        (double)_flare_fraction);
         }
+    }
+}
 
-        // Apply a first order lag to height demand and compensate for lag when commencing height
-        // control after takeoff to prevent plane pushing nose to level before climbing again. Post takeoff
-        // compensation offset is decayed using the same time constant as the height demand filter.
-        const float coef = MIN(_DT / (_DT + MAX(_hgt_dem_tconst, _DT)), 1.0f);
-        _hgt_rate_dem = (_hgt_dem_rate_ltd - _hgt_dem_lpf) / _hgt_dem_tconst;
-        _hgt_dem_lpf = _hgt_dem_rate_ltd * coef + (1.0f - coef) * _hgt_dem_lpf;
-        _post_TO_hgt_offset *= (1.0f - coef);
-        _hgt_dem = _hgt_dem_lpf + _post_TO_hgt_offset;
+bool AP_TECS::_update_landing_trajectory(void)
+{
+    // Attempt control the landing trajectory using a specified distance to aim point
+    const bool temp_bool = is_positive(_flarePullupAccel) && _flags.is_doing_auto_land;
+    if (_doing_tecs_controlled_landing != temp_bool) {
+        _land_traj_state = flareTrajectoryStatus::NONE;
+        _doing_tecs_controlled_landing = temp_bool;
+    };
 
-        // during approach compensate for height filter lag
-        if (_flags.is_doing_auto_land) {
-            _hgt_dem += _hgt_dem_tconst * _hgt_rate_dem;
-        }
+    if (!_doing_tecs_controlled_landing) {
+        return false;
+    }
 
-        // Don't allow height demand to get too far ahead of the vehicles current height
-        // if vehicle is unable to follow the demanded climb or descent
-        bool max_climb_condition   = (_pitch_dem_unc > _PITCHmaxf) ||
-                                        (_SEBdot_dem_clip == clipStatus::MAX);
-        bool max_descent_condition = (_pitch_dem_unc < _PITCHminf) ||
-                                        (_SEBdot_dem_clip == clipStatus::MIN);
-        if (_using_airspeed_for_throttle) {
-            // large height errors will result in the throttle saturating
-            max_climb_condition   |= (_thr_clip_status == clipStatus::MAX) &&
-                                        !((_flight_stage == AP_FixedWing::FlightStage::TAKEOFF) || (_flight_stage == AP_FixedWing::FlightStage::ABORT_LANDING));
-            max_descent_condition |= (_thr_clip_status == clipStatus::MIN);
-        }
-        const float hgt_dem_alpha = _DT / MAX(_DT + _hgt_dem_tconst, _DT);
-        if (max_climb_condition && _hgt_dem > _hgt_dem_prev) {
-                _max_climb_scaler *= (1.0f - hgt_dem_alpha);
-        } else if (!_flags.is_doing_auto_land && max_descent_condition && _hgt_dem < _hgt_dem_prev) {
-            _max_sink_scaler *= (1.0f - hgt_dem_alpha);
-        } else {
-            _max_climb_scaler = _max_climb_scaler * (1.0f - hgt_dem_alpha) + hgt_dem_alpha;
-            _max_sink_scaler  =  _max_sink_scaler * (1.0f - hgt_dem_alpha) + hgt_dem_alpha;
-        }
-        _max_climb_scaler = constrain_float(_max_climb_scaler, 0.0f, 1.0f);
-        _max_sink_scaler = constrain_float(_max_sink_scaler, 0.0f, 1.0f);
+    const float ground_speed = _ahrs.groundspeed();
 
-        _hgt_dem_prev = _hgt_dem;
-
-        _flare_fraction = 0.0f;
-        _flare_initialised = false;
-    } else {
-        // when flaring force height rate demand to the
-        // configured sink rate and adjust the demanded height to
-        // be kinematically consistent with the height rate.
-
-        // set all height filter states to current height to prevent large pitch transients if flare is aborted
-        _hgt_dem_lpf      = _height;
-        _hgt_dem_rate_ltd = _height;
-        _hgt_dem_in_prev  = _height;
-
-        if (!_flare_initialised) {
+    // state machine and variable initialisation
+    switch (_land_traj_state) {
+    case flareTrajectoryStatus::NONE:
+        if (!is_zero(_land_posx)) {
+            const float ground_speed_constrained = MAX(ground_speed, 5.0f);
+            _hgt_dem = _hgt_above_rwy;
             _flare_hgt_dem_home = _hgt_dem;
             _flare_hgt_dem_rwy = _hgt_above_rwy;
-            _hgt_at_start_of_flare = _hgt_above_rwy;
-            _hgt_rate_dem_at_flare_entry = _hgt_rate_dem;
-            _flare_initialised = true;
+            _land_entry_posy = _hgt_above_rwy;
+            _land_entry_posy_rate = _climb_rate;
+            _land_entry_gnd_speed = ground_speed_constrained;
+            _land_entry_posx = _land_posx;
+            _land_posx_offset = 0.0f;
+            _flare_pullup_initialised = false;
+
+            // calculate backwards from the  aim point and define a trajectory comprised of two straight line
+            // segments linked by a constant radius pullup
+
+            // equation of line through the origin that represents the final trajectory after the pullup
+            // that passes through the aim point .
+            // y = a1 * x + b1
+            _land_a1 = - _land_sink / ground_speed_constrained;
+            _land_b1 = 0.0f;
+
+            // define a circular arc for a pullup finishing at _flare_holdoff_hgt altitude
+            _land_pullup_accel = MAX(_flarePullupAccel, 0.5f); // m/s/s TODO make this a parameter
+            _land_pullup_radius = sq(_TASmin) / _land_pullup_accel;
+            if (!is_positive(_flare_holdoff_hgt) || !is_negative(_land_a1)) {
+                // pullup finishes at the landing point
+                _land_pullup_finish_posx = 0.0f;
+            } else {
+                _land_pullup_finish_posx = _flare_holdoff_hgt / _land_a1;
+            }
+            const float target_fp_angle = atanf(_land_a1);
+            _land_pullup_centre.x = _land_pullup_finish_posx - _land_pullup_radius * sinf(target_fp_angle);
+            _land_pullup_centre.y = _flare_holdoff_hgt + _land_pullup_radius * cosf(target_fp_angle);
+
+            // equation of a line that passes through the flare entry point and is tangential to the flare arc
+            // y = a0 * x + b0
+            if (is_negative(_land_entry_posx)) {
+                if (_land_entry_posy / _land_entry_posx < _land_a1) {
+                    // use the geometry of a right angle triangle with its hypotenuse from flare entry point to pullup
+                    const float hypotenuse = sqrtf(sq(_land_pullup_centre.x - _land_entry_posx)+sq(_land_pullup_centre.y - _land_entry_posy));
+                    const float fp_angle_to_centre = atanf((_land_pullup_centre.y - _land_entry_posy) / (_land_pullup_centre.x - _land_entry_posx));
+                    const float preflare_fp_angle = fp_angle_to_centre - asinf(_land_pullup_radius / hypotenuse);
+                    _land_a0 = tanf(preflare_fp_angle);
+                    _land_b0 = _land_entry_posy - _land_a0 * _land_entry_posx;
+                    _land_pullup_start_posx = _land_pullup_centre.x + _land_pullup_radius * sinf(preflare_fp_angle);
+                    if (_land_entry_posx > _land_pullup_start_posx) {
+                        // not enough room to flare and still hit the aim point so offset the point
+                        // and start the pullup immediately
+                        _land_posx_offset = _land_entry_posx - _land_pullup_start_posx;
+                        _land_pullup_start_posy = _hgt_above_rwy;
+                        _land_traj_state = flareTrajectoryStatus::PULLUP;
+                    } else {
+                        // start a normal flare sequence
+                        _land_traj_state = flareTrajectoryStatus::PRE;
+                    }
+                }
+            } else {
+                // overshot the waypoint so go to a backup plan 
+                _land_traj_state = flareTrajectoryStatus::OVERSHOOT;
+            }
+
+            AP::logger().WriteStreaming("TCF0", "TimeUS,a0,b0,a1,b1,lpcx,lpcy,lpsx,lpfx,lpr",
+                                        "s---------",
+                                        "F---------",
+                                        "Qfffffffff",
+                                        AP_HAL::micros64(),
+                                        (double)_land_a0,
+                                        (double)_land_b0,
+                                        (double)_land_a1,
+                                        (double)_land_b1,
+                                        (double)_land_pullup_centre.x,
+                                        (double)_land_pullup_centre.y,
+                                        (double)_land_pullup_start_posx,
+                                        (double)_land_pullup_finish_posx,
+                                        (double)_land_pullup_radius
+                                        );
         }
+        break;
+    case flareTrajectoryStatus::PRE:
+        if ((_land_posx - _land_posx_offset) > _land_pullup_start_posx) {
+            _land_pullup_start_posy = _hgt_above_rwy;
+            _land_traj_state = flareTrajectoryStatus::PULLUP;
+        }
+        break;
+    case flareTrajectoryStatus::PULLUP:
+        if ((_land_posx - _land_posx_offset)  > _land_pullup_finish_posx) {
+            _land_traj_state = flareTrajectoryStatus::FINAL;
+        }
+        break;
+    case flareTrajectoryStatus::FINAL:
+    case flareTrajectoryStatus::OVERSHOOT:
+        break;
+    }
 
-        // adjust the flare sink rate to increase/decrease as your travel further beyond the land wp
-        float land_sink_rate_adj = _land_sink + _land_sink_rate_change*_distance_beyond_land_wp;
-
-        // bring it in linearly with height
-        if (_hgt_at_start_of_flare > _flare_holdoff_hgt) {
-            _flare_fraction = constrain_float((_hgt_at_start_of_flare - _hgt_above_rwy) / (_hgt_at_start_of_flare - _flare_holdoff_hgt), 0.0f, 1.0f);
-        } else {
+    // trajectory generation
+    switch (_land_traj_state) {
+    case flareTrajectoryStatus::NONE:
+        _flare_fraction = 0.0f;
+        break;
+    case flareTrajectoryStatus::PRE:
+        // keep flying the initial trajectory
+        {
+            _hgt_dem = _land_a0 * (_land_posx - _land_posx_offset) + _land_b0;
+            _hgt_rate_dem = _land_a0 * ground_speed;
+            _flare_pitch_rate_dem = 0.0f;
+            // blend across to using a runway height datum prior to starting the pullup
+            _flare_fraction = 1.0f - MAX(_land_pullup_start_posx - _land_posx, 0.0f) / MAX(_land_pullup_start_posx - _land_entry_posx, 1.0f);
+            _flare_fraction = constrain_float(_flare_fraction, 0.0f, 1.0f);
+        }
+        break;
+    case flareTrajectoryStatus::PULLUP:
+        {
+            // fly a circular acc pullup between the initial and final trajectory
+            Vector2f centre_to_ac = Vector2f((_land_posx - _land_posx_offset), _hgt_above_rwy) - _land_pullup_centre;
+            centre_to_ac = centre_to_ac.normalized() * _land_pullup_radius;
+            _hgt_dem = _land_pullup_centre.y + centre_to_ac.y;
+            const float p = constrain_float(((_land_posx - _land_posx_offset) - _land_pullup_start_posx) / (_land_pullup_finish_posx - _land_pullup_start_posx), 0.0f, 1.0f);
+            _hgt_rate_dem = (_land_a0 * (1.0 - p) + _land_a1 * p) * ground_speed;
+            _flare_pitch_rate_dem = _land_pullup_accel / _TAS_state;
+            _flare_pullup_initialised = true;
             _flare_fraction = 1.0f;
         }
-        _hgt_rate_dem = _hgt_rate_dem_at_flare_entry * (1.0f - _flare_fraction) - land_sink_rate_adj * _flare_fraction;
-
-        _flare_hgt_dem_rwy += _DT * _hgt_rate_dem;
-        _flare_hgt_dem_home  += _DT * _hgt_rate_dem;
-
-        // fade the demanded height from height above home to height above runway as flare progresses
-        // the measured height is faded across from height above home to height above runway in AP_TECS::update_50hz
-        _hgt_dem = _flare_hgt_dem_home * (1.0f - _flare_fraction) + _flare_hgt_dem_rwy * _flare_fraction;
-
-        float dist_below_home_m;
-        _ahrs.get_relative_position_D_home(dist_below_home_m);
-        AP::logger().WriteStreaming("TECF", "TimeUS,h_rwy,h_home,h_blend,hdem_rwy,hdem_home,hdem_blend,frac",
-                                    "s-------",
-                                    "F-------",
-                                    "Qfffffff",
-                                    AP_HAL::micros64(),
-                                    (double)_hgt_above_rwy,
-                                    (double)-dist_below_home_m,
-                                    (double)_height,
-                                    (double)_flare_hgt_dem_rwy,
-                                    (double)_flare_hgt_dem_home,
-                                    (double)_hgt_dem,
-                                    (double)_flare_fraction);
+        break;
+    case flareTrajectoryStatus::FINAL:
+        {
+            // fly final trajectory to aim point
+            _hgt_dem = _land_a1 * (_land_posx - _land_posx_offset) + _land_b1;
+            _hgt_rate_dem = _land_a1 * ground_speed;
+            _flare_pitch_rate_dem = 0.0f;
+            _flare_fraction = 1.0f;
+        }
+        break;
+    case flareTrajectoryStatus::OVERSHOOT:
+        {
+            // we are overflying the final trajectory so only control sink rate
+            _hgt_rate_dem = - _land_sink;
+            _hgt_dem = _hgt_above_rwy;
+            _flare_pitch_rate_dem = 0.0f;
+            _flare_fraction = 0.0f;
+        }
+        break;
     }
+    AP::logger().WriteStreaming("TCF1", "TimeUS,lpx,lpxo,hafe,hdem,hrdem,fprd,lts",
+                                "s-------",
+                                "F-------",
+                                "QffffffB",
+                                AP_HAL::micros64(),
+                                (double)_land_posx,
+                                (double)_land_posx_offset,
+                                (double)_hgt_above_rwy,
+                                (double)_hgt_dem,
+                                (double)_hgt_rate_dem,
+                                (double)degrees(_flare_pitch_rate_dem),
+                                (uint8_t)_land_traj_state
+                                );
+
+    return _land_traj_state != flareTrajectoryStatus::NONE;
 }
 
 void AP_TECS::_detect_underspeed(void)
@@ -1203,8 +1390,8 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
 
     _flags.is_gliding = _flags.gliding_requested || _flags.propulsion_failed || aparm.throttle_max==0;
     _flags.is_doing_auto_land = (flight_stage == AP_FixedWing::FlightStage::LAND);
-    _distance_beyond_land_wp = distance_beyond_land_wp;
     _flight_stage = flight_stage;
+    _land_posx = distance_beyond_land_wp;
 
     // Convert inputs
     _hgt_dem_in_raw = hgt_dem_cm * 0.01f;
