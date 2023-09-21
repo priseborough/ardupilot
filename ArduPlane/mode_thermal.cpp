@@ -15,6 +15,8 @@ bool ModeThermal::_enter()
     plane.g2.soaring_controller.init_thermalling();
     plane.g2.soaring_controller.get_target(plane.next_WP_loc); // ahead on flight path
 
+    plane.nav_pitch_rate_cds = 0; // this should only be non zero when doing a FW landing flare maneouvre
+
     return true;
 }
 

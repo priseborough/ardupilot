@@ -5,6 +5,8 @@
 
 bool ModeLoiterAltQLand::_enter()
 {
+    plane.nav_pitch_rate_cds = 0; // this should only be non zero when doing a FW landing flare maneouvre
+
     if (plane.previous_mode->is_vtol_mode() || plane.quadplane.in_vtol_mode()) {
         plane.set_mode(plane.mode_qland, ModeReason::LOITER_ALT_IN_VTOL);
         return true;

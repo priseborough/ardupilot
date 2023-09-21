@@ -10,6 +10,8 @@ bool ModeFBWB::_enter()
 
     plane.set_target_altitude_current();
 
+    plane.nav_pitch_rate_cds = 0; // this should only be non zero when doing a FW landing flare maneouvre
+
     return true;
 }
 

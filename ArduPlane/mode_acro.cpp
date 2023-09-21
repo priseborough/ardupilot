@@ -6,6 +6,7 @@ bool ModeAcro::_enter()
     acro_state.locked_roll = false;
     acro_state.locked_pitch = false;
     IGNORE_RETURN(ahrs.get_quaternion(acro_state.q));
+    plane.nav_pitch_rate_cds = 0; // this should only be non zero when doing a FW landing flare maneouvre
     return true;
 }
 

@@ -17,6 +17,9 @@ bool ModeQLoiter::_enter()
 
     // prevent re-init of target position
     quadplane.last_loiter_ms = AP_HAL::millis();
+
+    plane.nav_pitch_rate_cds = 0; // this should only be non zero when doing a FW landing flare maneouvre
+
     return true;
 }
 

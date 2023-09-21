@@ -11,6 +11,8 @@ bool ModeQStabilize::_enter()
 
 void ModeQStabilize::update()
 {
+    plane.nav_pitch_rate_cds = 0; // this should only be non zero when doing a FW landing flare maneouvre
+
     // set nav_roll and nav_pitch using sticks
     // Beware that QuadPlane::tailsitter_check_input (called from Plane::read_radio)
     // may alter the control_in values for roll and yaw, but not the corresponding
