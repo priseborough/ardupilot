@@ -14,7 +14,6 @@
  */
 
 #include "Plane.h"
-
 /*
   altitude handling routines. These cope with both barometric control
   and terrain following control
