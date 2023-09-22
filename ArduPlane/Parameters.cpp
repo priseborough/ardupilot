@@ -62,6 +62,38 @@ const AP_Param::Info Plane::var_info[] = {
     // @Bitmask: 0:Roll,1:Pitch,2:Yaw,3:Steering,4:Landing
     GSCALAR(gcs_pid_mask,           "GCS_PID_MASK",     0),
 
+    // @Param: LOAD_FACTOR_MAX
+    // @DisplayName: Maximum load factor
+    // @Description: Maximum load factor that will be commanded during flight modes using automatic height control when acceleration vector trajectory control is selected using FLIGHT_OPTIONS.
+    // @Range: 2.0 6.0
+    // @Increment: 0.1
+    // @User: Standard
+    GSCALAR(load_factor_max, "LOAD_FACTOR_MAX", 4.0f),
+
+    // @Param: LOAD_FACTOR_LAG
+    // @DisplayName: Lag from pitch rate to load factor
+    // @Description: Time lag from pitch rate to load factor that the navigation loops compensate for when acceleration vector trajectory control is selected using FLIGHT_OPTIONS.
+    // @Range: 0.0 0.5
+    // @Increment: 0.01
+    // @User: Standard
+    GSCALAR(load_factor_lag, "LOAD_FACTOR_LAG", 0.2f),
+
+    // @Param: LOAD_FACTOR_GAIN
+    // @DisplayName: Load factor error gain
+    // @Description: Gain from integral of normal acceleration error to demanded pitch rate when acceleration vector trajectory control is selected using FLIGHT_OPTIONS.
+    // @Range: 0.0 2.0
+    // @Increment: 0.01
+    // @User: Standard
+    GSCALAR(load_factor_gain, "LOAD_FACTOR_GAIN", 0.5f),
+
+    // @Param: LOAD_FACTOR_LAT
+    // @DisplayName: Compensation gain for lateral g
+    // @Description: This gain controls how much the navigation loop compensates for sideslip induced lateral g when acceleration vector trajectory control is selected using FLIGHT_OPTIONS.
+    // @Range: 0.0 1.0
+    // @Increment: 0.1
+    // @User: Standard
+    GSCALAR(lat_acc_compensation_gain, "LOAD_FACTOR_LAT", 0.0f),
+
     // @Param: KFF_RDDRMIX
     // @DisplayName: Rudder Mix
     // @Description: Amount of rudder to add during aileron movement. Increase if nose initially yaws away from roll. Reduces adverse yaw.
@@ -1098,6 +1130,7 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     // @Bitmask: 11: Disable suppression of fixed wing rate gains in ground mode
     // @Bitmask: 12: Enable FBWB style loiter altitude control
     // @Bitmask: 13: Indicate takeoff waiting for neutral rudder with flight control surfaces
+    // @Bitmask: 14: Use acceleration vector trajectory control
     // @User: Advanced
     AP_GROUPINFO("FLIGHT_OPTIONS", 13, ParametersG2, flight_options, 0),
 

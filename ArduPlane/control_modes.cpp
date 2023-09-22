@@ -174,6 +174,10 @@ void Plane::autotune_enable(bool enable)
  */
 bool Plane::fly_inverted(void)
 {
+    if ((g2.flight_options & FlightOptions::ENABLE_ACC_VEC_TRAJ_CTRL) && control_mode->does_auto_throttle()) {
+        // inverted flight is currently not supported by this flight option
+        return false;
+    }
     if (control_mode == &plane.mode_manual) {
         return false;
     }
