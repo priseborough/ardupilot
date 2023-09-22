@@ -194,7 +194,9 @@ float Plane::stabilize_pitch_get_pitch_out()
             }
         }
 
-        const int32_t pitch_out = pitchController.get_rate_out(degrees(pid_info.target), speed_scaler);
+        const int32_t pitch_out = pitchController.get_rate_out(degrees(pid_info.target), speed_scaler,
+                                                                       ground_mode,
+                                                                       ground_mode && !(plane.g2.flight_options & FlightOptions::DISABLE_GROUND_PID_SUPPRESSION));
         /* when slaving fixed wing control to VTOL control we need to decay the integrator to prevent
            opposing integrators balancing between the two controllers
         */
@@ -226,9 +228,16 @@ float Plane::stabilize_pitch_get_pitch_out()
         throttle_at_zero()) {
         demanded_pitch = landing.get_pitch_cd();
     }
-
-    return pitchController.get_servo_out(demanded_pitch - ahrs.pitch_sensor, speed_scaler, disable_integrator,
+    using_accel_vector_nav = (g2.flight_options & FlightOptions::ENABLE_ACC_VEC_TRAJ_CTRL) && control_mode->does_auto_throttle() && plane.do_accel_vector_nav();
+    int32_t elevator;
+    if (using_accel_vector_nav) {
+        elevator = pitchController.get_rate_out(degrees(nav_body_pitch_rate_rps), speed_scaler, disable_integrator,
+                                        ground_mode && !(plane.flight_option_enabled(FlightOptions::DISABLE_GROUND_PID_SUPPRESSION)));
+    } else {
+        elevator = pitchController.get_servo_out(demanded_pitch - ahrs.pitch_sensor, speed_scaler, disable_integrator,
                                          ground_mode && !(plane.flight_option_enabled(FlightOptions::DISABLE_GROUND_PID_SUPPRESSION)));
+    }
+    return elevator;
 }
 
 /*
@@ -406,7 +415,8 @@ void Plane::stabilize()
         // scripting is in control of roll and pitch rates and throttle
         const float speed_scaler = get_speed_scaler();
         const float aileron = rollController.get_rate_out(nav_scripting.roll_rate_dps, speed_scaler);
-        const float elevator = pitchController.get_rate_out(nav_scripting.pitch_rate_dps, speed_scaler);
+        const bool suppress_pid = ground_mode && !(plane.g2.flight_options & FlightOptions::DISABLE_GROUND_PID_SUPPRESSION);
+        const float elevator = pitchController.get_rate_out(nav_scripting.pitch_rate_dps, speed_scaler, ground_mode, suppress_pid);
         SRV_Channels::set_output_scaled(SRV_Channel::k_aileron, aileron);
         SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, elevator);
         float rudder = 0;
@@ -580,12 +590,30 @@ int16_t Plane::calc_nav_yaw_ground(void)
 
 
 /*
-  calculate a new nav_pitch_cd from the speed height controller
+  calculate a new nav_pitch_cd or nav_body_pitch_rate_rps from the speed height controller
+
+  ********************************************
+  *** MUST BE CALLED AFTER calc_nav_roll() ***
+  ********************************************
+
  */
 void Plane::calc_nav_pitch()
 {
-    int32_t commanded_pitch = TECS_controller.get_pitch_demand();
-    nav_pitch_cd = constrain_int32(commanded_pitch, pitch_limit_min_cd, aparm.pitch_limit_max_cd.get());
+    if (!using_accel_vector_nav) {
+        normal_accel_error_integral = 0.0f;
+        // Calculate the Pitch of the plane
+        // --------------------------------
+        int32_t commanded_pitch = TECS_controller.get_pitch_demand();
+
+        // Received an external msg that guides roll in the last 3 seconds?
+        if ((control_mode == &mode_guided || control_mode == &mode_avoidADSB) &&
+                plane.guided_state.last_forced_rpy_ms.y > 0 &&
+                millis() - plane.guided_state.last_forced_rpy_ms.y < 3000) {
+            commanded_pitch = plane.guided_state.forced_rpy_cd.y;
+        }
+
+        nav_pitch_cd = constrain_int32(commanded_pitch, pitch_limit_min_cd, aparm.pitch_limit_max_cd.get());
+    }
 }
 
 
@@ -596,7 +624,149 @@ void Plane::calc_nav_roll()
 {
     int32_t commanded_roll = nav_controller->nav_roll_cd();
     nav_roll_cd = constrain_int32(commanded_roll, -roll_limit_cd, roll_limit_cd);
+
     update_load_factor();
+}
+
+/*
+  calculate a pitch rate and roll angle demand to achieve demanded vertical and horizontal acceleration
+  returns false if calculation could not be performed
+ */
+bool Plane::do_accel_vector_nav(void)
+{
+    bool is_valid;
+    float true_airspeed;
+    if (ahrs.airspeed_estimate(true_airspeed)) {
+        true_airspeed = ahrs.get_EAS2TAS() * MAX(true_airspeed, 0.8f * (float)aparm.airspeed_min);
+
+        // calculate roll angle from vertical and horizopntal acceleration demans
+        float vert_accel_dem = TECS_controller.get_vert_accel_demand(nav_pitch_clip);
+        const float commanded_roll_rad = radians(0.01f*(float)nav_roll_cd);
+        const float normal_accel_for_const_hgt = GRAVITY_MSS / cosf(commanded_roll_rad);
+        float turn_accel_dem = normal_accel_for_const_hgt * sinf(commanded_roll_rad);
+
+        // correct demanded vertical and turn acceleration for lateral g due to sideslip and airframe asymmetry
+        lateral_accel_filt.apply(AP::ins().get_accel().y);
+        const float accel_y = lateral_accel_filt.get();
+        vert_accel_dem += accel_y * sinf(ahrs.roll) * g.lat_acc_compensation_gain;
+        turn_accel_dem -= accel_y * cosf(ahrs.roll) * g.lat_acc_compensation_gain;
+
+        const float roll_demand_rad = atan2f(turn_accel_dem , vert_accel_dem + GRAVITY_MSS);
+
+        float pitch_rate_correction_rps = 0.0f;
+        float DT = 0.001f * (float)(millis() - last_accel_vec_update_ms);
+        if (DT > 0.04f) {
+            last_accel_vec_update_ms = millis();
+        } else if (is_positive(g.load_factor_gain)) {
+            if (vert_accel_dem > -GRAVITY_MSS) {
+                // only positive vertical g demand handled
+                const float normal_accel_required = sqrtf(sq(vert_accel_dem + GRAVITY_MSS) + sq(turn_accel_dem));
+                const float normal_accel_measured = -ahrs.get_accel().z;
+                const float normal_accel_error = normal_accel_required - normal_accel_measured;
+                if (is_positive(normal_accel_error * (float)nav_pitch_clip)) {
+                    // pitch angle is saturating so decay integrator
+                    const float coef = DT / (DT + plane.pitchController.get_angle_error_tconst());
+                    normal_accel_error_integral *= (1.0f - coef);
+                } else {
+                    normal_accel_error_integral += normal_accel_error * g.load_factor_gain * DT;
+                }
+            } // TODO handle else condition for negative load factor maneouvres
+            pitch_rate_correction_rps = normal_accel_error_integral / true_airspeed;
+        }
+        last_accel_vec_update_ms = millis();
+
+        // limit roll and recalculate turn acceleration
+        nav_roll_cd = constrain_int32((int32_t)(100.0f*degrees(roll_demand_rad)), -roll_limit_cd, roll_limit_cd);
+        turn_accel_dem = (vert_accel_dem + GRAVITY_MSS) * tanf(radians(0.01f*(float)nav_roll_cd));
+
+        const float pitch_error_gain = plane.pitchController.get_angle_error_gain() / MAX(cosf(ahrs.roll),0.1f);
+
+        // Received an external msg that guides attitude in the last 3 seconds?
+        if ((control_mode == &mode_guided || control_mode == &mode_avoidADSB) &&
+                plane.guided_state.last_forced_rpy_ms.y > 0 &&
+                millis() - plane.guided_state.last_forced_rpy_ms.y < 3000) {
+            nav_body_pitch_rate_rps = pitch_error_gain * (radians(0.01f * plane.guided_state.forced_rpy_cd.y) - ahrs.pitch);
+            nav_pitch_clip = 0;
+        } else {
+            // Convert acceeration demand to a body frame pitch rate using measured roll angle predicted ahead
+            // for the lag from pitch rate to load factor.
+            // TODO investigate use of a lead/lag filter instead.
+            float vert_rate =  plane.pitchController.get_coordination_gain() * vert_accel_dem / true_airspeed;
+
+            // apply rate limit to observe pitch angle limits
+            const float trim_offset =  radians(0.01 * (float)g.pitch_trim_cd);
+            const float vert_rate_max = pitch_error_gain * (TECS_controller.get_pitch_max() + trim_offset - ahrs.pitch);
+            const float vert_rate_min = pitch_error_gain * (TECS_controller.get_pitch_min() + trim_offset - ahrs.pitch);
+
+            if (vert_rate > vert_rate_max) {
+                vert_rate = vert_rate_max;
+                nav_pitch_clip = 1;
+            } else if (vert_rate < vert_rate_min) {
+                vert_rate = vert_rate_min;
+                nav_pitch_clip = -1;
+            } else {
+                nav_pitch_clip = 0;
+            }
+
+            const float turn_rate =  plane.pitchController.get_coordination_gain() * turn_accel_dem / true_airspeed;
+            const Vector3f ang_rate = ahrs.get_gyro_latest();
+            const float predicted_roll = ahrs.roll + g.load_factor_lag * ang_rate.x;
+            nav_body_pitch_rate_rps =  vert_rate * cosf(predicted_roll);
+            nav_body_pitch_rate_rps += turn_rate * sinf(predicted_roll);
+            nav_body_pitch_rate_rps += pitch_rate_correction_rps;
+        }
+
+        // get the rate limits required to observe the structural load factor limit
+        const float cos_roll = cosf(ahrs.roll);
+        const float pitch_rate_max =  (   g.load_factor_max - cos_roll) * (GRAVITY_MSS / true_airspeed);
+        const float pitch_rate_min =  ( - g.load_factor_max - cos_roll) * (GRAVITY_MSS / true_airspeed);
+
+        int8_t body_rate_clip = 0;
+        if (pitch_rate_max > pitch_rate_min) {
+            if (nav_body_pitch_rate_rps > pitch_rate_max) {
+                nav_body_pitch_rate_rps = pitch_rate_max;
+                body_rate_clip = 1;
+            } else if (nav_body_pitch_rate_rps < pitch_rate_min) {
+                nav_body_pitch_rate_rps = pitch_rate_min;
+                body_rate_clip = -1;
+            }
+            is_valid = true;
+        } else {
+            // error condition
+            nav_body_pitch_rate_rps = 0.0f;
+            is_valid = false;
+        }
+
+        // the effect of load factor limiting on height control is roll angle dependent
+        if (nav_pitch_clip == 0) {
+            if (body_rate_clip != 0) {
+                if (is_positive(cos_roll)) {
+                    nav_pitch_clip = body_rate_clip;
+                } else {
+                    nav_pitch_clip = -body_rate_clip;
+                }
+            }
+        }
+
+        AP::logger().Write("ACVN","TimeUS,TAD,VAD,RLU,RLD,NPR,ALU,ALD,CRR,RDR,AY,PRC","Qfffffffffff",
+                        AP_HAL::micros64(),
+                        turn_accel_dem,
+                        vert_accel_dem,
+                        pitch_rate_max,
+                        pitch_rate_min,
+                        nav_body_pitch_rate_rps,
+                        TECS_controller.get_pitch_max(),
+                        TECS_controller.get_pitch_min(),
+                        commanded_roll_rad,
+                        roll_demand_rad,
+                        accel_y,
+                        pitch_rate_correction_rps);
+    } else {
+        // error condition
+        nav_body_pitch_rate_rps = 0.0f;
+        is_valid = false;
+    }
+    return is_valid;
 }
 
 /*

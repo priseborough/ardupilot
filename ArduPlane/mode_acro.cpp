@@ -71,7 +71,8 @@ void ModeAcro::stabilize()
         // 'stabilze' to true, which disables the roll integrator
         SRV_Channels::set_output_scaled(SRV_Channel::k_aileron, plane.rollController.get_servo_out(roll_error_cd,
                                                                                              speed_scaler,
-                                                                                             true, false));
+                                                                                             true,
+                                                                                             plane.ground_mode && !(plane.g2.flight_options & FlightOptions::DISABLE_GROUND_PID_SUPPRESSION)));
     } else {
         /*
           aileron stick is non-zero, use pure rate control until the
@@ -94,14 +95,18 @@ void ModeAcro::stabilize()
         // integrator enabled, which helps with inverted flight
         plane.nav_pitch_cd = acro_state.locked_pitch_cd;
         SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, plane.pitchController.get_servo_out(plane.nav_pitch_cd - ahrs.pitch_sensor,
-                                                                                               speed_scaler,
-                                                                                               false, false));
+                                                                                                speed_scaler,
+                                                                                                plane.ground_mode,
+                                                                                                plane.ground_mode && !(plane.g2.flight_options & FlightOptions::DISABLE_GROUND_PID_SUPPRESSION)));
     } else {
         /*
           user has non-zero pitch input, use a pure rate controller
          */
         acro_state.locked_pitch = false;
-        SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, plane.pitchController.get_rate_out(pitch_rate, speed_scaler));
+        SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, plane.pitchController.get_rate_out(pitch_rate, speed_scaler,
+                                                                                                plane.ground_mode,
+                                                                                                plane.ground_mode && !(plane.g2.flight_options & FlightOptions::DISABLE_GROUND_PID_SUPPRESSION)));
+
     }
 
     float rudder_output;
@@ -216,7 +221,9 @@ void ModeAcro::stabilize_quaternion()
 
     // call to rate controllers
     SRV_Channels::set_output_scaled(SRV_Channel::k_aileron,  plane.rollController.get_rate_out(desired_rates.x, speed_scaler));
-    SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, plane.pitchController.get_rate_out(desired_rates.y, speed_scaler));
+    SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, plane.pitchController.get_rate_out(desired_rates.y, speed_scaler,
+                                                                                            plane.ground_mode,
+                                                                                            plane.ground_mode && !(plane.g2.flight_options & FlightOptions::DISABLE_GROUND_PID_SUPPRESSION)));
     output_rudder_and_steering(plane.yawController.get_rate_out(desired_rates.z,  speed_scaler, false));
 
     acro_state.roll_active_last = roll_active;
