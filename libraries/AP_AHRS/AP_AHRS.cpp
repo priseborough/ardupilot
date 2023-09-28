@@ -178,6 +178,13 @@ const AP_Param::GroupInfo AP_AHRS::var_info[] = {
 
     // index 17
 
+    // @Param: OPTIONS
+    // @DisplayName: Optional AHRS behaviour
+    // @Description: This controls optional AHRS behaviour. Setting DisableDCMFallback will change the AHRS behaviour for fixed wing aircraft to not fall back to DCM when the EKF stops fusing GPS measurements while there is 3D GPS lock
+    // @Bitmask: 0:DisableDCMFallback
+    // @User: Advanced
+    AP_GROUPINFO("OPTIONS",  18, AP_AHRS, _options, 0),
+
     AP_GROUPEND
 };
 
@@ -1789,7 +1796,8 @@ AP_AHRS::EKFType AP_AHRS::active_EKF_type(void) const
 
     /*
       fixed wing and rover will fall back to DCM if the EKF doesn't
-      have GPS. This is the safest option as DCM is very robust. Note
+      have GPS unless this fallback has been inhibited.
+      This is the safest option as DCM is very robust. Note
       that we also check the filter status when fly_forward is false
       and we are disarmed. This is to ensure that the arming checks do
       wait for good GPS position on fixed wing and rover
@@ -1827,19 +1835,12 @@ AP_AHRS::EKFType AP_AHRS::active_EKF_type(void) const
             should_use_gps = true;
         }
 #endif
-        if (hal.util->get_soft_armed() &&
-            (!filt_state.flags.using_gps ||
-             !filt_state.flags.horiz_pos_abs) &&
+        if (!option_set(Options::DISABLE_DCM_FALLBACK) &&
+            hal.util->get_soft_armed() &&
             should_use_gps &&
-            AP::gps().status() >= AP_GPS::GPS_OK_FIX_3D) {
-            // if the EKF is not fusing GPS or doesn't have a 2D fix
-            // and we have a 3D lock, then plane and rover would
-            // prefer to use the GPS position from DCM. This is a
-            // safety net while some issues with the EKF get sorted
-            // out
-            return EKFType::NONE;
-        }
-        if (hal.util->get_soft_armed() && filt_state.flags.const_pos_mode) {
+            AP::gps().status() >= AP_GPS::GPS_OK_FIX_3D &&
+            (!filt_state.flags.using_gps || !filt_state.flags.horiz_pos_abs) ) {
+            // Note: This is a last resort fallback and makes the navigation highly vulnerable to GPS noise.
             return EKFType::NONE;
         }
         if (!filt_state.flags.attitude ||
