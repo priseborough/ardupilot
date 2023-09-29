@@ -615,8 +615,8 @@ void AP_TECS::_update_height_demand(void)
             float land_sink_rate_adj = _land_sink + _land_sink_rate_change * _land_posx;
 
             // bring it in linearly with height
-            if (_hgt_at_start_of_flare > _flare_holdoff_hgt) {
-                _flare_fraction = constrain_float((_hgt_at_start_of_flare - _hgt_above_rwy) / (_hgt_at_start_of_flare - _flare_holdoff_hgt), 0.0f, 1.0f);
+            if (_hgt_at_start_of_flare > MAX(_flare_holdoff_hgt, 0.0f)) {
+                _flare_fraction = constrain_float((_hgt_at_start_of_flare - _hgt_above_rwy) / (_hgt_at_start_of_flare - MAX(_flare_holdoff_hgt, 0.0f)), 0.0f, 1.0f);
             } else {
                 _flare_fraction = 1.0f;
             }
@@ -684,20 +684,21 @@ bool AP_TECS::_update_landing_trajectory(void)
             // that passes through the aim point .
             // y = a1 * x + b1
             _land_a1 = - _land_sink / ground_speed_constrained;
-            _land_b1 = 0.0f;
+            _land_b1 = MAX(_flare_holdoff_hgt, 0.0f);
 
             // define a circular arc for a pullup finishing at _flare_holdoff_hgt altitude
             _land_pullup_accel = MAX(_flarePullupAccel, 0.5f); // m/s/s TODO make this a parameter
             _land_pullup_radius = sq(_TASmin) / _land_pullup_accel;
-            if (!is_positive(_flare_holdoff_hgt) || !is_negative(_land_a1)) {
-                // pullup finishes at the landing point
+            if (!is_positive(_land_sink)) {
+                // doing a flare holdoff with flare assumed to finish at or above the aim point
                 _land_pullup_finish_posx = 0.0f;
             } else {
-                _land_pullup_finish_posx = _flare_holdoff_hgt / _land_a1;
+                // post flare fullup, fly a straight line to the aim point
+                _land_pullup_finish_posx = MAX(_flare_holdoff_hgt, 0.0f) / _land_a1;
             }
             const float target_fp_angle = atanf(_land_a1);
             _land_pullup_centre.x = _land_pullup_finish_posx - _land_pullup_radius * sinf(target_fp_angle);
-            _land_pullup_centre.y = _flare_holdoff_hgt + _land_pullup_radius * cosf(target_fp_angle);
+            _land_pullup_centre.y = MAX(_flare_holdoff_hgt, 0.0f) + _land_pullup_radius * cosf(target_fp_angle);
 
             // equation of a line that passes through the flare entry point and is tangential to the flare arc
             // y = a0 * x + b0
