@@ -804,9 +804,9 @@ const AP_Param::Info Plane::var_info[] = {
     GOBJECT(rangefinder,            "RNGFND", RangeFinder),
 
     // @Param: RNGFND_LANDING
-    // @DisplayName: Enable rangefinder for landing
-    // @Description: This enables the use of a rangefinder for automatic landing. The rangefinder will be used both on the landing approach and for final flare
-    // @Values: 0:Disabled,1:Enabled
+    // @DisplayName: Enable height above ground measurement for landing
+    // @Description: This enables the use of a rangefinder or EKF height above ground estimate for automatic landing. The selected estimate will be used both on the landing approach and for final flare.
+    // @Values: 0:Disabled,1:EnabledUseRngFnd,2:EnabledUseEKF
     // @User: Standard
     GSCALAR(rangefinder_landing,    "RNGFND_LANDING",   0),
 

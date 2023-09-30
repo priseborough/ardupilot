@@ -609,7 +609,7 @@ float Plane::rangefinder_correction(void)
         return 0;
     }
 
-    // for now we only support the rangefinder for landing 
+    // for now we only support height above ground measurements for landing
     bool using_rangefinder = (g.rangefinder_landing && flight_stage == AP_FixedWing::FlightStage::LAND);
     if (!using_rangefinder) {
         return 0;
@@ -646,6 +646,15 @@ void Plane::rangefinder_terrain_correction(float &height)
  */
 void Plane::rangefinder_height_update(void)
 {
+    if (g.rangefinder_landing == 2) {
+        if (ahrs.get_hagl(rangefinder_state.height_estimate)) {
+            rangefinder_state.last_correction_time_ms = millis();
+            rangefinder_terrain_correction(rangefinder_state.height_estimate);
+            rangefinder_state.correction = adjusted_relative_altitude_cm()*0.01 - rangefinder_state.height_estimate;
+        }
+        return;
+    }
+
     float distance = rangefinder.distance_orient(ROTATION_PITCH_270);
     
     if ((rangefinder.status_orient(ROTATION_PITCH_270) == RangeFinder::Status::Good) && ahrs.home_is_set()) {
