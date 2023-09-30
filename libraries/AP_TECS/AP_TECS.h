@@ -483,6 +483,7 @@ private:
     float _reset_pitch_dem;
 
     float _SKE_weighting;
+    float _SKE_Weighting_prev;
 
     AP_Int8 _use_synthetic_airspeed;
     

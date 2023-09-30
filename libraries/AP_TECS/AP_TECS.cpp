@@ -1167,6 +1167,7 @@ void AP_TECS::_update_pitch(void)
     // either weight can fade to 0, but don't go above 1 to prevent instability if tuned at a speed weight of 1 and wieghting is varied to end points in flight.
     SPE_weighting = MIN(SPE_weighting, 1.0f);
     _SKE_weighting = MIN(_SKE_weighting, 1.0f);
+    _SKE_Weighting_prev = _SKE_weighting;
 
     // Calculate demanded specific energy balance and error
     float SEB_dem = _SPE_dem * SPE_weighting - _SKE_dem * _SKE_weighting;
@@ -1234,7 +1235,13 @@ void AP_TECS::_update_pitch(void)
                                     ((_pitch_dem_unc < _PITCHminf) && integSEB_delta < 0.0f);
     if (!inhibit_integrator) {
         _integSEBdot += integSEB_delta;
-        _integKE += (_SKE_est - _SKE_dem) * _SKE_weighting * _DT / timeConstant();
+        if (is_positive(_SKE_weighting)) {
+            _integKE += (_SKE_est - _SKE_dem) * _DT / timeConstant();
+        } else {
+            // don't get stuck with a residual integrator if we stop using airspeed feedback
+            const float coef = 1.0f - _DT / (_DT + timeConstant());
+            _integKE *= coef;
+        }
     } else {
         // fade out integrator if saturating
         const float coef = 1.0f - _DT / (_DT + timeConstant());
@@ -1242,11 +1249,21 @@ void AP_TECS::_update_pitch(void)
         _integKE *= coef;
     }
     _integSEBdot = constrain_float(_integSEBdot, integSEBdot_min, integSEBdot_max);
-    const float KE_integ_limit = 0.25f * (_PITCHmaxf - _PITCHminf) * gainInv; // allow speed trim integrator to access 505 of pitch range
-    _integKE = constrain_float(_integKE, - KE_integ_limit, KE_integ_limit);
+
+    if (!tecs_is_flaring() && is_positive(_SKE_weighting)) {
+        // allow speed trim integrator to access 50% of pitch range
+        const float KE_integ_limit = 0.25f * (_PITCHmaxf - _PITCHminf) * (gainInv / MAX(_SKE_weighting, 0.1f));
+        _integKE = constrain_float(_integKE, - KE_integ_limit, KE_integ_limit);
+    }
 
     // Calculate pitch demand from specific energy balance signals
-    _pitch_dem_unc = (SEBdot_dem_total + _integSEBdot + _integKE) / gainInv;
+    _pitch_dem_unc = (SEBdot_dem_total + _integSEBdot + _integKE * _SKE_weighting) / gainInv;
+
+    // Shrink this integrator if the kinetic energy control weighting is increased so that
+    // the resulting pitch angle offset doesn't increase
+    if (is_positive(_SKE_weighting) && _SKE_weighting > _SKE_Weighting_prev) {
+        _integKE *= (_SKE_Weighting_prev / _SKE_weighting);
+    }
 
     // Add a feedforward term from demanded airspeed to pitch
     if (_flags.is_gliding) {
@@ -1295,6 +1312,7 @@ void AP_TECS::_initialise_states(int32_t ptchMinCO_cd, float hgt_afe)
     // Initialise states and variables if DT > 0.2 second or in climbout
     if (_DT > 0.2f || _need_reset || _need_reset_with_defined_pitch) {
         _SKE_weighting        = 1.0f;
+        _SKE_Weighting_prev   = 1.0f;
         _integTHR_state       = 0.0f;
         _integSEBdot          = 0.0f;
         _integKE              = 0.0f;
