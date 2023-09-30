@@ -313,7 +313,9 @@ void AP_Landing::type_slope_setup_landing_glide_slope(const Location &prev_WP_lo
     // point and above it
     Location loc = next_WP_loc;
     loc.offset_bearing(land_bearing_cd * 0.01f, -flare_distance);
-    loc.alt += aim_height*100;
+    if (!(_options & (1<<2))) {
+        loc.alt += aim_height*100;
+    }
 
     // calculate slope to landing point
     bool is_first_calc = is_zero(slope);
