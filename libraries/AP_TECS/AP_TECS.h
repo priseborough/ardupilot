@@ -66,6 +66,12 @@ public:
         return int32_t(_pitch_dem * 5729.5781f);
     }
 
+    // demanded pitch angle rate during the flare manoeuvre in degrees/second
+    // returns 0 if not flaring
+    float get_flare_pitch_rate_demand(void) {
+        return degrees(_flare_pitch_rate_dem);
+    }
+
     // Rate of change of velocity along X body axis in m/s^2
     float get_VXdot(void) {
         return _vel_dot;
@@ -202,6 +208,7 @@ private:
     AP_Int32 _options;
     AP_Float _flare_holdoff_hgt;
     AP_Float _hgt_dem_tconst;
+    AP_Float _flarePullupAccel;
 
     enum {
         OPTION_GLIDER_ONLY=(1<<0)
@@ -389,7 +396,7 @@ private:
     float _SPEdot;
     float _SKEdot;
 
-    // variables used for precision landing pitch control
+    // variables used for for legacy flare control
     float _hgt_at_start_of_flare; // height above runway at flare entry (m)
     float _hgt_rate_dem_at_flare_entry; // demanded height rate at flare entry (m/s)
     float _hgt_above_rwy; // measured height above runway (m)
@@ -410,14 +417,44 @@ private:
     // Time since last update of main TECS loop (seconds)
     float _DT;
 
-    // true when class variables used for flare control have been initialised
+    // true when class variables used for the legacy flare control algorithm have been initialised
     // on flare entry
-    bool _flare_initialised;
+    bool _legacy_flare_initialised;
+
+    // variables used for precision landing height rate and aim point control
+     bool _flare_pullup_initialised;
+    float _land_posx;
+    float _land_posx_offset;
+    float _land_entry_posy;
+    float _land_entry_posy_rate;
+    float _land_entry_gnd_speed;
+    float _land_entry_posx;
+    float _land_a0;
+    float _land_b0;
+    float _land_a1;
+    float _land_b1;
+    float _land_pullup_start_posx;
+    float _land_pullup_finish_posx;
+    float _land_pullup_start_posy;
+    float _land_pullup_accel;
+    float _land_pullup_radius;
+    Vector2f _land_pullup_centre;
+    bool _doing_tecs_controlled_landing;
+
+    enum class flareTrajectoryStatus  : int8_t {
+        NONE      = 0,
+        PRE       = 1,
+        PULLUP    = 2,
+        FINAL     = 3,
+        OVERSHOOT = 4
+    };
+    flareTrajectoryStatus _land_traj_state;
+
+    // pitch angle rate demand during flare manoeuvre in radians/sec
+    float _flare_pitch_rate_dem;
 
     // percent traveled along the previous and next waypoints
     float _path_proportion;
-
-    float _distance_beyond_land_wp;
 
     float _land_pitch_min = -90;
 
@@ -454,6 +491,11 @@ private:
 
     // Update the demanded height
     void _update_height_demand(void);
+
+    // Update a reference vertical trajectory for landing that guides the aircraft to a supplied aim point
+    // including a flare pullup maneouvre.
+    // Return false if the trajectory cannot be calculated
+    bool _update_landing_trajectory(void);
 
     // Detect an underspeed condition
     void _detect_underspeed(void);
