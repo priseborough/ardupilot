@@ -4947,15 +4947,27 @@ class AutoTestPlane(AutoTest):
 
     def LandingFlare(self):
         """Test landing flare manoeuvre"""
+        self.set_analog_rangefinder_parameters()
         self.set_parameters({
             "RTL_AUTOLAND": 1,
             "SIM_WIND_SPD": 0,
             "LAND_PF_ALT": 0,
             "LAND_PF_SEC": 0,
-            "TECS_FLARE_HGT": 0.0,
+            "LAND_FLARE_ALT": 0,
+            "LAND_FLARE_SEC": 0,
+            "TECS_FLARE_HGT": 1.0,
             "TECS_LAND_SINK": 0.0,
+            "TECS_FLARE_ACC" : 0.05,
             "LAND_PITCH_CD": -200,
             "TECS_LAND_PMAX": 5,
+            "PTCH_RATE_I": 1.0,
+            "PTCH_RATE_P": 0.3,
+            "PTCH_RATE_FF": 0.2,
+            "PTCH2SRV_TCONST": 0.33,
+            "RNGFND_LANDING": 1,
+            "SIM_BARO_DRIFT": 0.02,
+            "ARSPD_FBW_MIN": 15,
+            "LAND_OPTIONS": 4,
         })
         num_wp = self.load_mission("ap-circuit.txt")
         self.reboot_sitl()
@@ -4969,8 +4981,8 @@ class AutoTestPlane(AutoTest):
         # Start checking for flare entry height range when 200m out from landing point
         self.wait_waypoint(1, num_wp-1, max_dist=200, timeout=600)
         self.wait_altitude(10, 15, relative=True, timeout=30)
-        self.wait_groundspeed(0, 0.5, timeout=60)
-        # distance to waypoint when finished ground slide should be less than 10m
+        self.wait_total_g(1.5, 10.0, 30)
+        # distance to waypoint just after touchdown should be less than 10m
         msg = self.assert_receive_message('NAV_CONTROLLER_OUTPUT')
         wp_dist = msg.wp_dist
         if wp_dist > 10:

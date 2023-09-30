@@ -6406,6 +6406,30 @@ class AutoTest(ABC):
             altitude_source=altitude_source,
         )
 
+    def wait_total_g(self, g_min, g_max, timeout=30, **kwargs):
+        """Wait for a given vertical rate."""
+        assert g_min <= g_max, "Minimum speed should be less than maximum speed."
+
+        def get_total_g(timeout2):
+            msg = self.assert_receive_message('RAW_IMU', timeout=timeout2)
+            return math.sqrt(msg.xacc**2+msg.yacc**2+msg.zacc**2) / 1000
+
+        def validator(value2, target2=None):
+            if g_min <= value2 <= g_max:
+                return True
+            else:
+                return False
+
+        self.wait_and_maintain(
+            value_name="total_g",
+            target=g_min,
+            current_value_getter=lambda: get_total_g(timeout),
+            accuracy=(g_max - g_min),
+            validator=lambda value2, target2: validator(value2, target2),
+            timeout=timeout,
+            **kwargs
+        )
+
     def wait_climbrate(self, speed_min, speed_max, timeout=30, **kwargs):
         """Wait for a given vertical rate."""
         assert speed_min <= speed_max, "Minimum speed should be less than maximum speed."
