@@ -90,7 +90,7 @@ bool AP_Landing::type_slope_verify_land(const Location &prev_WP_loc, Location &n
     // 3) probably crashed (ensures motor gets turned off)
 
     const bool on_approach_stage = type_slope_is_on_approach();
-    const bool below_flare_alt = (height <= flare_alt);
+    const bool below_flare_alt = (flare_alt > 0 && height <= flare_alt);
     const bool below_flare_sec = (flare_sec > 0 && height <= sink_rate * flare_sec);
     const bool probably_crashed = (aparm.crash_detection_enable && fabsf(sink_rate) < 0.2f && !is_flying);
 
