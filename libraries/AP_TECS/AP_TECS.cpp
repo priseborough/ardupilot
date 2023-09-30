@@ -626,14 +626,13 @@ void AP_TECS::_update_height_demand(void)
 
             float dist_below_home_m;
             _ahrs.get_relative_position_D_home(dist_below_home_m);
-            AP::logger().WriteStreaming("TECF", "TimeUS,h_rwy,h_home,h_blend,hdem_rwy,hdem_home,hdem_blend,frac",
-                                        "s-------",
-                                        "F-------",
-                                        "Qfffffff",
+            AP::logger().WriteStreaming("TECF", "TimeUS,h_rwy,h_home,hdem_rwy,hdem_home,hdem_blend,frac",
+                                        "s------",
+                                        "F------",
+                                        "Qffffff",
                                         AP_HAL::micros64(),
                                         (double)_hgt_above_rwy,
-                                        (double)-dist_below_home_m,
-                                        (double)_height,
+                                        (double)_height_above_home,
                                         (double)_flare_hgt_dem_rwy,
                                         (double)_flare_hgt_dem_home,
                                         (double)_hgt_dem,
@@ -802,14 +801,15 @@ bool AP_TECS::_update_landing_trajectory(void)
         }
         break;
     }
-    AP::logger().WriteStreaming("TCF1", "TimeUS,lpx,lpxo,hafe,hdem,hrdem,fprd,lts,frac",
-                                "s--------",
-                                "F--------",
-                                "QffffffBf",
+    AP::logger().WriteStreaming("TCF1", "TimeUS,lpx,lpxo,h_rwy,h_home,hdem,hrdem,fprd,lts,frac",
+                                "s---------",
+                                "F---------",
+                                "QfffffffBf",
                                 AP_HAL::micros64(),
                                 (double)_land_posx,
                                 (double)_land_posx_offset,
                                 (double)_hgt_above_rwy,
+                                (double)_height_above_home,
                                 (double)_hgt_dem,
                                 (double)_hgt_rate_dem,
                                 (double)degrees(_flare_pitch_rate_dem),
