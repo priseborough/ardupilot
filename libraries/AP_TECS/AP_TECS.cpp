@@ -1269,10 +1269,11 @@ void AP_TECS::_update_pitch(void)
     _last_pitch_dem = _pitch_dem;
 
     if (AP::logger().should_log(_log_bitmask)){
-        AP::logger().WriteStreaming("TEC2","TimeUS,PEW,EBD,EBE,EBDD,EBDE,EBDDT,Imin,Imax,I,KI,pmin,pmax",
-                                    "Qffffffffffff",
+        AP::logger().WriteStreaming("TEC2","TimeUS,PEW,KEW,EBD,EBE,EBDD,EBDE,EBDDT,Imin,Imax,I,KI,pmin,pmax",
+                                    "Qfffffffffffff",
                                     AP_HAL::micros64(),
                                     (double)SPE_weighting,
+                                    (double)_SKE_weighting,
                                     (double)SEB_dem,
                                     (double)SEB_est,
                                     (double)SEBdot_dem,
