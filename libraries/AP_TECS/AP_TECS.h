@@ -417,6 +417,7 @@ private:
     float _hgt_rate_dem_at_flare_entry; // demanded height rate at flare entry (m/s)
     float _hgt_above_rwy; // measured height above runway (m)
     float _pitch_min_at_flare_entry; // lower pitch angle limit at flare entry (rad)
+    float _pitch_max_at_flare_entry; // upper pitch angle limit at flare entry (rad)
 
     // used to scale max climb and sink limits to match vehicle ability
     float _max_climb_scaler;

@@ -1488,22 +1488,20 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
 
     // calculate the expected pitch angle from the demanded climb rate and airspeed for use during approach and flare
     if (is_flaring) {
-        const float pitch_limit_deg = (1.0f - _flare_fraction) * _pitch_min_at_flare_entry + _flare_fraction * 0.01f * _landing.get_pitch_cd();
+        // in flare use min pitch from LAND_PITCH_CD and max pitch from TECS_LAND_PMAX if set
+        const float pitch_lower_limit_deg = (1.0f - _flare_fraction) * _pitch_min_at_flare_entry + _flare_fraction * 0.01f * _landing.get_pitch_cd();
+        const float end_of_flare_pitch_max = _land_pitch_max != 0 ? _land_pitch_max : _pitch_max_at_flare_entry;
+        const float pitch_upper_limit_deg = (1.0f - _flare_fraction) * _pitch_max_at_flare_entry + _flare_fraction * end_of_flare_pitch_max;
 
-        // in flare use min pitch from LAND_PITCH_CD
-        _PITCHminf = MAX(_PITCHminf, pitch_limit_deg);
-
-        // and use max pitch from TECS_LAND_PMAX
-        if (_land_pitch_max != 0) {
-            // note that this allows a flare pitch outside the normal TECS auto limits
-            _PITCHmaxf = _land_pitch_max;
-        }
+        _PITCHminf = MAX(_PITCHminf, pitch_lower_limit_deg);
+        _PITCHmaxf = MIN(_PITCHmaxf, pitch_upper_limit_deg);
 
         // and allow zero throttle
         _THRminf = 0;
     } else if (is_on_approach) {
         _PITCHminf = MAX(_PITCHminf, 0.01f * aparm.pitch_limit_min_cd);
         _pitch_min_at_flare_entry = _PITCHminf;
+        _pitch_max_at_flare_entry = _PITCHmaxf;
     }
 
     if (is_on_approach) {
