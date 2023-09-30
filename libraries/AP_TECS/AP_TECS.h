@@ -156,6 +156,19 @@ public:
         _reset_pitch_dem = pitch_dem_rad;
     }
 
+    // returns true if TECS is in full control of the landing
+    bool tecs_is_landing() {
+        return _land_traj_state != flareTrajectoryStatus::NONE;
+    }
+
+    // returns true if TECS is in full control of the landing
+    // and has commenced the final pullup manoeuvre
+    bool tecs_is_flaring() {
+        return  _land_traj_state == flareTrajectoryStatus::PULLUP ||
+                _land_traj_state == flareTrajectoryStatus::FINAL ||
+                _land_traj_state == flareTrajectoryStatus::OVERSHOOT;
+    }
+
     // this supports the TECS_* user settable parameters
     static const struct AP_Param::GroupInfo var_info[];
 
@@ -299,8 +312,11 @@ private:
     float _hgt_dem;             // height demand sent to control loops (m)
     float _hgt_dem_prev;        // _hgt_dem from previous frame (m)
 
-    // fraction of flare manoeuvre completed
+    // fraction of flare pullup manoeuvre completed
     float _flare_fraction;
+
+    // fraction of the the pre-flare landing approach completed
+    float _landing_fraction;
 
     // height rate demands
     float _hgt_dem_rate_ltd;    // height demand after application of the rate limiter (m)

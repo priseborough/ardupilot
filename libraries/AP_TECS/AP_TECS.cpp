@@ -321,11 +321,11 @@ void AP_TECS::update_50hz(void)
     // AIAA Journal of Guidance and Control, 78-1307R
 
     // Use distance above home for up and away flight and fade across to distance above runway
-    // when flaring.
+    // as landing progresses.
     float dist_below_home_m;
     _ahrs.get_relative_position_D_home(dist_below_home_m);
     _height_above_home = - dist_below_home_m;
-    _height = _hgt_above_rwy * _flare_fraction + _height_above_home * (1.0f - _flare_fraction);
+    _height = _hgt_above_rwy * _landing_fraction + _height_above_home * (1.0f - _landing_fraction);
 
     // Calculate time in seconds since last update
     uint64_t now = AP_HAL::micros64();
@@ -586,6 +586,7 @@ void AP_TECS::_update_height_demand(void)
             }
 
             _flare_fraction = 0.0f;
+            _landing_fraction = 0.0f;
             _legacy_flare_initialised = false;
         } else {
             // when flaring force height rate demand to the
@@ -620,22 +621,25 @@ void AP_TECS::_update_height_demand(void)
             _flare_hgt_dem_rwy += _DT * _hgt_rate_dem;
             _flare_hgt_dem_home  += _DT * _hgt_rate_dem;
 
-            // fade the demanded height from height above home to height above runway as flare progresses
+            // fade the demanded height from height above home to height above runway as landing progresses
             // the measured height is faded across from height above home to height above runway in AP_TECS::update_50hz
-            _hgt_dem = _flare_hgt_dem_home * (1.0f - _flare_fraction) + _flare_hgt_dem_rwy * _flare_fraction;
+            _landing_fraction = _path_proportion;
+            _hgt_dem = _flare_hgt_dem_home * (1.0f - _landing_fraction) + _flare_hgt_dem_rwy * _landing_fraction;
+
 
             float dist_below_home_m;
             _ahrs.get_relative_position_D_home(dist_below_home_m);
-            AP::logger().WriteStreaming("TECF", "TimeUS,h_rwy,h_home,hdem_rwy,hdem_home,hdem_blend,frac",
-                                        "s------",
-                                        "F------",
-                                        "Qffffff",
+            AP::logger().WriteStreaming("TECF", "TimeUS,h_rwy,h_home,hdem_rwy,hdem_home,hdem_blend,lf,ff",
+                                        "s-------",
+                                        "F-------",
+                                        "Qfffffff",
                                         AP_HAL::micros64(),
                                         (double)_hgt_above_rwy,
                                         (double)_height_above_home,
                                         (double)_flare_hgt_dem_rwy,
                                         (double)_flare_hgt_dem_home,
                                         (double)_hgt_dem,
+                                        (double)_landing_fraction,
                                         (double)_flare_fraction);
         }
     }
@@ -644,13 +648,9 @@ void AP_TECS::_update_height_demand(void)
 bool AP_TECS::_update_landing_trajectory(void)
 {
     // Attempt control the landing trajectory using a specified distance to aim point
-    const bool temp_bool = is_positive(_flarePullupAccel) && _flags.is_doing_auto_land;
-    if (_doing_tecs_controlled_landing != temp_bool) {
-        _land_traj_state = flareTrajectoryStatus::NONE;
-        _doing_tecs_controlled_landing = temp_bool;
-    };
-
+    _doing_tecs_controlled_landing = is_positive(_flarePullupAccel) && _flags.is_doing_auto_land;
     if (!_doing_tecs_controlled_landing) {
+        _land_traj_state = flareTrajectoryStatus::NONE;
         return false;
     }
 
@@ -757,6 +757,7 @@ bool AP_TECS::_update_landing_trajectory(void)
     // trajectory generation
     switch (_land_traj_state) {
     case flareTrajectoryStatus::NONE:
+        _landing_fraction = 0.0f;
         _flare_fraction = 0.0f;
         break;
     case flareTrajectoryStatus::PRE:
@@ -766,8 +767,9 @@ bool AP_TECS::_update_landing_trajectory(void)
             _hgt_rate_dem = _land_a0 * ground_speed;
             _flare_pitch_rate_dem = 0.0f;
             // blend across to using a runway height datum prior to starting the pullup
-            _flare_fraction = 1.0f - MAX(_land_pullup_start_posx - _land_posx, 0.0f) / MAX(_land_pullup_start_posx - _land_entry_posx, 1.0f);
-            _flare_fraction = constrain_float(_flare_fraction, 0.0f, 1.0f);
+            _landing_fraction = 1.0f - MAX(_land_pullup_start_posx - _land_posx, 0.0f) / MAX(_land_pullup_start_posx - _land_entry_posx, 1.0f);
+            _landing_fraction = constrain_float(_landing_fraction, 0.0f, 1.0f);
+            _flare_fraction = 0.0f;
         }
         break;
     case flareTrajectoryStatus::PULLUP:
@@ -776,11 +778,11 @@ bool AP_TECS::_update_landing_trajectory(void)
             Vector2f centre_to_ac = Vector2f((_land_posx - _land_posx_offset), _hgt_above_rwy) - _land_pullup_centre;
             centre_to_ac = centre_to_ac.normalized() * _land_pullup_radius;
             _hgt_dem = _land_pullup_centre.y + centre_to_ac.y;
-            const float p = constrain_float(((_land_posx - _land_posx_offset) - _land_pullup_start_posx) / (_land_pullup_finish_posx - _land_pullup_start_posx), 0.0f, 1.0f);
-            _hgt_rate_dem = (_land_a0 * (1.0 - p) + _land_a1 * p) * ground_speed;
+            _flare_fraction = constrain_float(((_land_posx - _land_posx_offset) - _land_pullup_start_posx) / (_land_pullup_finish_posx - _land_pullup_start_posx), 0.0f, 1.0f);
+            _hgt_rate_dem = (_land_a0 * (1.0 - _flare_fraction) + _land_a1 * _flare_fraction) * ground_speed;
             _flare_pitch_rate_dem = _land_pullup_accel / _TAS_state;
             _flare_pullup_initialised = true;
-            _flare_fraction = 1.0f;
+            _landing_fraction = 1.0f;
         }
         break;
     case flareTrajectoryStatus::FINAL:
@@ -789,6 +791,7 @@ bool AP_TECS::_update_landing_trajectory(void)
             _hgt_dem = _land_a1 * (_land_posx - _land_posx_offset) + _land_b1;
             _hgt_rate_dem = _land_a1 * ground_speed;
             _flare_pitch_rate_dem = 0.0f;
+            _landing_fraction = 1.0f;
             _flare_fraction = 1.0f;
         }
         break;
@@ -798,14 +801,15 @@ bool AP_TECS::_update_landing_trajectory(void)
             _hgt_rate_dem = - _land_sink;
             _hgt_dem = _hgt_above_rwy;
             _flare_pitch_rate_dem = 0.0f;
+            _landing_fraction = 0.0f;
             _flare_fraction = 0.0f;
         }
         break;
     }
-    AP::logger().WriteStreaming("TCF1", "TimeUS,lpx,lpxo,h_rwy,h_home,hdem,hrdem,fprd,lts,frac",
-                                "s---------",
-                                "F---------",
-                                "QfffffffBf",
+    AP::logger().WriteStreaming("TCF1", "TimeUS,lpx,lpxo,h_rwy,h_home,hdem,hrdem,fprd,lts,lf,ff",
+                                "s----------",
+                                "F----------",
+                                "QfffffffBff",
                                 AP_HAL::micros64(),
                                 (double)_land_posx,
                                 (double)_land_posx_offset,
@@ -815,6 +819,7 @@ bool AP_TECS::_update_landing_trajectory(void)
                                 (double)_hgt_rate_dem,
                                 (double)degrees(_flare_pitch_rate_dem),
                                 (uint8_t)_land_traj_state,
+                                (double)_landing_fraction,
                                 (double)_flare_fraction
                                 );
 
@@ -926,7 +931,7 @@ void AP_TECS::_update_throttle_with_airspeed(void)
     // If underspeed condition is set, then demand full throttle
     if (_flags.underspeed) {
         _throttle_dem = 1.0f;
-    } else if (_flags.is_gliding) {
+    } else if (_flags.is_gliding || tecs_is_flaring()) {
         _throttle_dem = 0.0f;
     } else {
         // Calculate gain scaler from specific energy error to throttle
@@ -1091,7 +1096,7 @@ void AP_TECS::_update_throttle_without_airspeed(int16_t throttle_nudge)
     } else {
         _takeoff_start_ms = 0;
     }
-    if (_flags.is_gliding) {
+    if (_flags.is_gliding || tecs_is_flaring()) {
         _throttle_dem = 0.0f;
         return;
     }
@@ -1318,6 +1323,9 @@ void AP_TECS::_initialise_states(int32_t ptchMinCO_cd, float hgt_afe)
         _hgt_rate_dem_at_flare_entry  = 0.0f;
         _hgt_above_rwy                  = 0.0f;
         _pitch_min_at_flare_entry = 0.0f;
+        _landing_fraction = 0.0f;
+        _flare_fraction = 0.0f;
+        _legacy_flare_initialised = false;
 
         _max_climb_scaler = 1.0f;
         _max_sink_scaler = 1.0f;
@@ -1460,13 +1468,25 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
         _pitch_max_limit = 90;
     }
 
-    if (!_landing.is_on_approach()) {
+    bool is_flaring;
+    bool is_on_approach;
+    if (_doing_tecs_controlled_landing) {
+        is_flaring = _land_traj_state == flareTrajectoryStatus::PULLUP ||
+                     _land_traj_state == flareTrajectoryStatus::FINAL ||
+                     _land_traj_state == flareTrajectoryStatus::OVERSHOOT;
+        is_on_approach = _land_traj_state == flareTrajectoryStatus::PRE;
+    } else {
+        is_flaring = _landing.is_flaring();
+        is_on_approach = _landing.is_on_approach();
+    }
+
+    if (!is_on_approach) {
         // reset land pitch min when not landing
         _land_pitch_min = _PITCHminf;
     }
 
     // calculate the expected pitch angle from the demanded climb rate and airspeed for use during approach and flare
-    if (_landing.is_flaring()) {
+    if (is_flaring) {
         const float pitch_limit_deg = (1.0f - _flare_fraction) * _pitch_min_at_flare_entry + _flare_fraction * 0.01f * _landing.get_pitch_cd();
 
         // in flare use min pitch from LAND_PITCH_CD
@@ -1480,12 +1500,12 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
 
         // and allow zero throttle
         _THRminf = 0;
-    } else if (_landing.is_on_approach()) {
+    } else if (is_on_approach) {
         _PITCHminf = MAX(_PITCHminf, 0.01f * aparm.pitch_limit_min_cd);
         _pitch_min_at_flare_entry = _PITCHminf;
     }
 
-    if (_landing.is_on_approach()) {
+    if (is_on_approach) {
         // don't allow the lower bound of pitch to decrease, nor allow
         // it to increase rapidly. This prevents oscillation of pitch
         // demand while in landing approach based on rapidly changing
