@@ -1155,7 +1155,7 @@ void AP_TECS::_update_pitch(void)
     } else if (_flags.is_doing_auto_land) {
         if (_spdWeightLand < 0) {
             // use sliding scale from normal weight down to zero at landing
-            float scaled_weight = _spdWeight * (1.0f - constrain_float(_path_proportion,0,1));
+            float scaled_weight = _spdWeight * (1.0f - constrain_float(_landing_fraction,0,1));
             _SKE_weighting = constrain_float(scaled_weight, 0.0f, 2.0f);
         } else {
             _SKE_weighting = constrain_float(_spdWeightLand, 0.0f, 2.0f);
