@@ -255,6 +255,7 @@ private:
     AP_Float _pitch_ff_v0;
     AP_Float _pitch_ff_k;
     AP_Float _accel_gf;
+    AP_Float _flare_herr_gain;
 
     // temporary _pitch_max_limit. Cleared on each loop. Clear when >= 90
     int8_t _pitch_max_limit = 90;

@@ -293,10 +293,17 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
 
     // @Param: ACCEL_GF
     // @DisplayName: Vertical acceleration gain factor.
-    // @Description: Factor applied to the calculation of vertical acceleration demand
+    // @Description: Controls the gain from vertical velocity error to demanded vertical acceleration during up and away flight (not during flare). This will be translated to a pitch rate demand by the plane attitude controller if FLIGHT_OPTIONS bit 14 is set.
     // @Range: 1.0 10.0
     // @User: Advanced
     AP_GROUPINFO("ACCEL_GF", 35, AP_TECS, _accel_gf, 7.0),
+
+    // @Param: FLARE_HGAIN
+    // @DisplayName: Gain from height error to demanded vertical acceleration used during the flare manoeuvre.
+    // @Description: Factor applied to the calculation of vertical acceleration demand
+    // @Range: 0.5 2.0
+    // @User: Advanced
+    AP_GROUPINFO("FLARE_HGAIN", 36, AP_TECS, _flare_herr_gain, 1.0),
 
     AP_GROUPEND
 };
@@ -1279,12 +1286,23 @@ void AP_TECS::_update_pitch(void)
         _pitch_dem_unc += (_TAS_dem_adj - _pitch_ff_v0) * _pitch_ff_k;
     }
 
-    // calculate a demanded vertical velocity
-    const float energy_loop_tconst = timeConstant();
-    const float vel_dem = constrain_float(_pitch_dem_unc * _TAS_state, -_sink_rate_limit, _climb_rate_limit);
+    if (tecs_is_flaring() || !is_positive(_SKE_weighting)) {
+        const float damping = 0.85f;
+        const float herr_gain = MAX(_flare_herr_gain, 0.0f);
+        const float P_err_max = _climb_rate_limit * sqrtf(herr_gain) / (2.0f * damping);
+        const float P_err_min = -_sink_rate_limit * sqrtf(herr_gain) / (2.0f * damping);
+        const float P_err = constrain_float((_hgt_dem - _height), P_err_min, P_err_max);
+        _vert_accel_dem = P_err * herr_gain + (_hgt_rate_dem -_climb_rate) * 2.0f * damping * sqrtf(herr_gain);
+        _vert_accel_dem += _flare_pitch_rate_dem * _TAS_state;
+    } else {
+        // calculate a demanded vertical velocity
+        const float energy_loop_tconst = timeConstant();
+        const float vel_dem = constrain_float(_pitch_dem_unc * _TAS_state, -_sink_rate_limit, _climb_rate_limit);
 
-    // calculate a demanded vertical acceleration
-    _vert_accel_dem = constrain_float((vel_dem - _climb_rate) * (_accel_gf / energy_loop_tconst) , -_vertAccLim, _vertAccLim);
+        // calculate a demanded vertical acceleration
+        _vert_accel_dem = (vel_dem - _climb_rate) * (_accel_gf / energy_loop_tconst);
+    }
+    _vert_accel_dem = constrain_float(_vert_accel_dem, -_vertAccLim, _vertAccLim);
 
     // Constrain pitch demand
     _pitch_dem = constrain_float(_pitch_dem_unc, _PITCHminf, _PITCHmaxf);
