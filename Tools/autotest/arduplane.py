@@ -4954,9 +4954,9 @@ class AutoTestPlane(AutoTest):
             "LAND_PF_ALT": 0,
             "LAND_PF_SEC": 0,
             "LAND_FLARE_ALT": 0,
-            "LAND_FLARE_SEC": 0,
-            "TECS_FLARE_HGT": 1.0,
-            "TECS_LAND_SINK": 0.0,
+            "LAND_FLARE_SEC": 0.5,
+            "TECS_FLARE_HGT": 0.5,
+            "TECS_LAND_SINK": 0.5,
             "TECS_FLARE_ACC" : 0.05,
             "LAND_PITCH_CD": -200,
             "TECS_LAND_PMAX": 5,
@@ -4968,6 +4968,14 @@ class AutoTestPlane(AutoTest):
             "SIM_BARO_DRIFT": 0.02,
             "ARSPD_FBW_MIN": 15,
             "LAND_OPTIONS": 4,
+            "FLIGHT_OPTIONS": 16384,
+            "TECS_LAND_TCONST": 5,
+            "TECS_LAND_DAMP": 0.3,
+            "RLL_RATE_I": 1.0,
+            "RLL2SRV_TCONST": 0.4,
+            "RLL_RATE_D": 0.02,
+            "LOAD_FACTOR_GAIN": 0,
+            "LOAD_FACTOR_LAG": 0.1,
         })
         num_wp = self.load_mission("ap-circuit.txt")
         self.reboot_sitl()
