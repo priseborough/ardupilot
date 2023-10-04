@@ -240,6 +240,8 @@ void AP_AHRS::init()
 
     last_active_ekf_type = (EKFType)_ekf_type.get();
 
+    gcs_send_EKF_type(last_active_ekf_type);
+
     // init backends
     dcm.init();
 #if HAL_EXTERNAL_AHRS_ENABLED
@@ -401,9 +403,25 @@ void AP_AHRS::update(bool skip_ins_update)
 
     EKFType active = active_EKF_type();
     if (active != last_active_ekf_type) {
+        gcs_send_EKF_type(active);
         last_active_ekf_type = active;
+    }
+
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+    /*
+      add timing jitter to simulate slow EKF response
+     */
+    const auto *sitl = AP::sitl();
+    if (sitl->loop_time_jitter_us > 0) {
+        hal.scheduler->delay_microseconds(random() % sitl->loop_time_jitter_us);
+    }
+#endif
+}
+
+void AP_AHRS::gcs_send_EKF_type(EKFType active_type)
+{
         const char *shortname = "???";
-        switch ((EKFType)active) {
+        switch ((EKFType)active_type) {
         case EKFType::NONE:
             shortname = "DCM";
             break;
@@ -429,17 +447,6 @@ void AP_AHRS::update(bool skip_ins_update)
 #endif
         }
         GCS_SEND_TEXT(MAV_SEVERITY_INFO, "AHRS: %s active", shortname);
-    }
-
-#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
-    /*
-      add timing jitter to simulate slow EKF response
-     */
-    const auto *sitl = AP::sitl();
-    if (sitl->loop_time_jitter_us > 0) {
-        hal.scheduler->delay_microseconds(random() % sitl->loop_time_jitter_us);
-    }
-#endif
 }
 
 /*

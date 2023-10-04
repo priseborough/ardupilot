@@ -835,6 +835,8 @@ private:
     struct AP_AHRS_Backend::Estimates external_estimates;
 #endif
 
+    void gcs_send_EKF_type(const EKFType active_type);
+
     /*
      * copy results from a backend over AP_AHRS canonical results.
      * This updates member variables like roll and pitch, as well as
