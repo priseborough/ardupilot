@@ -1865,7 +1865,7 @@ AP_AHRS::EKFType AP_AHRS::active_EKF_type(void) const
             return EKFType::NONE;
         }
 
-        // Handle complete loss of navigation
+        // Handle complete loss of navigation where there has been an EKF mode fallback
         if (!(option_set(Options::DISABLE_DCM_FALLBACK_FW) && fly_forward) &&
             !(option_set(Options::DISABLE_DCM_FALLBACK_VTOL) && !fly_forward) &&
             hal.util->get_soft_armed() && filt_state.flags.const_pos_mode) {
@@ -1878,6 +1878,7 @@ AP_AHRS::EKFType AP_AHRS::active_EKF_type(void) const
             return EKFType::NONE;
         }
 
+        // The EKF has indicated not to use it's horizontal velocity or position estimates
         if (!filt_state.flags.horiz_vel ||
             (!filt_state.flags.horiz_pos_abs && !filt_state.flags.horiz_pos_rel)) {
             if ((!AP::compass().use_for_yaw()) &&
@@ -1893,7 +1894,10 @@ AP_AHRS::EKFType AP_AHRS::active_EKF_type(void) const
                     return ret;
                 }
             }
-            return EKFType::NONE;
+            if (!(option_set(Options::DISABLE_DCM_FALLBACK_FW) && fly_forward) &&
+            !(option_set(Options::DISABLE_DCM_FALLBACK_VTOL) && !fly_forward)) {
+                return EKFType::NONE;
+            }
         }
     }
     return ret;
