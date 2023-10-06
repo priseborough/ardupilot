@@ -718,6 +718,7 @@ bool AP_TECS::_update_landing_trajectory(void)
                     const float hypotenuse = sqrtf(sq(_land_pullup_centre.x - _land_entry_posx)+sq(_land_pullup_centre.y - _land_entry_posy));
                     const float fp_angle_to_centre = atanf((_land_pullup_centre.y - _land_entry_posy) / (_land_pullup_centre.x - _land_entry_posx));
                     const float preflare_fp_angle = fp_angle_to_centre - asinf(_land_pullup_radius / hypotenuse);
+                    gcs().send_text(MAV_SEVERITY_INFO, "TECS landing plan glide slope %.1f degrees", (double)degrees(-preflare_fp_angle));
                     _land_a0 = tanf(preflare_fp_angle);
                     _land_b0 = _land_entry_posy - _land_a0 * _land_entry_posx;
                     _land_pullup_start_posx = _land_pullup_centre.x + _land_pullup_radius * sinf(preflare_fp_angle);
@@ -734,6 +735,7 @@ bool AP_TECS::_update_landing_trajectory(void)
                 }
             } else {
                 // overshot the waypoint so go to a backup plan 
+                gcs().send_text(MAV_SEVERITY_INFO, "TECS landing plan overshoot");
                 _land_traj_state = flareTrajectoryStatus::OVERSHOOT;
             }
 
