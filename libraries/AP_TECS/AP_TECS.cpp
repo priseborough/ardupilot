@@ -699,16 +699,18 @@ bool AP_TECS::_update_landing_trajectory(void)
             // define a circular arc for a pullup finishing at _flare_holdoff_hgt altitude
             _land_pullup_accel = MAX(_flarePullupAccel, 0.5f); // m/s/s TODO make this a parameter
             _land_pullup_radius = sq(_TASmin) / _land_pullup_accel;
+            const float target_fp_angle = atanf(_land_a1);
             if (!is_positive(_land_sink)) {
                 // doing a flare holdoff with flare assumed to finish at or above the aim point
                 _land_pullup_finish_posx = 0.0f;
+                _land_pullup_centre.x = _land_pullup_finish_posx;
+                _land_pullup_centre.y = MAX(_flare_holdoff_hgt, 0.0f) + _land_pullup_radius;
             } else {
                 // post flare fullup, fly a straight line to the aim point
                 _land_pullup_finish_posx = MAX(_flare_holdoff_hgt, 0.0f) / _land_a1;
+                _land_pullup_centre.x = _land_pullup_finish_posx - _land_pullup_radius * sinf(target_fp_angle);
+                _land_pullup_centre.y = MAX(_flare_holdoff_hgt, 0.0f) + _land_pullup_radius * cosf(target_fp_angle);
             }
-            const float target_fp_angle = atanf(_land_a1);
-            _land_pullup_centre.x = _land_pullup_finish_posx - _land_pullup_radius * sinf(target_fp_angle);
-            _land_pullup_centre.y = MAX(_flare_holdoff_hgt, 0.0f) + _land_pullup_radius * cosf(target_fp_angle);
 
             // equation of a line that passes through the flare entry point and is tangential to the flare arc
             // y = a0 * x + b0
