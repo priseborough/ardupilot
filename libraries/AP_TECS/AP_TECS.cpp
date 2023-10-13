@@ -1096,7 +1096,11 @@ void AP_TECS::_update_throttle_without_airspeed(int16_t throttle_nudge)
     {
         _throttle_dem = nomThr + (_THRmaxf - nomThr) * pitch_blended / _PITCHmaxf;
     }
-    else if (pitch_blended < 0.0f && _PITCHminf < 0.0f)
+    else if (pitch_blended < 0.0f && (aparm.stab_pitch_down > 0.0f))
+    {
+        _throttle_dem = nomThr + (_THRminf - nomThr) * pitch_blended / radians(-aparm.stab_pitch_down);
+    }
+    else if (pitch_blended < 0.0f && (_PITCHminf < 0.0f))
     {
         _throttle_dem = nomThr + (_THRminf - nomThr) * pitch_blended / _PITCHminf;
     }
