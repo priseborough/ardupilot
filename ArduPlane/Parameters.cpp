@@ -117,7 +117,7 @@ const AP_Param::Info Plane::var_info[] = {
     // @Increment: 0.1
     // @Units: deg
     // @User: Advanced
-    GSCALAR(stab_pitch_down, "STAB_PITCH_DOWN",   2.0f),
+    ASCALAR(stab_pitch_down, "STAB_PITCH_DOWN",   2.0f),
 
     // @Param: GLIDE_SLOPE_MIN
     // @DisplayName: Glide slope minimum
