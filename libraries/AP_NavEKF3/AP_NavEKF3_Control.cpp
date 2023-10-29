@@ -94,6 +94,9 @@ void NavEKF3_core::setWindMagStateLearningMode()
 
             windStatesAligned = true;
 
+            // fuse a zero sideslip observation to form the covariances
+            FuseSideslip();
+
         } else {
             // set the variances using a typical max wind speed for small UAV operation
             zeroCols(P, 22, 23);
