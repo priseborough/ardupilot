@@ -458,9 +458,33 @@ void AP_TECS::_update_speed(float DT)
 
 void AP_TECS::_update_speed_demand(void)
 {
+    // Determine the true cruising airspeed (m/s)
+    const float TAScruise = aparm.airspeed_cruise * _ahrs.get_EAS2TAS();
+
+    // calculate velocity rate limits based on physical performance limits
+    // provision to use a different rate limit if bad descent or underspeed condition exists
+    // Use 50% of maximum energy rate on gain, 90% on dissipation to allow margin for total energy controller
+    const float velRateMax = 0.5f * _STEdot_max / _TAS_state;
+    // Maximum permissible rate of deceleration value at max airspeed
+    const float velRateNegMax = 0.9f * _STEdot_neg_max / _TASmax;
+    // Maximum permissible rate of deceleration value at cruise speed
+    const float velRateNegCruise = 0.9f * _STEdot_min / TAScruise;
+    // Linear interpolation between velocity rate at cruise and max speeds, capped at those speeds
+    const float velRateMin = linear_interpolate(velRateNegMax, velRateNegCruise, _TAS_state, _TASmax, TAScruise);
+
     if (_options & OPTION_DESCENT_SPEEDUP) {
-        // Allow demanded speed to  go to maximum when descending at maximum descent rate
-        _TAS_dem = _TAS_dem + (_TASmax - _TAS_dem) * _sink_fraction;
+        // Allow demanded speed to go to maximum when descending at maximum descent rate
+        // Reduce speed to demanded value at max decel rate as target height is approached
+        const float decel_rate = - linear_interpolate(velRateNegMax, velRateNegCruise, _TAS_dem, _TASmax, TAScruise);
+        const float time_to_bottom = (_height - _hgt_dem_in) / _maxSinkRate;
+        float speed_increment = _TASmax - _TAS_dem;
+        if (is_positive(decel_rate) && is_positive(time_to_bottom)) {
+            const float time_to_decel = speed_increment / decel_rate;
+            if (time_to_bottom < time_to_decel) {
+                speed_increment *= (time_to_bottom / time_to_decel);
+            }
+        }
+        _TAS_dem = _TAS_dem + speed_increment * _sink_fraction;
     }
 
     // Set the airspeed demand to the minimum value if an underspeed condition exists
@@ -475,19 +499,6 @@ void AP_TECS::_update_speed_demand(void)
     // Constrain speed demand, taking into account the load factor
     _TAS_dem = constrain_float(_TAS_dem, _TASmin, _TASmax);
 
-    // Determine the true cruising airspeed (m/s)
-    const float TAScruise = aparm.airspeed_cruise * _ahrs.get_EAS2TAS();
-
-    // calculate velocity rate limits based on physical performance limits
-    // provision to use a different rate limit if bad descent or underspeed condition exists
-    // Use 50% of maximum energy rate on gain, 90% on dissipation to allow margin for total energy controller
-    const float velRateMax = 0.5f * _STEdot_max / _TAS_state;
-    // Maximum permissible rate of deceleration value at max airspeed
-    const float velRateNegMax = 0.9f * _STEdot_neg_max / _TASmax;
-    // Maximum permissible rate of deceleration value at cruise speed
-    const float velRateNegCruise = 0.9f * _STEdot_min / TAScruise;
-    // Linear interpolation between velocity rate at cruise and max speeds, capped at those speeds
-    const float velRateMin = linear_interpolate(velRateNegMax, velRateNegCruise, _TAS_state, _TASmax, TAScruise);
     const float TAS_dem_previous = _TAS_dem_adj;
 
     // Apply rate limit
