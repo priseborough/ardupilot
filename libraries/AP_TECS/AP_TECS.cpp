@@ -472,21 +472,6 @@ void AP_TECS::_update_speed_demand(void)
     // Linear interpolation between velocity rate at cruise and max speeds, capped at those speeds
     const float velRateMin = linear_interpolate(velRateNegMax, velRateNegCruise, _TAS_state, _TASmax, TAScruise);
 
-    if (_options & OPTION_DESCENT_SPEEDUP) {
-        // Allow demanded speed to go to maximum when descending at maximum descent rate
-        // Reduce speed to demanded value at max decel rate as target height is approached
-        const float decel_rate = - linear_interpolate(velRateNegMax, velRateNegCruise, _TAS_dem, _TASmax, TAScruise);
-        const float time_to_bottom = (_height - _hgt_dem_in) / _maxSinkRate;
-        float speed_increment = _TASmax - _TAS_dem;
-        if (is_positive(decel_rate) && is_positive(time_to_bottom)) {
-            const float time_to_decel = speed_increment / decel_rate;
-            if (time_to_bottom < time_to_decel) {
-                speed_increment *= (time_to_bottom / time_to_decel);
-            }
-        }
-        _TAS_dem = _TAS_dem + speed_increment * _sink_fraction;
-    }
-
     // Set the airspeed demand to the minimum value if an underspeed condition exists
     // or a bad descent condition exists
     // This will minimise the rate of descent resulting from an engine failure,
@@ -524,6 +509,46 @@ void AP_TECS::_update_speed_demand(void)
 
     // Constrain speed demand again to protect against bad values on initialisation.
     _TAS_dem_adj = constrain_float(_TAS_dem_adj, _TASmin, _TASmax);
+
+    if (_options & OPTION_DESCENT_SPEEDUP) {
+        // Allow demanded speed to go to maximum when descending at maximum descent rate
+        // Reduce speed to demanded value at max decel rate as target height is approached
+        const float decel_rate = - linear_interpolate(velRateNegMax, velRateNegCruise, _TAS_dem_adj, _TASmax, TAScruise);
+        const float time_to_bottom = (_height - _hgt_dem_in) / _maxSinkRate;
+        float speed_increment = _TASmax - _TAS_dem_adj;
+        if (is_positive(decel_rate) && is_positive(time_to_bottom)) {
+            const float time_to_decel = speed_increment / decel_rate;
+            if (time_to_bottom < time_to_decel) {
+                speed_increment *= (time_to_bottom / time_to_decel);
+            }
+        }
+        const float TAS_dem_FF = _TAS_dem_adj + speed_increment * _sink_fraction;
+
+        // Implement an integral feedback that adjusts speed target to achieve a zero throttle on descent
+        const float dEdT  = (_STEdot_max - _STEdot_min) / (_THRmaxf - _THRminf);
+        _SKE_dem_reduction += _sink_fraction * _throttle_dem * dEdT * _DT / timeConstant();
+        const float uppper_limit = MAX(0.0f, 0.5f * (sq(_TAS_dem_adj) - sq(_TASmin)));
+        _SKE_dem_reduction = constrain_float(_SKE_dem_reduction, 0.0f, uppper_limit);
+        const float SKE_dem_ll = 0.5f * sq(MAX(_TASmin, _TAS_dem_adj));
+        const float SKE_dem = MAX(SKE_dem_ll, 0.5f * sq(TAS_dem_FF) - _SKE_dem_reduction);
+
+        _TAS_dem_adj = sqrtf(2.0f * SKE_dem);
+
+#if HAL_LOGGING_ENABLED
+        if (AP::logger().should_log(_log_bitmask)){
+            AP::logger().WriteStreaming("TECD","TimeUS,TDFF,SDR,TDA",
+                                        "Qfff",
+                                        AP_HAL::micros64(),
+                                        (double)TAS_dem_FF,
+                                        (double)_SKE_dem_reduction,
+                                        (double)_TAS_dem_adj
+                                        );
+        }
+#endif
+    } else {
+        _SKE_dem_reduction = 0.0f;
+    }
+
 }
 
 void AP_TECS::_update_height_demand(void)
@@ -1163,6 +1188,8 @@ void AP_TECS::_initialise_states(int32_t ptchMinCO_cd, float hgt_afe)
 
         _max_climb_scaler = 1.0f;
         _max_sink_scaler = 1.0f;
+
+        _SKE_dem_reduction = 0.0f;
 
         const float fc = 1.0f / (M_2PI * _timeConst);
         _pitch_demand_lpf.set_cutoff_frequency(fc);

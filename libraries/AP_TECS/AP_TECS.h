@@ -437,6 +437,9 @@ private:
     // aerodynamic load factor
     float _load_factor;
 
+    // reduction in specific kinetic energy target required to achieve a zero throttle demand
+    float _SKE_dem_reduction;
+
     // Update the airspeed internal state using a second order complementary filter
     void _update_speed(float DT);
 
