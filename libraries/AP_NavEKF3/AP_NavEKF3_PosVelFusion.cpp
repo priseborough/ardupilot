@@ -109,7 +109,7 @@ void NavEKF3_core::ResetPosition(resetDataSource posResetSource)
 
     if (PV_AidingMode == AID_RELATIVE && posResetSource == resetDataSource::AIRDATA) {
         // special case where we are starting dead reckoning navigation using air data
-        stateStruct.position.xy().zero();
+        stateStruct.position.xy() = lastKnownPositionNE;
     } else if (PV_AidingMode != AID_ABSOLUTE) {
         // reset all position state history to the last known position
         stateStruct.position.x = lastKnownPositionNE.x;
