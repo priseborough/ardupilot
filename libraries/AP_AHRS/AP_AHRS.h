@@ -996,6 +996,7 @@ private:
         bool origin_ok;
         Vector3f velocity_NED;
         bool velocity_NED_ok;
+        bool initialised;
     } state;
 
     /*
