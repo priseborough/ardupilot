@@ -356,6 +356,7 @@ void NavEKF3_core::setAidingMode()
             // Check if GPS or external nav is being used
             bool posUsed = (imuSampleTime_ms - lastPosPassTime_ms <= minTestTime_ms);
             bool gpsVelUsed = (imuSampleTime_ms - lastVelPassTime_ms <= minTestTime_ms);
+            bool locSetUsed = (imuSampleTime_ms - lastLocSetTime_ms <= EK3_LOC_SET_TIMEOUT_MS);
 
             // Check if attitude drift has been constrained by a measurement source
             bool attAiding = posUsed || gpsVelUsed || optFlowUsed || airSpdUsed || dragUsed || rngBcnUsed || bodyOdmUsed;
@@ -366,7 +367,7 @@ void NavEKF3_core::setAidingMode()
             velAiding = posUsed || gpsVelUsed || optFlowUsed || airSpdUsed || dragUsed || rngBcnUsed || bodyOdmUsed;
 
             // Store the last valid airspeed estimate
-            windStateIsObservable = !inhibitWindStates && (posUsed || gpsVelUsed || optFlowUsed || rngBcnUsed || bodyOdmUsed);
+            windStateIsObservable = !inhibitWindStates && (posUsed || gpsVelUsed || optFlowUsed || rngBcnUsed || bodyOdmUsed || locSetUsed);
             if (windStateIsObservable) {
                 lastAirspeedEstimate = (stateStruct.velocity - Vector3F(stateStruct.wind_vel.x, stateStruct.wind_vel.y, 0.0F)).length();
                 lastAspdEstIsValid = true;

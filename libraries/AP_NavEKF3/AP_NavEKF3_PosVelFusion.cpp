@@ -179,15 +179,133 @@ void NavEKF3_core::ResetPosition(resetDataSource posResetSource)
 // Returns true if the set was successful
 bool NavEKF3_core::setLatLng(const Location &loc, float posAccuracy, uint32_t timestamp_ms)
 {
-    if ((imuSampleTime_ms - lastPosPassTime_ms) < frontend->deadReckonDeclare_ms ||
-        (PV_AidingMode == AID_NONE)
-        || !validOrigin) {
+    if (!validOrigin) {
         return false;
     }
+
+    if (PV_AidingMode == AID_NONE) {
+        const bool noConflictingSource = !readyToUseExtNav() && !readyToUseGPS();
+        const bool canUseAirData = readyToUseAirData();
+        if (noConflictingSource && canUseAirData) {
+            PV_AidingMode = AID_ABSOLUTE;
+            // activate wind states and initialise if necessary
+            inhibitWindStates = false;
+            updateStateIndexLim();
+
+            // use airspeed to set wind relative velocity assuming we are flying with zero side slip
+            Vector2F velVarNE = Vector2F(tasDataDelayed.tasVariance, tasDataDelayed.tasVariance);
+            Vector3F tempEuler;
+            stateStruct.quat.to_euler(tempEuler.x, tempEuler.y, tempEuler.z);
+            stateStruct.velocity.x = tasDataDelayed.tas * cosF(tempEuler.z);
+            stateStruct.velocity.y = tasDataDelayed.tas * sinF(tempEuler.z);
+            if (lastExtWindVelSet_ms > 0) {
+                // use previously specified wind to correct for wind drift
+                stateStruct.velocity.xy() += stateStruct.wind_vel;
+                velVarNE.x += P[22][22];
+                velVarNE.y += P[23][23];
+            }
+
+            zeroRows(P,4,5);
+            zeroCols(P,4,5);
+            P[4][4] = velVarNE.x;
+            P[5][5] = velVarNE.y;
+
+        }
+    } else if (PV_AidingMode == AID_RELATIVE) {
+        // already dead reckoning so now we have an origin, an absolute position can be estimated
+        PV_AidingMode = AID_ABSOLUTE;
+    }
+
+    // don't allow unless dead reckoning
+    if ((imuSampleTime_ms - lastPosPassTime_ms) < frontend->deadReckonDeclare_ms) {
+        return false;
+    }
+
+    lastLocSetTime_ms = imuSampleTime_ms;
 
     // Store the position before the reset so that we can record the reset delta
     posResetNE.x = stateStruct.position.x;
     posResetNE.y = stateStruct.position.y;
+
+    // Correct for time delay relative to fusion time horizon assuming a constant velocity
+    // Limit time stamp to a range between current time and 5 seconds ago
+    const uint32_t timeStampConstrained_ms = MAX(MIN(timestamp_ms, imuSampleTime_ms), imuSampleTime_ms - 5000);
+    const int32_t delta_ms = int32_t(imuDataDelayed.time_ms - timeStampConstrained_ms);
+    const ftype delaySec = 1E-3F * ftype(delta_ms);
+    const Vector2F newPosNE = EKF_origin.get_distance_NE_ftype(loc) + stateStruct.velocity.xy() * delaySec;
+
+    // If wind states are active, fuse the position as an observation and only modify the wind states
+    if (!inhibitWindStates && stateIndexLim >= 23 && is_positive(P[7][7]) && is_positive(P[8][8])) {
+        // Apply a 5-sigma circular innovation limit
+        Vector2F innovation = posResetNE - newPosNE;
+        ftype R_OBS = sq(MAX(posAccuracy,frontend->_gpsHorizPosNoise));
+        ftype innovationVariance = P[7][7] + P[8][8] + 2.0F * R_OBS;
+        ftype testRatio = innovation.length() / (5.0F * sqrtF(innovationVariance));
+        if(is_positive(testRatio)) {
+            innovation *= (1.0F/testRatio);
+        }
+
+        // Fuse NE axis measurements sequentially.
+        for (uint8_t obsIndex=0; obsIndex<=1; obsIndex++) {
+            uint8_t stateIndex = 7 + obsIndex;
+
+            // calculate the Kalman gain and calculate innovation variances
+            ftype innovVar = P[stateIndex][stateIndex] + R_OBS;
+            ftype innovVarInv = 1.0f/innovVar;
+
+            // only apply state corrections to wind states
+            zero_range(&Kfusion[0], 0, 21);
+            Kfusion[22] = P[22][stateIndex]*innovVarInv;
+            Kfusion[23] = P[23][stateIndex]*innovVarInv;
+
+            // update the covariance - take advantage of direct observation of a single state at index = stateIndex to reduce computations
+            // this is a numerically optimised implementation of standard equation P = (I - K*H)*P;
+            for (uint8_t i=0; i<=stateIndexLim; i++) {
+                for (uint8_t j= 0; j<=stateIndexLim; j++) {
+                    KHP[i][j] = Kfusion[i] * P[stateIndex][j];
+                }
+            }
+            // Check that we are not going to drive any variances negative and skip the update if so
+            bool healthyFusion = true;
+            for (uint8_t i= 0; i<=stateIndexLim; i++) {
+                if (KHP[i][i] > P[i][i]) {
+                    healthyFusion = false;
+                }
+            }
+            if (healthyFusion) {
+                // update the covariance matrix
+                for (uint8_t i= 0; i<=stateIndexLim; i++) {
+                    for (uint8_t j= 0; j<=stateIndexLim; j++) {
+                        P[i][j] = P[i][j] - KHP[i][j];
+                    }
+                }
+
+                // force the covariance matrix to be symmetrical and limit the variances to prevent ill-conditioning.
+                ForceSymmetry();
+                ConstrainVariances();
+
+                // update states and re-normalise the quaternions
+                for (uint8_t i = 0; i<=stateIndexLim; i++) {
+                    statesArray[i] = statesArray[i] - Kfusion[i] * innovation[obsIndex];
+                }
+                stateStruct.quat.normalize();
+
+                // record good fusion status
+                if (obsIndex == 0) {
+                    faultStatus.bad_npos = false;
+                } else if (obsIndex == 1) {
+                    faultStatus.bad_epos = false;
+                }
+            } else {
+                // record bad fusion status
+                if (obsIndex == 0) {
+                    faultStatus.bad_npos = true;
+                } else if (obsIndex == 1) {
+                    faultStatus.bad_epos = true;
+                }
+            }
+        }
+    }
 
     // reset the corresponding covariances
     zeroRows(P,7,8);
@@ -201,12 +319,7 @@ bool NavEKF3_core::setLatLng(const Location &loc, float posAccuracy, uint32_t ti
     // set the variances using the position measurement noise parameter
     P[7][7] = P[8][8] = sq(MAX(posAccuracy,frontend->_gpsHorizPosNoise));
 
-    // Correct the position for time delay relative to fusion time horizon assuming a constant velocity
-    // Limit time stamp to a range between current time and 5 seconds ago
-    const uint32_t timeStampConstrained_ms = MAX(MIN(timestamp_ms, imuSampleTime_ms), imuSampleTime_ms - 5000);
-    const int32_t delta_ms = int32_t(imuDataDelayed.time_ms - timeStampConstrained_ms);
-    const ftype delaySec = 1E-3F * ftype(delta_ms);
-    const Vector2F newPosNE = EKF_origin.get_distance_NE_ftype(loc) + stateStruct.velocity.xy() * delaySec;
+    // reset the NE position states to the measurement
     ResetPositionNE(newPosNE.x,newPosNE.y);
 
     return true;

@@ -128,6 +128,9 @@
 #define WIND_SPD_UNCERTAINTY 0.5F
 #endif // EK3_FEATURE_POSITION_RESET
 
+// maximum time between location set inputs that will allow for wind state correction
+#define EK3_LOC_SET_TIMEOUT_MS 1800000
+
 class NavEKF3_core : public NavEKF_core_common
 {
 public:
@@ -1124,6 +1127,7 @@ private:
     uint16_t hgtRetryTime_ms;       // time allowed without use of height measurements before a height timeout is declared
     uint32_t lastVelPassTime_ms;    // time stamp when GPS velocity measurement last passed innovation consistency check (msec)
     uint32_t lastPosPassTime_ms;    // time stamp when GPS position measurement last passed innovation consistency check (msec)
+    uint32_t lastLocSetTime_ms;     // time stamp when the WGS-84 location was set externally (msec)
     uint32_t lastHgtPassTime_ms;    // time stamp when height measurement last passed innovation consistency check (msec)
     uint32_t lastTasPassTime_ms;    // time stamp when airspeed measurement last passed innovation consistency check (msec)
     uint32_t lastTasFailTime_ms;    // time stamp when airspeed measurement last failed innovation consistency check (msec)
