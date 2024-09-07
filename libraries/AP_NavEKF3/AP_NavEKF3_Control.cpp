@@ -100,7 +100,7 @@ void NavEKF3_core::setWindMagStateLearningMode()
             zeroCols(P, 22, 23);
             zeroRows(P, 22, 23);
             for (uint8_t index=22; index<=23; index++) {
-                P[index][index] = sq(WIND_VEL_VARIANCE_MAX);
+                P[index][index] = WIND_VEL_VARIANCE_MAX;
             }
         }
     }
