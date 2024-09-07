@@ -85,7 +85,10 @@ void NavEKF3_core::setWindMagStateLearningMode()
                 stateStruct.wind_vel.x = windSpeed * cosF(tempEuler.z);
                 stateStruct.wind_vel.y = windSpeed * sinF(tempEuler.z);
             } else {
-                trueAirspeedVariance = sq(WIND_VEL_VARIANCE_MAX); // use 2-sigma for faster initial convergence
+                // This is required for stable state estimates to form across a wide range of initial conditions.
+                // Note that when only sideslip fusion is being used to form wind estimates, the wind state process
+                // noise in CovariancePrediction is increased to allow for faster learning.
+                trueAirspeedVariance = 0.0f;
             }
 
             // set the wind state variances to the measurement uncertainty
