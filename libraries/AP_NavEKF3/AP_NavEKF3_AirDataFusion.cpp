@@ -289,7 +289,11 @@ void NavEKF3_core::FuseSideslip()
     ftype vd;
     ftype vwn;
     ftype vwe;
-    const ftype R_BETA = 0.03f; // assume a sideslip angle RMS of ~10 deg
+
+    // if sideslip fusion is the only source of air data aiding, use a smaller observation noise to achieve faster wind stste learning.
+    const bool onlyAirDataSource = !tasDataDelayed.allowFusion || (imuDataDelayed.time_ms - tasDataDelayed.time_ms > 500);
+    const ftype R_BETA = onlyAirDataSource ? sq(radians(5.0f)) : sq(radians(10.0f));
+
     Vector13 SH_BETA;
     Vector8 SK_BETA;
     Vector3F vel_rel_wind;

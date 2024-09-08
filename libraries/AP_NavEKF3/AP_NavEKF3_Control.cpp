@@ -77,24 +77,49 @@ void NavEKF3_core::setWindMagStateLearningMode()
             // use airspeed if if recent data available
             Vector3F tempEuler;
             stateStruct.quat.to_euler(tempEuler.x, tempEuler.y, tempEuler.z);
-            ftype trueAirspeedVariance;
             const bool haveAirspeedMeasurement = (tasDataDelayed.allowFusion && (imuDataDelayed.time_ms - tasDataDelayed.time_ms < 500) && useAirspeed());
             if (haveAirspeedMeasurement) {
-                trueAirspeedVariance = constrain_ftype(tasDataDelayed.tasVariance, WIND_VEL_VARIANCE_MIN, WIND_VEL_VARIANCE_MAX);
+                const ftype trueAirspeedVariance = constrain_ftype(tasDataDelayed.tasVariance, WIND_VEL_VARIANCE_MIN, WIND_VEL_VARIANCE_MAX);
                 const ftype windSpeed =  sqrtF(sq(stateStruct.velocity.x) + sq(stateStruct.velocity.y)) - tasDataDelayed.tas;
                 stateStruct.wind_vel.x = windSpeed * cosF(tempEuler.z);
                 stateStruct.wind_vel.y = windSpeed * sinF(tempEuler.z);
+
+                // set the wind state variances to the measurement uncertainty
+                zeroCols(P, 22, 23);
+                zeroRows(P, 22, 23);
+                P[22][22] = P[23][23] = trueAirspeedVariance;
             } else {
                 // This is required for stable state estimates to form across a wide range of initial conditions.
                 // Note that when only sideslip fusion is being used to form wind estimates, the wind state process
-                // noise in CovariancePrediction is increased to allow for faster learning.
-                trueAirspeedVariance = 0.0f;
-            }
+                // noise in CovariancePrediction() is increased and the sideslip fusion observation noise in
+                // FuseSideslip() is decreased to achieved faster learning.
 
-            // set the wind state variances to the measurement uncertainty
-            zeroCols(P, 22, 23);
-            zeroRows(P, 22, 23);
-            P[22][22] = P[23][23] = trueAirspeedVariance;
+                // Assume light wind with high uncertainty in speed
+                const ftype speed = 5.0f;
+                const ftype speed_accuracy = 10.0f;
+
+                // Assume wind coming from forwaerd hemisphere
+                const ftype direction = degrees(wrap_PI(stateStruct.quat.get_euler_yaw() + M_PI));
+                const ftype direction_accuracy = radians(90.0f);
+
+                // set the wind state variances
+                const ftype spdVar = sq(speed_accuracy);
+                const ftype dirnVar = sq(radians(direction_accuracy));
+
+                const ftype PS0 = cosf(radians(direction));
+                const ftype PS1 = sq(PS0);
+                const ftype PS2 = sinf(radians(direction));
+                const ftype PS3 = sq(PS2);
+                const ftype PS4 = dirnVar*sq(speed);
+                const ftype PS5 = PS0*PS2*(-PS4 + spdVar);
+
+                zeroRows(P,22,23);
+                zeroCols(P,22,23);
+                P[22][22] = PS1*spdVar + PS3*PS4;
+                P[23][22] = PS5;
+                P[22][23] = PS5;
+                P[23][23] = PS1*PS4 + PS3*spdVar;
+            }
 
             windStatesAligned = true;
 
