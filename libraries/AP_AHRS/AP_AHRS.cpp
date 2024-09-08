@@ -2079,7 +2079,7 @@ AP_AHRS::EKFType AP_AHRS::fallback_active_EKF_type(void) const
 
 #if AP_AHRS_DCM_ENABLED
     bool disable_dcm_fallback = fly_forward ? option_set(Options::DISABLE_DCM_FALLBACK_FW) : option_set(Options::DISABLE_DCM_FALLBACK_VTOL);
-    if (disable_dcm_fallback) {
+    if (!disable_dcm_fallback) {
         return EKFType::DCM;
     }
 #endif
