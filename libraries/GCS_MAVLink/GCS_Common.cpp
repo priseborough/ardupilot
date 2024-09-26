@@ -5555,7 +5555,7 @@ void GCS_MAVLINK::send_global_position_int()
 #if AP_AHRS_ENABLED
     AP_AHRS &ahrs = AP::ahrs();
 
-    UNUSED_RESULT(ahrs.get_location(global_position_current_loc)); // return value ignored; we send stale data
+    UNUSED_RESULT(ahrs.get_location_for_reporting(global_position_current_loc)); // return value ignored; we send stale data
 
     Vector3f vel;
     if (!ahrs.get_velocity_NED(vel)) {
