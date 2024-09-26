@@ -337,11 +337,11 @@ bool NavEKF3_core::getLLH(Location &loc) const
             if (getGPSLLH(loc)) {
                 return true;
             } else {
+                // best guess
                 loc.lat = EKF_origin.lat;
                 loc.lng = EKF_origin.lng;
-                loc.offset(lastKnownPositionNE.x + posOffsetNED.x,
-                           lastKnownPositionNE.y + posOffsetNED.y);
-                loc.alt = EKF_origin.alt - lastKnownPositionD*100.0;
+                loc.offset(outputDataNew.position.x + posOffsetNED.x,
+                           outputDataNew.position.y + posOffsetNED.y);
                 return false;
             }
         }
