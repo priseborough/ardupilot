@@ -92,6 +92,11 @@ public:
     // get current location estimate
     bool get_location(Location &loc) const;
 
+    // get current location estimate for external reporting of position which is updated
+    // under a wider range of conditions than the location returned by get_location
+    // returns true when the estimator or sensor providing the location has flagged it as valid
+    bool get_location_for_reporting(Location &loc) const;
+
     // get latest altitude estimate above ground level in meters and validity flag
     bool get_hagl(float &hagl) const WARN_IF_UNUSED;
 
@@ -984,6 +989,7 @@ private:
         bool secondary_quat_ok;
         Location location;
         bool location_ok;
+        Location location_for_reporting;
         Location secondary_pos;
         bool secondary_pos_ok;
         Vector2f ground_speed_vec;

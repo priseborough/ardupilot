@@ -353,6 +353,7 @@ void AP_AHRS::update_state(void)
     state.secondary_quat_ok = _get_secondary_quaternion(state.secondary_quat);
     Location location;
     state.location_ok = _get_location(location);
+    state.location_for_reporting = location;
     if (state.location_ok || (!state.initialised && _get_origin(location))) {
         state.location = location;
         state.initialised = true;
@@ -3504,6 +3505,13 @@ const EKFGSF_yaw *AP_AHRS::get_yaw_estimator(void) const
 bool AP_AHRS::get_location(Location &loc) const
 {
     loc = state.location;
+    return state.location_ok;
+}
+
+// get current location estimate for external reporting
+bool AP_AHRS::get_location_for_reporting(Location &loc) const
+{
+    loc = state.location_for_reporting;
     return state.location_ok;
 }
 
