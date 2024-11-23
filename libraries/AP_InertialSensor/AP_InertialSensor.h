@@ -359,6 +359,7 @@ public:
         uint16_t _real_required_count;
         AP_Int8 _sensor_mask;
         AP_Int8 _batch_options_mask;
+        AP_Int8 _cal_exclude_mask;
 
         // Parameters controlling pushing data to AP_Logger:
         // Each DF message is ~ 108 bytes in size, so we use about 1kB/s of
@@ -785,6 +786,8 @@ private:
 
     AP_Int32 tcal_options;
     bool tcal_learning;
+
+    AP_Int8 skip_cal_mask;
 #endif
 
     // Raw logging options bitmask and parameter

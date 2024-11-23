@@ -683,6 +683,13 @@ const AP_Param::GroupInfo AP_InertialSensor::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("_RAW_LOG_OPT", 56, AP_InertialSensor, raw_logging_options, 0),
 
+    // @Param: _SKIP_CAL
+    // @DisplayName: Mask of IMU's that will skip all offset and scale factor calibration
+    // @Description: This enables high accuracy IMU's that are factory calibrated to skip offset and scale factor calibration
+    // @Bitmask: 0:FirstIMU,1:SecondIMU,2:ThirdIMU,3:FourthIMU,4:FifthIMU,5:SixthIMU
+    // @User: Advanced
+    AP_GROUPINFO("_SKIP_CAL", 57, AP_InertialSensor, skip_cal_mask, 0),
+
     /*
       NOTE: parameter indexes have gaps above. When adding new
       parameters check for conflicts carefully
@@ -1633,25 +1640,40 @@ bool AP_InertialSensor::accel_calibrated_ok_all() const
 {
     // check each accelerometer has offsets saved
     for (uint8_t i=0; i<get_accel_count(); i++) {
-        if (!_accel_id_ok[i]) {
-            return false;
-        }
-        // exactly 0.0 offset is extremely unlikely
-        if (_accel_offset(i).get().is_zero()) {
-            return false;
-        }
-        // zero scaling also indicates not calibrated
-        if (_accel_scale(i).get().is_zero()) {
-            return false;
+        if (((1<<i) & skip_cal_mask) == 0) {
+            if (!_accel_id_ok[i]) {
+                return false;
+            }
+            // exactly 0.0 offset is extremely unlikely
+            if (_accel_offset(i).get().is_zero()) {
+                return false;
+            }
+            // zero scaling also indicates not calibrated
+            if (_accel_scale(i).get().is_zero()) {
+                return false;
+            }
         }
     }
+
     for (uint8_t i=get_accel_count(); i<INS_MAX_INSTANCES; i++) {
         if (_accel_id(i) != 0) {
             // missing accel
             return false;
         }
     }
-    
+
+    for (uint8_t i=get_accel_count(); i<INS_MAX_INSTANCES; i++) {
+        if (((1<<i) & skip_cal_mask) > 0) {
+            // this IMU should have zero calibration
+            const Vector3f &scaling = _accel_scale(i).get();
+            bool have_scaling = (!is_zero(scaling.x) && !is_equal(scaling.x,1.0f)) || (!is_zero(scaling.y) && !is_equal(scaling.y,1.0f)) || (!is_zero(scaling.z) && !is_equal(scaling.z,1.0f));
+            bool have_offsets = !_accel_offset(i).get().is_zero();
+            if (have_scaling || have_offsets) {
+                return false;
+            }
+        }
+    }
+
     // check calibrated accels matches number of accels (no unused accels should have offsets or scaling)
     if (get_accel_count() < INS_MAX_INSTANCES) {
         for (uint8_t i=get_accel_count(); i<INS_MAX_INSTANCES; i++) {
@@ -1808,7 +1830,10 @@ AP_InertialSensor::_init_gyro()
     // found so far
     DEV_PRINTF("\n");
     for (uint8_t k=0; k<num_gyros; k++) {
-        if (!converged[k]) {
+        if (((1<<k) & skip_cal_mask) > 0) {
+            _gyro_offset(k).set(Vector3f());
+            _gyro_cal_ok[k] = true;
+        } else if (!converged[k]) {
             DEV_PRINTF("gyro[%u] did not converge: diff=%f dps (expected < %f)\n",
                                 (unsigned)k,
                                 (double)ToDeg(best_diff[k]),
@@ -2374,7 +2399,7 @@ void AP_InertialSensor::_acal_save_calibrations()
 {
     Vector3f bias, gain;
     for (uint8_t i=0; i<_accel_count; i++) {
-        if (_accel_calibrator[i].get_status() == ACCEL_CAL_SUCCESS) {
+        if (_accel_calibrator[i].get_status() == ACCEL_CAL_SUCCESS && (((1<<i) & skip_cal_mask) == 0)) {
             _accel_calibrator[i].get_calibration(bias, gain);
             _accel_offset(i).set_and_save(bias);
             _accel_scale(i).set_and_save(gain);
@@ -2646,8 +2671,13 @@ MAV_RESULT AP_InertialSensor::simple_accel_cal()
         for (uint8_t k=0; k<num_accels; k++) {
             // remove rotated gravity
             new_accel_offset[k] -= rotated_gravity;
-            _accel_offset(k).set_and_save(new_accel_offset[k]);
-            _accel_scale(k).save();
+            if (((1<<k) & skip_cal_mask) > 0) {
+                _accel_offset(k).set_and_save(new_accel_offset[k]);
+                _accel_scale(k).save();
+            } else {
+                _accel_offset(k).set_and_save(Vector3f());
+                _accel_scale(k).set_and_save(Vector3f());
+            }
             _accel_id(k).save();
             _accel_id_ok[k] = true;
 #if HAL_INS_TEMPERATURE_CAL_ENABLE
