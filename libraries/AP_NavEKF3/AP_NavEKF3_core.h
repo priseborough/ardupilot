@@ -1461,7 +1461,7 @@ private:
     bool onGroundNotMoving;             // true when on the ground and not moving
     uint32_t lastMoveCheckLogTime_ms;   // last time the movement check data was logged (msec)
 
-	// variables used to inhibit accel bias learning
+	// variables used to inhibit imu delta velocity bias learning
     bool inhibitDelVelBiasStates;       // true when all IMU delta velocity bias states are de-activated
     bool dvelBiasAxisInhibit[3] {};		// true when IMU delta velocity bias states for a specific axis is de-activated
 	Vector3F dvelBiasAxisVarPrev;		// saved delta velocity XYZ bias variances (m/sec)**2
