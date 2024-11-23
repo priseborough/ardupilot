@@ -153,7 +153,7 @@ void NavEKF3_core::setWindMagStateLearningMode()
     }
 
     // inhibit delta velocity bias learning if we have not yet aligned the tilt
-    if (tiltAlignComplete && inhibitDelVelBiasStates) {
+    if (tiltAlignComplete && inhibitDelVelBiasStates && !(frontend->_highAccuracyMask & (1U<<core_index))) {
         // activate the states
         inhibitDelVelBiasStates = false;
         updateStateIndexLim();
@@ -164,7 +164,7 @@ void NavEKF3_core::setWindMagStateLearningMode()
         P[15][15] = P[13][13];
     }
 
-    if (tiltAlignComplete && inhibitDelAngBiasStates) {
+    if (tiltAlignComplete && inhibitDelAngBiasStates && !(frontend->_highAccuracyMask & (1U<<core_index))) {
         // activate the states
         inhibitDelAngBiasStates = false;
         updateStateIndexLim();

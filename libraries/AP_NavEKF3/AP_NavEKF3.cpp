@@ -141,9 +141,16 @@ const AP_Param::GroupInfo NavEKF3::var_info[] = {
     // @RebootRequired: True
     AP_GROUPINFO_FLAGS("ENABLE", 0, NavEKF3, _enable, 1, AP_PARAM_FLAG_ENABLE),
 
+    // @Param: NO_IMU_BIAS
+    // @DisplayName: Bitmask of cores using high accuracy IMUs
+    // @Description: 1 byte bitmap of cores using IMUs which are high accuracy and do not require gyro and accel bias estimation.
+    // @Bitmask: 0:FirstIMU,1:SecondIMU,2:ThirdIMU,3:FourthIMU,4:FifthIMU,5:SixthIMU
+    // @User: Advanced
+    // @RebootRequired: True
+    AP_GROUPINFO("NO_IMU_BIAS", 1, NavEKF3, _highAccuracyMask, 0),
+
     // GPS measurement parameters
 
-    // 1 was GPS_TYPE
 
     // @Param: VELNE_M_NSE
     // @DisplayName: GPS horizontal velocity measurement noise (m/s)
