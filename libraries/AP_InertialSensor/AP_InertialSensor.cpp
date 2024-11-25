@@ -2671,7 +2671,7 @@ MAV_RESULT AP_InertialSensor::simple_accel_cal()
         for (uint8_t k=0; k<num_accels; k++) {
             // remove rotated gravity
             new_accel_offset[k] -= rotated_gravity;
-            if (((1<<k) & skip_cal_mask) > 0) {
+            if (((1<<k) & skip_cal_mask) == 0) {
                 _accel_offset(k).set_and_save(new_accel_offset[k]);
                 _accel_scale(k).save();
             } else {
