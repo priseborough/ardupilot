@@ -449,6 +449,12 @@ private:
     AP_Int8 _primary_core;          // initial core number
     AP_Enum<LogLevel> _log_level;   // log verbosity level
     AP_Float _gpsVAccThreshold;     // vertical accuracy threshold to use GPS as an altitude source
+    AP_Int32 _options;              // bitmask that controls EKF optional behaviours
+
+    // enum for processing options
+    enum class Options {
+        AlignWithoutGPS = (1<<0),
+    };
 
 // Possible values for _flowUse
 #define FLOW_USE_NONE    0

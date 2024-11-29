@@ -741,6 +741,13 @@ const AP_Param::GroupInfo NavEKF3::var_info2[] = {
     // @Units: m
     AP_GROUPINFO("GPS_VACC_MAX", 10, NavEKF3, _gpsVAccThreshold, 0.0f),
 
+    // @Param: OPTIONS
+    // @DisplayName: Optional EKF behaviour
+    // @Description: This controls optional EKF behaviour. Setting AlignWithoutGPS will try to perform the filter alignment regardless of GPS status.
+    // @Bitmask: 0:AlignWithoutGPS
+    // @User: Advanced
+    AP_GROUPINFO("OPTIONS",  11, NavEKF3, _options, 0),
+
     AP_GROUPEND
 };
 
