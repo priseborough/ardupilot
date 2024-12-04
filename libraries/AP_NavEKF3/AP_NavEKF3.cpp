@@ -204,9 +204,13 @@ const AP_Param::GroupInfo NavEKF3::var_info[] = {
     // @Units: m
     AP_GROUPINFO("GLITCH_RAD", 7, NavEKF3, _gpsGlitchRadiusMax, GLITCH_RADIUS_DEFAULT),
 
-    // 8 previously used for EKF3_GPS_DELAY parameter that has been deprecated.
-    // The EKF now takes its GPS delay form the GPS library with the default delays
-    // specified by the GPS_DELAY and GPS_DELAY2 parameters.
+    // @Param: BLOCKED
+    // @DisplayName: Bitmask of cores that are blocked for use by flight control
+    // @Description: 1 byte bitmap of cores using IMUs which are blocked for selection as the primary sensor which is used flight control. This enables ride-along testing of new IMU's. Selecting a core as the primary via the EK3_PRIMARY parameter will override EK3_BLOCKED.
+    // @Bitmask: 0:FirstIMU,1:SecondIMU,2:ThirdIMU,3:FourthIMU,4:FifthIMU,5:SixthIMU
+    // @User: Advanced
+    // @RebootRequired: True
+    AP_GROUPINFO("BLOCKED", 8, NavEKF3, _notForFlightControl, 0),
 
     // Height measurement parameters
 
@@ -718,7 +722,7 @@ const AP_Param::GroupInfo NavEKF3::var_info2[] = {
 
     // @Param: PRIMARY
     // @DisplayName: Primary core number
-    // @Description: The core number (index in IMU mask) that will be used as the primary EKF core on startup. While disarmed the EKF will force the use of this core. A value of 0 corresponds to the first IMU in EK3_IMU_MASK.
+    // @Description: The core number (index in IMU mask) that will be used as the primary EKF core on startup. While disarmed the EKF will force the use of this core. A value of 0 corresponds to the first IMU in EK3_IMU_MASK. Do not set to a core that has been inhibited for use as a primary via the EK3_NO_PRIMARY parameter.
     // @Range: 0 2
     // @Increment: 1
     // @User: Advanced
@@ -960,7 +964,8 @@ void NavEKF3::UpdateFilter(void)
 
         // loop through all available cores to find if an alternative core is available
         for (uint8_t coreIndex=0; coreIndex<num_cores; coreIndex++) {
-            if (coreIndex != primary) {
+            const bool blockUse = _notForFlightControl & (1<<coreIndex);
+            if (coreIndex != primary && !blockUse) {
                 float altCoreError = coreRelativeErrors[coreIndex];
 
                 // an alternative core is available for selection based on 2 conditions -
