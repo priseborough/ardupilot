@@ -455,6 +455,7 @@ private:
     // enum for processing options
     enum class Options {
         AlignWithoutGPS = (1<<0),
+        UseMagToAlignOnly = (1<<1),
     };
 
 // Possible values for _flowUse

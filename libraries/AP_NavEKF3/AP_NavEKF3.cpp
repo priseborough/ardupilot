@@ -747,8 +747,8 @@ const AP_Param::GroupInfo NavEKF3::var_info2[] = {
 
     // @Param: OPTIONS
     // @DisplayName: Optional EKF behaviour
-    // @Description: This controls optional EKF behaviour. Setting AlignWithoutGPS will try to perform the filter alignment regardless of GPS status.
-    // @Bitmask: 0:AlignWithoutGPS
+    // @Description: This controls optional EKF behaviour. Setting AlignWithoutGPS will try to perform the filter alignment regardless of GPS status. Setting UseMagToAlignOnly will casue the EKF to use the magnetomer to perform the initial yaw alignment only.
+    // @Bitmask: 0:AlignWithoutGPS,1:UseMagToAlignOnly
     // @User: Advanced
     AP_GROUPINFO("OPTIONS",  11, NavEKF3, _options, 0),
 

@@ -217,6 +217,13 @@ void NavEKF3_core::alignYawAngle(const yaw_elements &yawAngData)
 // select fusion of magnetometer data
 void NavEKF3_core::SelectMagFusion()
 {
+    if ((frontend->_options & (int32_t)NavEKF3::Options::UseMagToAlignOnly) && !yawAlignComplete) {
+        setYawFromMag();
+        yawAlignComplete = true;
+        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "EKF3 IMU%u MAG%u initial yaw alignment complete",(unsigned)imu_index, (unsigned)magSelectIndex);
+        return;
+    }
+
     // clear the flag that lets other processes know that the expensive magnetometer fusion operation has been performed on that time step
     // used for load levelling
     magFusePerformed = false;

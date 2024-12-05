@@ -221,6 +221,9 @@ void NavEKF3_core::setYawSource()
             yaw_source = AP_NavEKF_Source::SourceYaw::GPS;
         }
     }
+    if ((yaw_source != AP_NavEKF_Source::SourceYaw::NONE) && (frontend->_options & (int32_t)NavEKF3::Options::UseMagToAlignOnly)) {
+        yaw_source = yaw_source_last = AP_NavEKF_Source::SourceYaw::NONE;
+    }
     if (yaw_source != yaw_source_last) {
         yaw_source_last = yaw_source;
         yaw_source_reset = true;
@@ -247,7 +250,8 @@ void NavEKF3_core::setAidingMode()
     if (yaw_source_last == AP_NavEKF_Source::SourceYaw::NONE &&
         !motorsArmed &&
         onGround &&
-        PV_AidingMode != AID_NONE)
+        PV_AidingMode != AID_NONE &&
+        !(frontend->_options & (int32_t)NavEKF3::Options::UseMagToAlignOnly))
     {
         PV_AidingMode = AID_NONE;
         yawAlignComplete = false;
