@@ -204,6 +204,8 @@ const AP_Param::GroupInfo NavEKF3::var_info[] = {
     // @Units: m
     AP_GROUPINFO("GLITCH_RAD", 7, NavEKF3, _gpsGlitchRadiusMax, GLITCH_RADIUS_DEFAULT),
 
+    // Miscellaneous
+
     // @Param: BLOCKED
     // @DisplayName: Bitmask of cores that are blocked for use by flight control
     // @Description: 1 byte bitmap of cores using IMUs which are blocked for selection as the primary sensor which is used flight control. This enables ride-along testing of new IMU's. Selecting a core as the primary via the EK3_PRIMARY parameter will override EK3_BLOCKED.
@@ -212,9 +214,17 @@ const AP_Param::GroupInfo NavEKF3::var_info[] = {
     // @RebootRequired: True
     AP_GROUPINFO("BLOCKED", 8, NavEKF3, _notForFlightControl, 0),
 
-    // Height measurement parameters
+    // @Param: GPS_FAIL_SEC
+    // @DisplayName: GPS fail time (sec)
+    // @Description: Not for flight. GPS lock status will be set to 0 after this many seconds from boot. The EKF will not failsafe back to a non navigation mode. Set to 0 to disable this feature.
+    // @Range: 0 32768
+    // @Increment: 100
+    // @User: Advanced
+    // @Units: s
+    // @RebootRequired: True
+    AP_GROUPINFO("GPS_FAIL_SEC", 9, NavEKF3, _gpsFailTimeSec, 0),
 
-    // 9 was ALT_SOURCE
+    // Height measurement parameters
 
     // @Param: ALT_M_NSE
     // @DisplayName: Altitude measurement noise (m)

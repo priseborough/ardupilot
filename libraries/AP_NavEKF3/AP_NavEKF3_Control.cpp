@@ -375,7 +375,7 @@ void NavEKF3_core::setAidingMode()
                     (imuSampleTime_ms - lastPosPassTime_ms > maxLossTime_ms);
             }
 
-            if (attAidLossCritical) {
+            if (attAidLossCritical && (frontend->_gpsFailTimeSec <= 0)) {
                 // if the loss of attitude data is critical, then put the filter into a constant position mode
                 PV_AidingMode = AID_NONE;
                 posTimeout = true;

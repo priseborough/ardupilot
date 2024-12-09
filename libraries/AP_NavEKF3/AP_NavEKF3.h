@@ -385,6 +385,7 @@ private:
     AP_Int8  _enable;               // zero to disable EKF3
     AP_Int8  _highAccuracyMask;     // mask of cores using high accuracy IMU's that do not require bias estimation
     AP_Int8 _notForFlightControl;   // mask of cores that cannot be used for flight control
+    AP_Int32 _gpsFailTimeSec;       // GPS lock status will be set to 0 after this time from boot (sec)
     AP_Float _gpsHorizVelNoise;     // GPS horizontal velocity measurement noise : m/s
     AP_Float _gpsVertVelNoise;      // GPS vertical velocity measurement noise : m/s
     AP_Float _gpsHorizPosNoise;     // GPS horizontal position measurement noise m
