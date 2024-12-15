@@ -316,6 +316,8 @@ __bin_names = {
     "CopterTests2a": "arducopter",
     "CopterTests2b": "arducopter",
 
+    "CopterTestExtNav": "arducopter",
+
     "Plane": "arduplane",
     "Rover": "ardurover",
     "Tracker": "antennatracker",
@@ -390,6 +392,7 @@ tester_class_map = {
     "test.CopterTests2": arducopter.AutoTestCopterTests2,               # travis-ci
     "test.CopterTests2a": arducopter.AutoTestCopterTests2a, # 8m23s
     "test.CopterTests2b": arducopter.AutoTestCopterTests2b, # 8m18s
+    "test.CopterTestExtNav": arducopter.AutoTestCopterTestExtNav,
     "test.Plane": arduplane.AutoTestPlane,
     "test.QuadPlane": quadplane.AutoTestQuadPlane,
     "test.Rover": rover.AutoTestRover,
@@ -1108,6 +1111,7 @@ if __name__ == "__main__":
         'test.CopterTests2',
         'test.CopterTests2a',
         'test.CopterTests2b',
+        'test.CopterTestExtNav',
 
         'clang-scan-build',
     ]
@@ -1146,6 +1150,7 @@ if __name__ == "__main__":
         "fly.ArduCopterTests2": "test.CopterTests2",
         "fly.ArduCopterTests2a": "test.CopterTests2a",
         "fly.ArduCopterTests2b": "test.CopterTests2b",
+        "fly.ArduCopterTestExtNav": "test.CopterTestExtNav",
 
     }
 
