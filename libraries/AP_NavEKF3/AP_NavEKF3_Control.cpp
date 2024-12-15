@@ -212,7 +212,12 @@ void NavEKF3_core::updateStateIndexLim()
 // set the default yaw source
 void NavEKF3_core::setYawSource()
 {
-    AP_NavEKF_Source::SourceYaw yaw_source = frontend->sources.getYawSource();
+    AP_NavEKF_Source::SourceYaw yaw_source;
+    if (frontend->_options & (int32_t)NavEKF3::Options::UseMagToAlignOnly) {
+        yaw_source = yawAlignComplete ? AP_NavEKF_Source::SourceYaw::NONE : AP_NavEKF_Source::SourceYaw::COMPASS;
+    } else {
+        yaw_source = frontend->sources.getYawSource();
+    }
     if (wasLearningCompass_ms > 0) {
         // can't use compass while it is being calibrated
         if (yaw_source == AP_NavEKF_Source::SourceYaw::COMPASS) {
@@ -220,9 +225,6 @@ void NavEKF3_core::setYawSource()
         } else if (yaw_source == AP_NavEKF_Source::SourceYaw::GPS_COMPASS_FALLBACK) {
             yaw_source = AP_NavEKF_Source::SourceYaw::GPS;
         }
-    }
-    if ((yaw_source != AP_NavEKF_Source::SourceYaw::NONE) && (frontend->_options & (int32_t)NavEKF3::Options::UseMagToAlignOnly)) {
-        yaw_source = yaw_source_last = AP_NavEKF_Source::SourceYaw::NONE;
     }
     if (yaw_source != yaw_source_last) {
         yaw_source_last = yaw_source;
