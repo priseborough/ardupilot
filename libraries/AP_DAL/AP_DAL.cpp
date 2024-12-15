@@ -360,6 +360,43 @@ void AP_DAL::writeExtNavVelData(const Vector3f &vel, float err, uint32_t timeSta
 
 }
 
+// log external navigation data
+void AP_DAL::writeExtNavPoseData(const Vector3f &pos, const Vector3f &rpy, uint32_t timeStamp_ms, uint16_t delay_ms, uint32_t resetTime_ms)
+{
+    end_frame();
+
+    const log_RENP old = _RENP;
+    _RENP.pos = pos;
+    _RENP.rpy = rpy;
+    _RENP.timeStamp_ms = timeStamp_ms;
+    _RENP.delay_ms = delay_ms;
+    _RENP.resetTime_ms = resetTime_ms;
+    WRITE_REPLAY_BLOCK_IFCHANGED(RENP, _RENP, old);
+
+}
+
+// log external navigation data
+void AP_DAL::writeExtNavCovarianceData(const float posCov[6], const float rpyCov[6], uint32_t timeStamp_ms)
+{
+    end_frame();
+
+    const log_RENC old = _RENC;
+    _RENC.posCov_0 = posCov[0];
+    _RENC.posCov_1 = posCov[1];
+    _RENC.posCov_2 = posCov[2];
+    _RENC.posCov_3 = posCov[3];
+    _RENC.posCov_4 = posCov[4];
+    _RENC.posCov_5 = posCov[5];
+    _RENC.rpyCov_0 = rpyCov[0];
+    _RENC.rpyCov_1 = rpyCov[1];
+    _RENC.rpyCov_2 = rpyCov[2];
+    _RENC.rpyCov_3 = rpyCov[3];
+    _RENC.rpyCov_4 = rpyCov[4];
+    _RENC.rpyCov_5 = rpyCov[5];
+    _RENC.timeStamp_ms = timeStamp_ms;
+    WRITE_REPLAY_BLOCK_IFCHANGED(RENC, _RENC, old);
+}
+
 // log wheel odomotry data
 void AP_DAL::writeWheelOdom(float delAng, float delTime, uint32_t timeStamp_ms, const Vector3f &posOffset, float radius)
 {
@@ -447,7 +484,26 @@ void AP_DAL::handle_message(const log_REPH &msg, NavEKF2 &ekf2, NavEKF3 &ekf3)
 {
     _REPH = msg;
     ekf2.writeExtNavData(msg.pos, msg.quat, msg.posErr, msg.angErr, msg.timeStamp_ms, msg.delay_ms, msg.resetTime_ms);
-    ekf3.writeExtNavData(msg.pos, msg.quat, msg.posErr, msg.angErr, msg.timeStamp_ms, msg.delay_ms, msg.resetTime_ms);
+}
+
+/*
+  handle external nav pose data
+ */
+void AP_DAL::handle_message(const log_RENP &msg, NavEKF2 &ekf2, NavEKF3 &ekf3)
+{
+    _RENP = msg;
+    ekf3.writeExtNavPoseData(msg.pos, msg.rpy, msg.timeStamp_ms, msg.delay_ms, msg.resetTime_ms);
+}
+
+/*
+  handle external nav covariance data
+ */
+void AP_DAL::handle_message(const log_RENC &msg, NavEKF2 &ekf2, NavEKF3 &ekf3)
+{
+    _RENC = msg;
+    const float posCov[6] = {msg.posCov_0, msg.posCov_1, msg.posCov_2, msg.posCov_3, msg.posCov_4, msg.posCov_5};
+    const float rpyCov[6] = {msg.rpyCov_0, msg.rpyCov_1, msg.rpyCov_2, msg.rpyCov_3, msg.rpyCov_4, msg.rpyCov_5};
+    ekf3.writeExtNavCovarianceData(posCov, rpyCov, msg.timeStamp_ms);
 }
 
 /*

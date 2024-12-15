@@ -37,7 +37,9 @@
     LOG_REPH_MSG, \
     LOG_REVH_MSG, \
     LOG_RWOH_MSG, \
-    LOG_RBOH_MSG
+    LOG_RBOH_MSG, \
+    LOG_RENP_MSG, \
+    LOG_RENC_MSG
 
 // Replay Data Structures
 struct log_RFRH {
@@ -323,6 +325,36 @@ struct log_REPH {
     uint8_t _end;
 };
 
+// @LoggerMessage: RENP
+// @Description: Replay external nav pose data
+struct log_RENP {
+    Vector3f pos;
+    Vector3f rpy;
+    uint32_t timeStamp_ms;
+    uint32_t resetTime_ms;
+    uint16_t delay_ms;
+    uint8_t _end;
+};
+
+// @LoggerMessage: RENC
+// @Description: Replay external nav pose covariance data
+struct log_RENC {
+    float posCov_0;
+    float posCov_1;
+    float posCov_2;
+    float posCov_3;
+    float posCov_4;
+    float posCov_5;
+    float rpyCov_0;
+    float rpyCov_1;
+    float rpyCov_2;
+    float rpyCov_3;
+    float rpyCov_4;
+    float rpyCov_5;
+    uint32_t timeStamp_ms;
+    uint8_t _end;
+};
+
 // @LoggerMessage: REVH
 // @Description: Replay external position data
 struct log_REVH {
@@ -421,4 +453,8 @@ struct log_RBOH {
     { LOG_RWOH_MSG, RLOG_SIZE(RWOH),                                   \
       "RWOH", "ffIffff", "DA,DT,TS,PX,PY,PZ,R", "-------", "-------" }, \
     { LOG_RBOH_MSG, RLOG_SIZE(RBOH),                                   \
-      "RBOH", "ffffffffIfffH", "Q,DPX,DPY,DPZ,DAX,DAY,DAZ,DT,TS,OX,OY,OZ,D", "-------------", "-------------" },
+      "RBOH", "ffffffffIfffH", "Q,DPX,DPY,DPZ,DAX,DAY,DAZ,DT,TS,OX,OY,OZ,D", "-------------", "-------------" }, \
+    { LOG_RENP_MSG, RLOG_SIZE(RENP),                                   \
+      "RENP", "ffffffIIH", "PX,PY,PZ,R,P,Y,TS,RT,D", "---------", "---------" }, \
+    { LOG_RENC_MSG, RLOG_SIZE(RENC),                                   \
+      "RENC", "ffffffffffffI", "NN,NE,ND,EE,ED,DD,RR,RP,RY,PP,PY,YY,TS", "-------------", "-------------" },
