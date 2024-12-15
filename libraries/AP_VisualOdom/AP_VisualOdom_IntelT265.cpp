@@ -26,49 +26,107 @@
 extern const AP_HAL::HAL& hal;
 
 // consume vision position estimate data and send to EKF. distances in meters
-void AP_VisualOdom_IntelT265::handle_vision_position_estimate(uint64_t remote_time_us, uint32_t time_ms, float x, float y, float z, const Quaternion &attitude, float posErr, float angErr, uint8_t reset_counter)
+void AP_VisualOdom_IntelT265::handle_vision_position_estimate(uint64_t remote_time_us, uint32_t time_ms,
+                                                              const Vector3f position,
+                                                              const Vector3f rpy_in,
+                                                              const float covariance[21],
+                                                              uint8_t reset_counter)
 {
     const float scale_factor = _frontend.get_pos_scale();
-    Vector3f pos{x * scale_factor, y * scale_factor, z * scale_factor};
-    Quaternion att = attitude;
+    Vector3f pos = position * scale_factor;
 
-    // handle user request to align camera
-    if (_align_camera) {
-        if (align_sensor_to_vehicle(pos, attitude)) {
-            _align_camera = false;
+    Vector3f rpy_out; 
+    float roll; // used for logging
+    float pitch; // used for logging
+    float yaw; // used for logging
+    uint32_t time_stamp_corrected_ms = time_ms;
+    const bool rpy_invalid = (_frontend.get_options() & OPTIONS_IGNORE_RPY) || (is_zero(rpy_in.x) && is_zero(rpy_in.y) && is_zero(rpy_in.z)) || isnanf(rpy_in.x) || isnanf(rpy_in.y) || isnanf(rpy_in.z);
+    if (rpy_invalid) {
+        if (is_positive(covariance[20])) {
+            // hack to re-purpose last element in covariance matrix to send time delay
+            // in micro seconds when rpy accuracy data is not required
+            time_stamp_corrected_ms -= uint32_t(covariance[20]) / 1000;
         }
-    }
-    if (_align_posxy || _align_posz) {
-        if (align_position_to_ahrs(pos, _align_posxy, _align_posz)) {
-            _align_posxy = _align_posz = false;
+        // setting these data to nanf will stop the yaw being used or checked elsewhere
+        rpy_out.x = NAN;
+        rpy_out.y = NAN;
+        rpy_out.z = NAN;
+        // these data are logged with a unit covnersion so cannot tolerate NAN
+        roll = 0.0f;
+        pitch = 0.0f;
+        yaw = 0.0f;
+    } else {
+        Quaternion att;
+        att.from_euler(rpy_in);
+
+        // handle user request to align camera
+        if (_align_camera) {
+            if (align_sensor_to_vehicle(pos, att)) {
+                _align_camera = false;
+            }
         }
+        if (_align_posxy || _align_posz) {
+            if (align_position_to_ahrs(pos, _align_posxy, _align_posz)) {
+                _align_posxy = _align_posz = false;
+            }
+        }
+
+        // rotate position and attitude to align with vehicle
+        rotate_and_correct_position(pos);
+        rotate_attitude(att);
+
+        // store corrected attitude for use in pre-arm checks
+        _attitude_last = att;
+
+        // calculate euler orientation for logging
+        att.to_euler(roll, pitch, yaw);
+
+        rpy_out = rpy_in;
     }
 
-    // rotate position and attitude to align with vehicle
-    rotate_and_correct_position(pos);
-    rotate_attitude(att);
 
-    posErr = constrain_float(posErr, _frontend.get_pos_noise(), 100.0f);
-    angErr = constrain_float(angErr, _frontend.get_yaw_noise(), 1.5f);
+    float cov[21];
+    memcpy(cov, covariance, sizeof(cov));
+    float posErr;
+    if (isnanf(cov[0])) {
+        // position uncertainty is not provided so use parameter defaults
+        posErr = _frontend.get_pos_noise();
+        cov[0] = sq(posErr);
+        cov[6] = sq(posErr);
+        cov[11] = sq(posErr);
+        // assume position errors for each axis are uncorrelated to each other and to the angle errors
+        cov[1] = cov[2] = cov[3] = cov[4] = cov[5] = 0.0f;
+        cov[7] = cov[8] = cov[9] = cov[10] = 0.0f;
+        cov[12] = cov[13] = cov[14] = 0.0f;
+    } else {
+        posErr = (cov[0]+cov[6]+cov[11]) / 3.0f;
+    }
+    float angErr;
+    if (isnanf(cov[15])) {
+        // angle uncertainty is not provided so use parameter defaults
+        angErr = _frontend.get_yaw_noise();
+        cov[15] = sq(angErr);
+        cov[18] = sq(angErr);
+        cov[20] = sq(angErr);
+        // assume angle errors uncorrelated to postion errors
+        cov[3] = cov[4] = cov[5] = 0.0f;
+        cov[8] = cov[9] = cov[10] = 0.0f;
+        cov[12] = cov[13] = cov[14] = 0.0f;
+        // assume angle errors uncorrelated to each other
+        cov[16] = cov[17] = cov[19] = 0.0f;
+    } else {
+        angErr = (cov[15]+cov[18]+cov[20]) / 3.0f;
+    }
 
     // check for recent position reset
     bool consume = should_consume_sensor_data(true, reset_counter);
     if (consume) {
         // send attitude and position to EKF
-        AP::ahrs().writeExtNavData(pos, att, posErr, angErr, time_ms, _frontend.get_delay_ms(), get_reset_timestamp_ms(reset_counter));
+        AP::ahrs().writeExtNavData(pos, rpy_out, cov, time_stamp_corrected_ms, _frontend.get_delay_ms(), get_reset_timestamp_ms(reset_counter));
     }
 
-    // calculate euler orientation for logging
-    float roll;
-    float pitch;
-    float yaw;
-    att.to_euler(roll, pitch, yaw);
-
     // log sensor data
-    Write_VisualPosition(remote_time_us, time_ms, pos.x, pos.y, pos.z, degrees(roll), degrees(pitch), wrap_360(degrees(yaw)), posErr, angErr, reset_counter, !consume);
-
-    // store corrected attitude for use in pre-arm checks
-    _attitude_last = att;
+    Write_VisualPosition(remote_time_us, time_stamp_corrected_ms, pos.x, pos.y, pos.z, degrees(roll), degrees(pitch), wrap_360(degrees(yaw)), posErr, angErr, reset_counter, !consume);
 
     // record time for health monitoring
     _last_update_ms = AP_HAL::millis();
@@ -235,6 +293,10 @@ bool AP_VisualOdom_IntelT265::pre_arm_check(char *failure_msg, uint8_t failure_m
     if (!AP::ahrs().get_quaternion(ahrs_quat)) {
         hal.util->snprintf(failure_msg, failure_msg_len, "waiting for AHRS attitude");
         return false;
+    }
+
+    if (_frontend.get_options() & OPTIONS_IGNORE_RPY) {
+        return true;
     }
 
     // check if roll and pitch is different by > 10deg (using NED so cannot determine whether roll or pitch specifically)

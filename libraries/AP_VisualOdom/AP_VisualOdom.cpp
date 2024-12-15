@@ -106,6 +106,13 @@ const AP_Param::GroupInfo AP_VisualOdom::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("_YAW_M_NSE", 7, AP_VisualOdom, _yaw_noise, 0.2f),
 
+    // @Param: _OPTIONS
+    // @DisplayName: Visual odometery options
+    // @Description: A range of options that can be applied to processing of visual odometry data. IgnoreRPY causes roll, pitch and yaw dara in the message to be ignored.
+    // @Bitmask: 0:IgnoreRPY
+    // @User: Advanced
+    AP_GROUPINFO("_OPTIONS", 8, AP_VisualOdom, _options, 0),
+
     AP_GROUPEND
 };
 
@@ -175,7 +182,11 @@ void AP_VisualOdom::handle_vision_position_delta_msg(const mavlink_message_t &ms
 
 // general purpose method to consume position estimate data and send to EKF
 // distances in meters, roll, pitch and yaw are in radians
-void AP_VisualOdom::handle_vision_position_estimate(uint64_t remote_time_us, uint32_t time_ms, float x, float y, float z, float roll, float pitch, float yaw, float posErr, float angErr, uint8_t reset_counter)
+void AP_VisualOdom::handle_vision_position_estimate(uint64_t remote_time_us, uint32_t time_ms,
+                                                    const Vector3f position,
+                                                    const Vector3f rpy,
+                                                    const float covariance[21],
+                                                    uint8_t reset_counter)
 {
     // exit immediately if not enabled
     if (!enabled()) {
@@ -184,24 +195,7 @@ void AP_VisualOdom::handle_vision_position_estimate(uint64_t remote_time_us, uin
 
     // call backend
     if (_driver != nullptr) {
-        // convert attitude to quaternion and call backend
-        Quaternion attitude;
-        attitude.from_euler(roll, pitch, yaw);
-        _driver->handle_vision_position_estimate(remote_time_us, time_ms, x, y, z, attitude, posErr, angErr, reset_counter);
-    }
-}
-
-// general purpose method to consume position estimate data and send to EKF
-void AP_VisualOdom::handle_vision_position_estimate(uint64_t remote_time_us, uint32_t time_ms, float x, float y, float z, const Quaternion &attitude, float posErr, float angErr, uint8_t reset_counter)
-{
-    // exit immediately if not enabled
-    if (!enabled()) {
-        return;
-    }
-
-    // call backend
-    if (_driver != nullptr) {
-        _driver->handle_vision_position_estimate(remote_time_us, time_ms, x, y, z, attitude, posErr, angErr, reset_counter);
+        _driver->handle_vision_position_estimate(remote_time_us, time_ms, position, rpy, covariance, reset_counter);
     }
 }
 
