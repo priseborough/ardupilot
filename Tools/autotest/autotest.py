@@ -275,6 +275,8 @@ __bin_names = {
     "CopterTests2a": "arducopter",
     "CopterTests2b": "arducopter",
 
+    "CopterTestExtNav": "arducopter",
+
     "Plane": "arduplane",
     "PlaneTests1a": "arduplane",
     "PlaneTests1b": "arduplane",
@@ -352,6 +354,7 @@ tester_class_map = {
     "test.CopterTests1e": arducopter.AutoTestCopterTests1e, # 8m32s
     "test.CopterTests2a": arducopter.AutoTestCopterTests2a, # 8m23s
     "test.CopterTests2b": arducopter.AutoTestCopterTests2b, # 8m18s
+    "test.CopterTestExtNav": arducopter.AutoTestCopterTestExtNav,
     "test.Plane": arduplane.AutoTestPlane,
     "test.PlaneTests1a": arduplane.AutoTestPlaneTests1a,
     "test.PlaneTests1b": arduplane.AutoTestPlaneTests1b,
@@ -1112,6 +1115,7 @@ if __name__ == "__main__":
 
         'test.CopterTests2a',
         'test.CopterTests2b',
+        'test.CopterTestExtNav',
 
         'test.PlaneTests1a',
         'test.PlaneTests1b',
@@ -1146,6 +1150,7 @@ if __name__ == "__main__":
 
         "fly.ArduCopterTests2a": "test.CopterTests2a",
         "fly.ArduCopterTests2b": "test.CopterTests2b",
+        "fly.ArduCopterTestExtNav": "test.CopterTestExtNav",
 
     }
 

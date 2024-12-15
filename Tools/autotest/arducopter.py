@@ -3707,6 +3707,93 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
         self.set_rc(2, 1500)
         self.do_RTL()
 
+    def fly_gps_vicon_combined(self):
+        """Fly GPS and Vicon Combination """
+        self.customise_SITL_commandline(["--serial5=sim:vicon:"])
+
+        """Setup parameters including switching to EKF3"""
+        self.context_push()
+        ex = None
+        try:
+            self.set_parameters({
+                "SIM_SPEEDUP": 1,    # slow down to prevent posible loss of MAVLink messages
+                "VISO_TYPE": 2,      # use Intel RealSense T265 interface
+                "VISO_OPTIONS": 1,   # ignore rpy data
+                "SERIAL5_PROTOCOL": 2,
+                "EK3_ENABLE": 1,
+                "EK3_SRC1_POSXY": 8, # Enables combined use of GPS and external nav
+                "EK3_IMU_MASK": 1,   # only use 1 EKF lane to speed up analysis
+                "EK2_ENABLE": 0,     # EKF2 doesn't support combined use of GPS and External Nav
+                "AHRS_EKF_TYPE": 3,
+                "SIM_VICON_TMASK": 32, # send global position messages only
+                "SIM_VICON_FAIL": 1, # simulate taking off without external nav
+                "SIM_VICON_YAW": 0,  # external nav uses NE reference frame so no yaw misalignment
+                "LOG_REPLAY": 1,
+                "LOG_DISARMED": 1,
+            })
+            self.reboot_sitl()
+
+            # ensure we can get a global position:
+            self.poll_home_position(timeout=120)
+
+            # record starting position using GPS
+            old_pos = self.get_global_position_int()
+            print("old_pos=%s" % str(old_pos))
+
+            # enable vicon
+            self.set_parameter("SIM_VICON_FAIL", 0)
+
+            # takeoff to 10m in Loiter
+            self.progress("Moving to ensure location is tracked")
+            self.takeoff(10, mode="LOITER", require_absolute=True, timeout=720)
+
+            # fly forward in Loiter
+            self.set_rc(2, 1300)
+
+            # disable vicon after moving for 30 seconds
+            self.delay_sim_time(30)
+            self.set_parameter("SIM_VICON_FAIL", 1)
+
+            # ensure vehicle remains in Loiter for 10 seconds
+            tstart = self.get_sim_time()
+            while self.get_sim_time() - tstart < 10:
+                if not self.mode_is('LOITER'):
+                    raise NotAchievedException("Expected to stay in loiter for >10 seconds")
+
+            # re-enable vicon
+            self.set_parameter("SIM_VICON_FAIL", 0)
+
+            # ensure vehicle remains in Loiter for 10 seconds
+            tstart = self.get_sim_time()
+            while self.get_sim_time() - tstart < 10:
+                if not self.mode_is('LOITER'):
+                    raise NotAchievedException("Expected to stay in loiter for >10 seconds")
+
+            # disable GPS
+            self.set_parameter("SIM_GPS_DISABLE", 1)
+
+            # ensure vehicle remains in Loiter for 10 seconds
+            tstart = self.get_sim_time()
+            while self.get_sim_time() - tstart < 10:
+                if not self.mode_is('LOITER'):
+                    raise NotAchievedException("Expected to stay in loiter for >10 seconds")
+
+            # re-enable GPS
+            self.set_parameter("SIM_GPS_DISABLE", 0)
+
+            # RTL and check vehicle arrives within 10m of home
+            self.set_rc(2, 1500)
+            self.do_RTL()
+
+        except Exception as e:
+            self.print_exception_caught(e)
+            ex = e
+        self.context_pop()
+        self.disarm_vehicle(force=True)
+        self.reboot_sitl()
+        if ex is not None:
+            raise ex
+
     def RTLSpeed(self):
         """Test RTL Speed parameters"""
         rtl_speed_ms = 7
@@ -12455,6 +12542,12 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
         ])
         return ret
 
+    def testExtNav(self):
+        ret = ([
+                self.fly_gps_vicon_combined,
+        ])
+        return ret
+
     def testcan(self):
         ret = ([
             self.CANGPSCopterMission,
@@ -12572,6 +12665,9 @@ class AutoTestCopterTests2b(AutoTestCopter):
     def tests(self):
         return self.tests2b()
 
+class AutoTestCopterTestExtNav(AutoTestCopter):
+    def tests(self):
+        return self.testExtNav()
 
 class AutoTestCAN(AutoTestCopter):
 
