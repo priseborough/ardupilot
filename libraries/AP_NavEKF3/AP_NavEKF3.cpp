@@ -719,7 +719,31 @@ const AP_Param::GroupInfo NavEKF3::var_info2[] = {
     // @Increment: 1
     // @User: Advanced
     AP_GROUPINFO("PRIMARY", 8, NavEKF3, _primary_core, EK3_PRIMARY_DEFAULT),
-    
+
+    // @Param: EXT_TCONST
+    // @DisplayName: External navigation origin time constant (sec)
+    // @Description: This sets the time constant used to align the external navigation source NED origin with the EKF origin when a global position reference source such as GPS is available.
+    // @Range: 1.0 100.0
+    // @User: Advanced
+    // @Units: s
+    AP_GROUPINFO("EXT_TCONST", 9, NavEKF3, _extNavOriginTconst, 10.0f),
+
+    // @Param: EXT_M_NSE
+    // @DisplayName: External navigation error growth minimum (m)
+    // @Description: When set to a positive value, the external naivigation position data will be assumed to be from an odometry source that accumulates error over time and reports the uncertainty growth in the covariance. The EKF will then use the increase in position variance to set the observation variance, but with a lower bound set by this parameter.
+    // @Range: 0.0 10.0
+    // @User: Advanced
+    // @Units: m
+    AP_GROUPINFO("EXT_M_NSE", 10, NavEKF3, _extNavPosNoiseMin, 0.0f),
+
+    // @Param: EXT_TSHIFT
+    // @DisplayName: External navigsation time shift limit (sec)
+    // @Description: This sets the maximum number of seconds the external navigation data will be time shifted using current accelerationo and velocity estimates when it is time stamped behind the EKF fusion time horizon.
+    // @Range: 0.0 10.0
+    // @User: Advanced
+    // @Units: s
+    AP_GROUPINFO("EXT_TSHIFT", 11, NavEKF3, _extNavMaxTshift, 5.0f),
+
     AP_GROUPEND
 };
 
@@ -1367,7 +1391,7 @@ bool NavEKF3::setOriginLLH(const Location &loc)
     if (!core) {
         return false;
     }
-    if ((sources.getPosXYSource() == AP_NavEKF_Source::SourceXY::GPS) || common_origin_valid) {
+    if ((sources.getPosXYSource() == AP_NavEKF_Source::SourceXY::GPS || sources.getPosXYSource() == AP_NavEKF_Source::SourceXY::GPSANDEXTNAV) || common_origin_valid) {
         // we don't allow setting of the EKF origin if using GPS
         // or if the EKF origin has already been set.
         // This is to prevent accidental setting of EKF origin with an
@@ -1497,7 +1521,7 @@ bool NavEKF3::using_extnav_for_yaw() const
 bool NavEKF3::configuredToUseGPSForPosXY(void) const
 {
     // 0 = use 3D velocity, 1 = use 2D velocity, 2 = use no velocity, 3 = do not use GPS
-    return  (sources.getPosXYSource() == AP_NavEKF_Source::SourceXY::GPS);
+    return  (sources.getPosXYSource() == AP_NavEKF_Source::SourceXY::GPS || sources.getPosXYSource() == AP_NavEKF_Source::SourceXY::GPSANDEXTNAV);
 }
 
 // write the raw optical flow measurements
@@ -1541,24 +1565,72 @@ void NavEKF3::writeEulerYawAngle(float yawAngle, float yawAngleErr, uint32_t tim
 }
 
 /*
- * Write position and quaternion data from an external navigation system
+ * Write position attitude and covariance data from an external navigation system
  *
  * pos        : XYZ position (m) in a RH navigation frame with the Z axis pointing down and XY axes horizontal. Frame must be aligned with NED if the magnetomer is being used for yaw.
- * quat       : quaternion describing the the rotation from navigation frame to body frame
- * posErr     : 1-sigma spherical position error (m)
- * angErr     : 1-sigma spherical angle error (rad)
+ * rpy        : 321 sequence Tait-Bryan angles defining the the rotation from navigation frame to body frame (rad)
+ * posCov     ; Row-major representation of position 3x3 cross-covariance matrix upper right triangle (states: x_global, y_global, z_global; first three entries are the first ROW, next two entries are the second ROW, etc.). If unknown, assign NaN value to first element in the array. If off diagonals are unkown, assign to zero.
+ * rpyCov     ; Row-major representation of attitude 3x3 cross-covariance matrix upper right triangle (states: roll, pitch; first three entries are the first ROW, next two entries are the second ROW, etc.). If unknown, assign NaN value to first element in the array. If off diagonals are unkown, assign to zero.
  * timeStamp_ms : system time the measurement was taken, not the time it was received (mSec)
  * delay_ms   : average delay of external nav system measurements relative to inertial measurements
  * resetTime_ms : system time of the last position reset request (mSec)
  *
 */
-void NavEKF3::writeExtNavData(const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint16_t delay_ms, uint32_t resetTime_ms)
+void NavEKF3::writeExtNavData(const Vector3f &pos, const Vector3f &rpy, const float covariance[21], uint32_t timeStamp_ms, uint16_t delay_ms, uint32_t resetTime_ms)
 {
-    AP::dal().writeExtNavData(pos, quat, posErr, angErr, timeStamp_ms, delay_ms, resetTime_ms);
+    AP::dal().writeExtNavPoseData(pos, rpy, timeStamp_ms, delay_ms, resetTime_ms);
+
+    // split covariance into separate position and attitude matrices as the EKF does not use error correlations between position and attitude
+    float posCov[6], rpyCov[6];
+    if (!isnan(covariance[0])) {
+        posCov[0] = covariance[0];
+        posCov[1] = covariance[1];
+        posCov[2] = covariance[2];
+        posCov[3] = covariance[6];
+        posCov[4] = covariance[7];
+        posCov[5] = covariance[11];
+    } else {
+        memset(&posCov, 0, sizeof(posCov));
+        rpyCov[0] = rpyCov[3] = sq(_gpsHorizPosNoise);
+        rpyCov[5] = sq(_baroAltNoise);
+    }
+
+    if (!isnan(covariance[15])) {
+        rpyCov[0] = covariance[15];
+        rpyCov[1] = covariance[16];
+        rpyCov[2] = covariance[17];
+        rpyCov[3] = covariance[18];
+        rpyCov[4] = covariance[19];
+        rpyCov[5] = covariance[20];
+    } else {
+        memset(&rpyCov, 0, sizeof(rpyCov));
+        rpyCov[0] = rpyCov[3] = rpyCov[5] = sq(_yawNoise);
+    }
+
+    AP::dal().writeExtNavCovarianceData(posCov, rpyCov, timeStamp_ms);
 
     if (core) {
         for (uint8_t i=0; i<num_cores; i++) {
-            core[i].writeExtNavData(pos, quat, posErr, angErr, timeStamp_ms, delay_ms, resetTime_ms);
+            core[i].writeExtNavPoseData(pos, rpy, timeStamp_ms, delay_ms, resetTime_ms);
+            core[i].writeExtNavCovarianceData(posCov, rpyCov, timeStamp_ms);
+        }
+    }
+}
+
+void NavEKF3::writeExtNavPoseData(const Vector3f &pos, const Vector3f &rpy, uint32_t timeStamp_ms, uint16_t delay_ms, uint32_t resetTime_ms)
+{
+    if (core) {
+        for (uint8_t i=0; i<num_cores; i++) {
+            core[i].writeExtNavPoseData(pos, rpy, timeStamp_ms, delay_ms, resetTime_ms);
+        }
+    }
+}
+
+void NavEKF3::writeExtNavCovarianceData(const float posCov[6], const float rpyCov[6], uint32_t timeStamp_ms)
+{
+    if (core) {
+        for (uint8_t i=0; i<num_cores; i++) {
+            core[i].writeExtNavCovarianceData(posCov, rpyCov, timeStamp_ms);
         }
     }
 }

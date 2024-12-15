@@ -241,18 +241,39 @@ public:
     void writeEulerYawAngle(float yawAngle, float yawAngleErr, uint32_t timeStamp_ms, uint8_t type);
 
     /*
-     * Write position and quaternion data from an external navigation system
+     * Write pose and covariance data from an external navigation system
      *
      * pos        : position in the RH navigation frame. Frame is assumed to be NED if frameIsNED is true. (m)
-     * quat       : quaternion desribing the the rotation from navigation frame to body frame
-     * posErr     : 1-sigma spherical position error (m)
-     * angErr     : 1-sigma spherical angle error (rad)
+     * rpy        : 321 sequence Tait-Bryan angles defining the the rotation from navigation frame to body frame
+     * covariance ; Row-major representation of position 6x6 cross-covariance matrix upper right triangle (states: x_global, y_global, z_global, roll, pitch, yaw; first six entries are the first ROW, next five entries are the second ROW, etc.). If position variances are unknown, assign NaN value to element [0]. If angle variances are unknown, assign NaN value to element [15]. If off diagonals are unkown, assign to zero.
      * timeStamp_ms : system time the measurement was taken, not the time it was received (mSec)
      * delay_ms   : average delay of external nav system measurements relative to inertial measurements
      * resetTime_ms : system time of the last position reset request (mSec)
      *
     */
-    void writeExtNavData(const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint16_t delay_ms, uint32_t resetTime_ms);
+    void writeExtNavData(const Vector3f &pos, const Vector3f &rpy, const float covariance[21], uint32_t timeStamp_ms, uint16_t delay_ms, uint32_t resetTime_ms);
+
+    /*
+     * Write pose data from an external navigation system
+     *
+     * pos        : position in the RH navigation frame. Frame is assumed to be NED if frameIsNED is true. (m)
+     * rpy        : 321 sequence Tait-Bryan angles defining the the rotation from navigation frame to body frame
+     * timeStamp_ms : system time the measurement was taken, not the time it was received (mSec)
+     * delay_ms   : average delay of external nav system measurements relative to inertial measurements
+     * resetTime_ms : system time of the last position reset request (mSec)
+     *
+    */
+    void writeExtNavPoseData(const Vector3f &pos, const Vector3f &rpy, uint32_t timeStamp_ms, uint16_t delay_ms, uint32_t resetTime_ms);
+
+    /*
+     * Write covariance data from an external navigation system
+     *
+     * posCov     ; Row-major representation of position 6x6 cross-covariance matrix upper right triangle (states: x_global, y_global, z_global, roll, pitch, yaw; first six entries are the first ROW, next five entries are the second ROW, etc.). If position variances are unknown, assign NaN value to element [0]. If angle variances are unknown, assign NaN value to element [15]. If off diagonals are unkown, assign to zero.
+     * rpyCov     ; Row-major representation of attitude 3x3 cross-covariance matrix upper right triangle (states: roll, pitch, yaw; first three entries are the first ROW, next two entries are the second ROW, etc.). If unknown, assign NaN value to first element in the array. If off diagonals are unkown, assign to zero.
+     * timeStamp_ms : system time the measurement was taken, not the time it was received (mSec)
+     *
+    */
+    void writeExtNavCovarianceData(const float posCov[6], const float rpyCov[6], uint32_t timeStamp_ms);
 
     /*
      * Write velocity data from an external navigation system
@@ -438,6 +459,9 @@ private:
     AP_Float _ognmTestScaleFactor;  // Scale factor applied to the thresholds used by the on ground not moving test
     AP_Float _baroGndEffectDeadZone;// Dead zone applied to positive baro height innovations when in ground effect (m)
     AP_Int8 _primary_core;          // initial core number
+    AP_Float _extNavOriginTconst;   // time constant used to align the external position origin
+    AP_Float _extNavPosNoiseMin;    // minimum 1-sigma external nav position noise that will be allowed
+    AP_Float _extNavMaxTshift;      // maximum number of seconds that the external nav positoin data will be time shifted and adjusted using velocity estimates
 
 // Possible values for _flowUse
 #define FLOW_USE_NONE    0

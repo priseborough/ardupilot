@@ -405,6 +405,9 @@ void NavEKF3_core::InitialiseVariables()
     extNavVelToFuse = false;
     useExtNavVel = false;
     extNavVelMeasTime_ms = 0;
+    extNavOriginNED.zero();
+    lastExtNavOriginTime_ms = 0;
+    memset(&extNavPosCovPrev, 0, sizeof(extNavPosCovPrev));
 #endif
 
     // zero data buffers
@@ -782,6 +785,11 @@ void NavEKF3_core::UpdateStrapdownEquationsNED()
     // variance estimation)
     accNavMag = velDotNEDfilt.length();
     accNavMagHoriz = velDotNEDfilt.xy().length();
+
+    // update a peak hold filtered horizontal acceleration
+    const ftype alpha = imuDataDelayed.delVelDT / (imuDataDelayed.delVelDT + frontend->_extNavMaxTshift);
+    accNavMagHorizPHF = MAX(accNavMagHorizPHF , accNavMagHoriz);
+    accNavMagHorizPHF *= (1.0F - alpha);
 
     // if we are not aiding, then limit the horizontal magnitude of acceleration
     // to prevent large manoeuvre transients disturbing the attitude
@@ -2229,6 +2237,10 @@ void NavEKF3_core::moveEKFOrigin(void)
     stateStruct.position.xy() += diffNE;
     outputDataNew.position.xy() += diffNE;
     outputDataDelayed.position.xy() += diffNE;
+
+#if EK3_FEATURE_EXTERNAL_NAV
+    extNavOriginNED.xy() -= diffNE;
+#endif
 
     for (unsigned index=0; index < imu_buffer_length; index++) {
         storedOutput[index].position.xy() += diffNE;
