@@ -935,10 +935,10 @@ void NavEKF2_core::updateTimingStatistics(void)
     timing.count++;
 }
 
-void NavEKF2_core::writeExtNavData(const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint16_t delay_ms, uint32_t resetTime_ms)
+void NavEKF2_core::writeExtNavData(const Vector3f &pos, const Quaternion &quat, const float posCov[6], float angErr, uint32_t timeStamp_ms, uint32_t resetTime_ms)
 {
     // protect against NaN
-    if (pos.is_nan() || isnan(posErr) || quat.is_nan() || isnan(angErr)) {
+    if (pos.is_nan() || isnan(posCov[0]) || isnan(posCov[3]) || isnan(posCov[5]) || quat.is_nan() || isnan(angErr)) {
         return;
     }
 
@@ -959,9 +959,9 @@ void NavEKF2_core::writeExtNavData(const Vector3f &pos, const Quaternion &quat, 
 
     extNavDataNew.pos = pos.toftype();
     extNavDataNew.quat = quat.toftype();
-    extNavDataNew.posErr = posErr;
+    extNavDataNew.posErr = sqrtf((posCov[0]+posCov[3]+posCov[5]) / 3.0f);
     extNavDataNew.angErr = angErr;
-    timeStamp_ms = timeStamp_ms - delay_ms;
+    timeStamp_ms = timeStamp_ms;
     // Correct for the average intersampling delay due to the filter updaterate
     timeStamp_ms -= localFilterTimeStep_ms/2;
     // Prevent time delay exceeding age of oldest IMU data in the buffer

@@ -250,18 +250,17 @@ public:
     /*
      * Write position and quaternion data from an external navigation system
      *
-     * pos        : position in the RH navigation frame. Frame is assumed to be NED (m)
+     * pos        : position in the RH navigation frame. Frame is assumed to be NED if frameIsNED is true. (m)
      * quat       : quaternion desribing the rotation from navigation frame to body frame
-     * posErr     : 1-sigma spherical position error (m)
-     * angErr     : 1-sigma spherical angle error (rad)
+     * posCov     ; Row-major representation of position 3x3 cross-covariance matrix upper right triangle (states: x_global, y_global, z_global; first three entries are the first ROW, next 2 entries are the second ROW, etc.). If position variances are unknown, assign NaN value to element [0].
+     * angErr     : 1-sigma spherical angle error (rad). Assign NaN value if not known.
      * timeStamp_ms : system time the measurement was taken, not the time it was received (mSec)
-     * delay_ms   : average delay of external nav system measurements relative to inertial measurements
-     * resetTime_ms : system time of the last position reset request (mSec)
+     * resetTime_ms : system time of the last position reset request (mSec)     *
      *
      * Sensor offsets are pulled directly from the AP_VisualOdom library
      *
     */
-    void writeExtNavData(const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint16_t delay_ms, uint32_t resetTime_ms);
+    void writeExtNavData(const Vector3f &pos, const Quaternion &quat, const float posCov[6], float angErr, uint32_t timeStamp_ms, uint32_t resetTime_ms);
 
     /*
      * Write velocity data from an external navigation system
