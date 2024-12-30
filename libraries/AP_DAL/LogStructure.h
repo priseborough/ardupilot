@@ -332,11 +332,13 @@ struct log_ROFH {
 struct log_REPH {
     Vector3f pos;
     Quaternion quat;
-    float posErr;
+    float posCov_0;
+    float posCov_1;
+    float posCov_2;
+    float posErrD;
     float angErr;
     uint32_t timeStamp_ms;
     uint32_t resetTime_ms;
-    uint16_t delay_ms;
     uint8_t _end;
 };
 
@@ -442,7 +444,7 @@ struct log_RBOH {
     { LOG_ROFH_MSG, RLOG_SIZE(ROFH),                                   \
       "ROFH", "ffffIffffB", "FX,FY,GX,GY,Tms,PX,PY,PZ,HgtOvr,Qual", "----------", "----------" }, \
     { LOG_REPH_MSG, RLOG_SIZE(REPH),                                   \
-      "REPH", "fffffffffIIH", "PX,PY,PZ,Q1,Q2,Q3,Q4,PEr,AEr,TS,RT,D", "------------", "------------" }, \
+      "REPH", "ffffffffffffII", "PX,PY,PZ,Q1,Q2,Q3,Q4,NN,NE,EE,PErD,AEr,TS,RT", "--------------", "--------------" }, \
     { LOG_RSLL_MSG, RLOG_SIZE(RSLL),                         \
       "RSLL", "IIfI", "Lat,Lng,PosAccSD,TS", "DU--", "GG--" }, \
     { LOG_REVH_MSG, RLOG_SIZE(REVH),                                   \
