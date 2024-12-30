@@ -40,7 +40,9 @@ public:
 
     // consume vision pose estimate data and send to EKF. distances in meters
     // quality of -1 means failed, 0 means unknown, 1 is worst, 100 is best
-    virtual void handle_pose_estimate(uint64_t remote_time_us, uint32_t time_ms, float x, float y, float z, const Quaternion &attitude, float posErr, float angErr, uint8_t reset_counter, int8_t quality) = 0;
+    // posCov is top right diagonal covariance matrix for XYZ position states in descending row order. Set first element to NaN if unknown.
+    // angErr is the 1-sigma circular angle uncertainty in radians. Set to NaN if unknown.
+    virtual void handle_pose_estimate(uint64_t remote_time_us, uint32_t time_ms, float x, float y, float z, const Quaternion &attitude, const float posCov[6], float angErr, uint8_t reset_counter, int8_t quality) = 0;
 
     // consume vision velocity estimate data and send to EKF, velocity in NED meters per second
     // quality of -1 means failed, 0 means unknown, 1 is worst, 100 is best
