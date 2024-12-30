@@ -240,18 +240,15 @@ public:
     void writeEulerYawAngle(float yawAngle, float yawAngleErr, uint32_t timeStamp_ms, uint8_t type);
 
     /*
-     * Write position and quaternion data from an external navigation system
-     *
+     * Write pose and covariance data from an external navigation system     *
      * pos        : position in the RH navigation frame. Frame is assumed to be NED if frameIsNED is true. (m)
      * quat       : quaternion desribing the rotation from navigation frame to body frame
-     * posErr     : 1-sigma spherical position error (m)
-     * angErr     : 1-sigma spherical angle error (rad)
+     * posCov     ; Row-major representation of position 3x3 cross-covariance matrix upper right triangle (states: x_global, y_global, z_global; first three entries are the first ROW, next 2 entries are the second ROW, etc.). If position variances are unknown, assign NaN value to element [0].
+     * angErr     : 1-sigma spherical angle error (rad). Assign NaN value if not known.
      * timeStamp_ms : system time the measurement was taken, not the time it was received (mSec)
-     * delay_ms   : average delay of external nav system measurements relative to inertial measurements
-     * resetTime_ms : system time of the last position reset request (mSec)
-     *
+     * resetTime_ms : system time of the last position reset request (mSec)     *
     */
-    void writeExtNavData(const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint16_t delay_ms, uint32_t resetTime_ms);
+    void writeExtNavData(const Vector3f &pos, const Quaternion &quat, const float posCov[6], float angErr, uint32_t timeStamp_ms, uint32_t resetTime_ms);
 
     /*
      * Write velocity data from an external navigation system
@@ -451,6 +448,9 @@ private:
     AP_Enum<LogLevel> _log_level;   // log verbosity level
     AP_Float _gpsVAccThreshold;     // vertical accuracy threshold to use GPS as an altitude source
     AP_Int32 _options;              // bit mask of processing options
+    AP_Float _extNavOriginTconst;   // time constant used to align the external position origin
+    AP_Float _extNavPosNoiseMin;    // minimum 1-sigma external nav position noise that will be allowed
+    AP_Float _extNavMaxTshift;      // maximum number of seconds that the external nav positoin data will be time shifted and adjusted using velocity estimates
 
     // enum for processing options
     enum class Option {
