@@ -19,7 +19,6 @@
  */
 #pragma once
 
-
 #if !defined(HAL_DEBUG_BUILD) || !HAL_DEBUG_BUILD
     #pragma GCC optimize("O2")
 #endif
@@ -341,7 +340,7 @@ public:
     * resetTime_ms : system time of the last position reset request (mSec)
     *
     */
-    void writeExtNavData(const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint16_t delay_ms, uint32_t resetTime_ms);
+    void writeExtNavData(const Vector3f &pos, const Quaternion &quat, const float posCov[6], float angErr, uint32_t timeStamp_ms, uint32_t resetTime_ms);
 
     /*
      * Write velocity data from an external navigation system
@@ -642,16 +641,19 @@ private:
     };
 
     struct yaw_elements : EKF_obs_element_t {
-        ftype         yawAng;         // yaw angle measurement (rad)
-        ftype         yawAngErr;      // yaw angle 1SD measurement accuracy (rad)
-        rotationOrder order;          // type specifiying Euler rotation order used, 0 = 321 (ZYX), 1 = 312 (ZXY)
+        ftype         yawAng;       // yaw angle measurement (rad)
+        ftype         yawAngErr;    // yaw angle 1SD measurement accuracy (rad)
+        rotationOrder order;        // type specifiying Euler rotation order used, 0 = 321 (ZYX), 1 = 312 (ZXY)
+        uint32_t      timeStamp_ms; // time stamp of message as received by the EKF and before correction for delays
     };
 
     struct ext_nav_elements : EKF_obs_element_t {
-        Vector3F        pos;        // XYZ position measured in a RH navigation frame (m)
-        ftype           posErr;     // spherical position measurement error 1-std (m)
-        bool            posReset;   // true when the position measurement has been reset
-        bool            corrected;  // true when the position has been corrected for sensor position
+        Vector3F    pos;            // XYZ position measured in a RH navigation frame (m)
+        ftype       posCov[6];      // top right diagonal covariance matrix for NED position states in descending row order
+        ftype       hposVarIncr;    // increment added to horizontal position observation variance to account for time shifting induced errors (m^2)
+        bool        posReset;       // true when the position measurement has been reset
+        bool        corrected;      // true when the position has been corrected for sensor position
+        uint32_t    timeStamp_ms;   // time stamp of message as received by the EKF and before correction for delays
     };
 
     struct ext_nav_vel_elements : EKF_obs_element_t {
@@ -681,7 +683,8 @@ private:
         BARO=4,         // Use Baro height
         MAG=5,          // Use magnetometer data
         RNGFND=6,       // Use rangefinder data
-        EXTNAV=7        // Use external nav data
+        EXTNAV=7,       // Use external nav data
+        GPSANDEXTNAV=8  // Use GPs as first priority else use external nav
     };
 
     // specifies the method to be used when fusing yaw observations
@@ -1078,6 +1081,7 @@ private:
     Matrix3F prevTnb;               // previous nav to body transformation used for INS earth rotation compensation
     ftype accNavMag;                // magnitude of navigation accel - used to adjust GPS obs variance (m/s^2)
     ftype accNavMagHoriz;           // magnitude of navigation accel in horizontal plane (m/s^2)
+    ftype accNavMagHorizPHF;        // peak hold filtered magnitude of navigation accel in horizontal plane (m/s^2)
     Vector3F earthRateNED;          // earths angular rate vector in NED (rad/s)
     ftype dtIMUavg;                 // expected time between IMU measurements (sec)
     ftype dtEkfAvg;                 // expected time between EKF updates (sec)
@@ -1470,6 +1474,7 @@ private:
     // external navigation fusion
     EKF_obs_buffer_t<ext_nav_elements> storedExtNav; // external navigation data buffer
     ext_nav_elements extNavDataDelayed; // External nav at the fusion time horizon
+    ext_nav_elements extNavDataNew;     // external navigation pose and covariance data before being pushed to the buffer
     uint32_t extNavMeasTime_ms;         // time external measurements were accepted for input to the data buffer (msec)
     uint32_t extNavLastPosResetTime_ms; // last time the external nav systen performed a position reset (msec)
     bool extNavDataToFuse;              // true when there is new external nav data to fuse
@@ -1483,7 +1488,11 @@ private:
     uint32_t extNavVelInnovTime_ms;     // system time that external nav velocity innovations were recorded (to detect timeouts)
     EKF_obs_buffer_t<yaw_elements> storedExtNavYawAng;  // external navigation yaw angle buffer
     yaw_elements extNavYawAngDataDelayed;   // external navigation yaw angle at the fusion time horizon
+    yaw_elements extNavYawAngDataNew;   // external navigation yaw angle data before being pushed to the buffer
     uint32_t last_extnav_yaw_fusion_ms; // system time that external nav yaw was last fused
+    Vector3F extNavOriginNED;           // exernal navigation origin offset wrt EKF's internal NED origin
+    uint32_t lastExtNavOriginTime_ms;   // last time we updated the external nav origin offset (msec)
+    ftype extNavPosCovPrev[6];          // previous value of the external navigation position covairance data.
 #endif // EK3_FEATURE_EXTERNAL_NAV
     bool useExtNavVel;                  // true if external nav velocity should be used
 

@@ -743,6 +743,30 @@ const AP_Param::GroupInfo NavEKF3::var_info2[] = {
     // @User: Advanced
     AP_GROUPINFO("OPTIONS",  11, NavEKF3, _options, 0),
 
+    // @Param: EXT_TCONST
+    // @DisplayName: External navigation origin time constant (sec)
+    // @Description: This sets the time constant used to align the external navigation source NED origin with the EKF origin when a global position reference source such as GPS is available.
+    // @Range: 1.0 100.0
+    // @User: Advanced
+    // @Units: s
+    AP_GROUPINFO("EXT_TCONST", 12, NavEKF3, _extNavOriginTconst, 10.0f),
+
+    // @Param: EXT_M_NSE
+    // @DisplayName: External navigation error growth minimum (m)
+    // @Description: When set to a positive value, the external naivigation position data will be assumed to be from an odometry source that accumulates error over time and reports the uncertainty growth in the covariance. The EKF will then use the increase in position variance to set the observation variance, but with a lower bound set by this parameter.
+    // @Range: 0.0 10.0
+    // @User: Advanced
+    // @Units: m
+    AP_GROUPINFO("EXT_M_NSE", 13, NavEKF3, _extNavPosNoiseMin, 0.0f),
+
+    // @Param: EXT_TSHIFT
+    // @DisplayName: External navigsation time shift limit (sec)
+    // @Description: This sets the maximum number of seconds the external navigation data will be time shifted using current accelerationo and velocity estimates when it is time stamped behind the EKF fusion time horizon.
+    // @Range: 0.0 10.0
+    // @User: Advanced
+    // @Units: s
+    AP_GROUPINFO("EXT_TSHIFT", 14, NavEKF3, _extNavMaxTshift, 5.0f),
+
     AP_GROUPEND
 };
 
@@ -1402,10 +1426,12 @@ bool NavEKF3::setOriginLLH(const Location &loc)
     if (!core) {
         return false;
     }
-    if (common_origin_valid) {
-        // we don't allow setting the EKF origin if it has already been set
-        // this is to prevent causing upsets from a shifting origin.
-        GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "EKF3: origin already set");
+    if ((sources.getPosXYSource() == AP_NavEKF_Source::SourceXY::GPS || sources.getPosXYSource() == AP_NavEKF_Source::SourceXY::GPSANDEXTNAV) || common_origin_valid) {
+        // we don't allow setting of the EKF origin if using GPS
+        // or if the EKF origin has already been set.
+        // This is to prevent accidental setting of EKF origin with an
+        // invalid position or height or causing upsets from a shifting origin.
+        GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "EKF3 refusing set origin");
         return false;
     }
     bool ret = false;
@@ -1543,7 +1569,7 @@ bool NavEKF3::using_extnav_for_yaw() const
 bool NavEKF3::configuredToUseGPSForPosXY(void) const
 {
     // 0 = use 3D velocity, 1 = use 2D velocity, 2 = use no velocity, 3 = do not use GPS
-    return  (sources.getPosXYSource() == AP_NavEKF_Source::SourceXY::GPS);
+    return  (sources.getPosXYSource() == AP_NavEKF_Source::SourceXY::GPS || sources.getPosXYSource() == AP_NavEKF_Source::SourceXY::GPSANDEXTNAV);
 }
 
 // write the raw optical flow measurements
@@ -1590,24 +1616,21 @@ void NavEKF3::writeEulerYawAngle(float yawAngle, float yawAngleErr, uint32_t tim
 }
 
 /*
- * Write position and quaternion data from an external navigation system
- *
- * pos        : XYZ position (m) in a RH navigation frame with the Z axis pointing down and XY axes horizontal. Frame must be aligned with NED if the magnetomer is being used for yaw.
- * quat       : quaternion describing the rotation from navigation frame to body frame
- * posErr     : 1-sigma spherical position error (m)
- * angErr     : 1-sigma spherical angle error (rad)
- * timeStamp_ms : system time the measurement was taken, not the time it was received (mSec)
- * delay_ms   : average delay of external nav system measurements relative to inertial measurements
- * resetTime_ms : system time of the last position reset request (mSec)
- *
+    * Write pose and covariance data from an external navigation system     *
+    * pos        : position in the RH navigation frame. Frame is assumed to be NED if frameIsNED is true. (m)
+    * quat       : quaternion desribing the rotation from navigation frame to body frame
+    * posCov     ; Row-major representation of position 3x3 cross-covariance matrix upper right triangle (states: x_global, y_global, z_global; first three entries are the first ROW, next 2 entries are the second ROW, etc.). If position variances are unknown, assign NaN value to element [0].
+    * angErr     : 1-sigma spherical angle error (rad). Assign NaN value if not known.
+    * timeStamp_ms : system time the measurement was taken, not the time it was received (mSec)
+    * resetTime_ms : system time of the last position reset request (mSec)     *
 */
-void NavEKF3::writeExtNavData(const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint16_t delay_ms, uint32_t resetTime_ms)
+void NavEKF3::writeExtNavData(const Vector3f &pos, const Quaternion &quat, const float posCov[6], float angErr, uint32_t timeStamp_ms, uint32_t resetTime_ms)
 {
-    dal.writeExtNavData(pos, quat, posErr, angErr, timeStamp_ms, delay_ms, resetTime_ms);
+    AP::dal().writeExtNavData(pos, quat, posCov, angErr, timeStamp_ms, resetTime_ms);
 
     if (core) {
         for (uint8_t i=0; i<num_cores; i++) {
-            core[i].writeExtNavData(pos, quat, posErr, angErr, timeStamp_ms, delay_ms, resetTime_ms);
+            core[i].writeExtNavData(pos, quat, posCov, angErr, timeStamp_ms, resetTime_ms);
         }
     }
 }

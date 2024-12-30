@@ -469,7 +469,11 @@ void NavEKF3_core::setAidingMode()
 #if EK3_FEATURE_EXTERNAL_NAV
             } else if (readyToUseExtNav()) {
                 // we are commencing aiding using external nav
-                posResetSource = resetDataSource::EXTNAV;
+                if (frontend->sources.getPosXYSource() == AP_NavEKF_Source::SourceXY::GPSANDEXTNAV) {
+                    posResetSource = resetDataSource::GPSANDEXTNAV;
+                } else {
+                    posResetSource = resetDataSource::EXTNAV;
+                }
                 GCS_SEND_TEXT(MAV_SEVERITY_INFO, "EKF3 IMU%u is using external nav data",(unsigned)imu_index);
                 GCS_SEND_TEXT(MAV_SEVERITY_INFO, "EKF3 IMU%u initial pos NED = %3.1f,%3.1f,%3.1f (m)",(unsigned)imu_index,(double)extNavDataDelayed.pos.x,(double)extNavDataDelayed.pos.y,(double)extNavDataDelayed.pos.z);
                 if (useExtNavVel) {
@@ -477,9 +481,11 @@ void NavEKF3_core::setAidingMode()
                     GCS_SEND_TEXT(MAV_SEVERITY_INFO, "EKF3 IMU%u initial vel NED = %3.1f,%3.1f,%3.1f (m/s)",(unsigned)imu_index,(double)extNavVelDelayed.vel.x,(double)extNavVelDelayed.vel.y,(double)extNavVelDelayed.vel.z);
                 }
                 // handle height reset as special case
-                hgtMea = -extNavDataDelayed.pos.z;
-                posDownObsNoise = sq(constrain_ftype(extNavDataDelayed.posErr, 0.1f, 10.0f));
-                ResetHeight();
+                if (frontend->sources.getPosZSource() == AP_NavEKF_Source::SourceZ::EXTNAV) {
+                    hgtMea = -extNavDataDelayed.pos.z;
+                    posDownObsNoise = sq(constrain_ftype(extNavDataDelayed.posCov[5], 0.1f, 10.0f));
+                    ResetHeight();
+                }
 #endif // EK3_FEATURE_EXTERNAL_NAV
             }
 
@@ -560,6 +566,7 @@ bool NavEKF3_core::readyToUseBodyOdm(void) const
 {
 #if EK3_FEATURE_BODY_ODOM
     if (!frontend->sources.useVelXYSource(AP_NavEKF_Source::SourceXY::EXTNAV) &&
+        !frontend->sources.useVelXYSource(AP_NavEKF_Source::SourceXY::GPSANDEXTNAV) &&
         !frontend->sources.useVelXYSource(AP_NavEKF_Source::SourceXY::WHEEL_ENCODER)) {
         // exit immediately if sources not configured to fuse external nav or wheel encoders
         return false;
@@ -584,7 +591,7 @@ bool NavEKF3_core::readyToUseBodyOdm(void) const
 // return true if the filter to be ready to use gps
 bool NavEKF3_core::readyToUseGPS(void) const
 {
-    if (frontend->sources.getPosXYSource() != AP_NavEKF_Source::SourceXY::GPS) {
+    if (frontend->sources.getPosXYSource() != AP_NavEKF_Source::SourceXY::GPS && frontend->sources.getPosXYSource() != AP_NavEKF_Source::SourceXY::GPSANDEXTNAV) {
         return false;
     }
 
@@ -609,10 +616,10 @@ bool NavEKF3_core::readyToUseRangeBeacon(void) const
 bool NavEKF3_core::readyToUseExtNav(void) const
 {
 #if EK3_FEATURE_EXTERNAL_NAV
-    if (frontend->sources.getPosXYSource() != AP_NavEKF_Source::SourceXY::EXTNAV) {
+    if (frontend->sources.getPosXYSource() != AP_NavEKF_Source::SourceXY::EXTNAV &&
+        frontend->sources.getPosXYSource() != AP_NavEKF_Source::SourceXY::GPSANDEXTNAV) {
         return false;
     }
-
     return tiltAlignComplete && extNavDataToFuse;
 #else
     return false;
@@ -674,6 +681,11 @@ bool NavEKF3_core::assume_zero_sideslip(void) const
 // returns false if the origin is already set
 bool NavEKF3_core::setOriginLLH(const Location &loc)
 {
+    if ((PV_AidingMode == AID_ABSOLUTE) && (frontend->sources.getPosXYSource() == AP_NavEKF_Source::SourceXY::GPSANDEXTNAV)) {
+        // external nav use requries a stable public origin
+        return false;
+    }
+
     return setOrigin(loc);
 }
 
@@ -787,7 +799,7 @@ void  NavEKF3_core::updateFilterStatus(void)
     status.flags.takeoff = dal.get_takeoff_expected(); // The EKF has been told to expect takeoff is in a ground effect mitigation mode and has started the EKF-GSF yaw estimator
     status.flags.touchdown = dal.get_touchdown_expected(); // The EKF has been told to detect touchdown and is in a ground effect mitigation mode
     status.flags.using_gps = ((imuSampleTime_ms - lastGpsPosPassTime_ms) < 4000) && (PV_AidingMode == AID_ABSOLUTE);
-    status.flags.gps_glitching = !gpsAccuracyGood && (PV_AidingMode == AID_ABSOLUTE) && (frontend->sources.getPosXYSource() == AP_NavEKF_Source::SourceXY::GPS); // GPS glitching is affecting navigation accuracy
+    status.flags.gps_glitching = !gpsAccuracyGood && (PV_AidingMode == AID_ABSOLUTE) && (frontend->sources.getPosXYSource() == AP_NavEKF_Source::SourceXY::GPS || frontend->sources.getPosXYSource() == AP_NavEKF_Source::SourceXY::GPSANDEXTNAV); // GPS glitching is affecting navigation accuracy
     status.flags.gps_quality_good = gpsGoodToAlign;
     // for reporting purposes we report rejecting airspeed after 3s of not fusing when we want to fuse the data
     status.flags.rejecting_airspeed = lastTasFailTime_ms != 0 &&
@@ -807,7 +819,7 @@ void NavEKF3_core::runYawEstimatorPrediction()
     }
 
     // ensure GPS is used for horizontal position and velocity
-    if (frontend->sources.getPosXYSource() != AP_NavEKF_Source::SourceXY::GPS ||
+    if (!(frontend->sources.getPosXYSource() == AP_NavEKF_Source::SourceXY::GPS || frontend->sources.getPosXYSource() == AP_NavEKF_Source::SourceXY::GPSANDEXTNAV) ||
         !frontend->sources.useVelXYSource(AP_NavEKF_Source::SourceXY::GPS)) {
         return;
     }
@@ -828,7 +840,7 @@ void NavEKF3_core::runYawEstimatorCorrection()
         return;
     }
     // ensure GPS is used for horizontal position and velocity
-    if (frontend->sources.getPosXYSource() != AP_NavEKF_Source::SourceXY::GPS ||
+    if (!(frontend->sources.getPosXYSource() == AP_NavEKF_Source::SourceXY::GPS || frontend->sources.getPosXYSource() == AP_NavEKF_Source::SourceXY::GPSANDEXTNAV) ||
         !frontend->sources.useVelXYSource(AP_NavEKF_Source::SourceXY::GPS)) {
         return;
     }
