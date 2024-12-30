@@ -3905,15 +3905,22 @@ void GCS_MAVLINK::handle_odometry(const mavlink_message_t &msg)
 
     Quaternion q{m.q[0],m.q[1],m.q[2],m.q[3]};
 
-    float posErr = 0;
-    float angErr = 0;
+    // m.pose_covariance is Row-major representation of pose 6x6 cross-covariance matrix upper right triangle (states: x_global, y_global, z_global, roll, pitch, yaw; first six entries are the first ROW, next five entries are the second ROW, etc.). If unknown, NaN value assigned to first element in the array.*/
+    float posCov[6];
+    posCov[0] = m.pose_covariance[0];
+    posCov[1] = m.pose_covariance[1];
+    posCov[2] = m.pose_covariance[2];
+    posCov[3] = m.pose_covariance[6];
+    posCov[4] = m.pose_covariance[7];
+    posCov[5] = m.pose_covariance[11];
+
+    float angErr = NAN;
     if (!isnan(m.pose_covariance[0])) {
-        posErr = cbrtf(sq(m.pose_covariance[0])+sq(m.pose_covariance[6])+sq(m.pose_covariance[11]));
         angErr = cbrtf(sq(m.pose_covariance[15])+sq(m.pose_covariance[18])+sq(m.pose_covariance[20]));
     }
 
     const uint32_t timestamp_ms = correct_offboard_timestamp_usec_to_ms(m.time_usec, PAYLOAD_SIZE(chan, ODOMETRY));
-    visual_odom->handle_pose_estimate(m.time_usec, timestamp_ms, m.x, m.y, m.z, q, posErr, angErr, m.reset_counter, m.quality);
+    visual_odom->handle_pose_estimate(m.time_usec, timestamp_ms, m.x, m.y, m.z, q, posCov, angErr, m.reset_counter, m.quality);
 
     // convert velocity vector from FRD to NED frame
     Vector3f vel{m.vx, m.vy, m.vz};
@@ -3935,7 +3942,6 @@ void GCS_MAVLINK::handle_common_vision_position_estimate_data(const uint64_t use
                                                               const uint8_t reset_counter,
                                                               const uint16_t payload_size)
 {
-    float posErr = 0;
     float angErr = 0;
     // correct offboard timestamp to be in local ms since boot
     uint32_t timestamp_ms = correct_offboard_timestamp_usec_to_ms(usec, payload_size);
@@ -3945,12 +3951,19 @@ void GCS_MAVLINK::handle_common_vision_position_estimate_data(const uint64_t use
         return;
     }
 
+    float posCov[6];
     if (!isnan(covariance[0])) {
-        posErr = cbrtf(sq(covariance[0])+sq(covariance[6])+sq(covariance[11]));
+        // m.covariance is Row-major representation of pose 6x6 cross-covariance matrix upper right triangle (states: x_global, y_global, z_global, roll, pitch, yaw; first six entries are the first ROW, next five entries are the second ROW, etc.). If unknown, NaN value assigned to first element in the array.*/
+        posCov[0] = covariance[0];
+        posCov[1] = covariance[1];
+        posCov[2] = covariance[2];
+        posCov[3] = covariance[6];
+        posCov[4] = covariance[7];
+        posCov[5] = covariance[11];
         angErr = cbrtf(sq(covariance[15])+sq(covariance[18])+sq(covariance[20]));
     }
 
-    visual_odom->handle_pose_estimate(usec, timestamp_ms, x, y, z, roll, pitch, yaw, posErr, angErr, reset_counter, 0);
+    visual_odom->handle_pose_estimate(usec, timestamp_ms, x, y, z, roll, pitch, yaw, posCov, angErr, reset_counter, 0);
 }
 
 void GCS_MAVLINK::handle_att_pos_mocap(const mavlink_message_t &msg)
@@ -3965,8 +3978,18 @@ void GCS_MAVLINK::handle_att_pos_mocap(const mavlink_message_t &msg)
     if (visual_odom == nullptr) {
         return;
     }
+
+    // m.covariance is Row-major representation of pose 6x6 cross-covariance matrix upper right triangle (states: x_global, y_global, z_global, roll, pitch, yaw; first six entries are the first ROW, next five entries are the second ROW, etc.). If unknown, NaN value assigned to first element in the array.*/
+    float posCov[6];
+    posCov[0] = m.covariance[0];
+    posCov[1] = m.covariance[1];
+    posCov[2] = m.covariance[2];
+    posCov[3] = m.covariance[6];
+    posCov[4] = m.covariance[7];
+    posCov[5] = m.covariance[11];
+
     // note: att_pos_mocap does not include reset counter
-    visual_odom->handle_pose_estimate(m.time_usec, timestamp_ms, m.x, m.y, m.z, m.q, 0, 0, 0, 0);
+    visual_odom->handle_pose_estimate(m.time_usec, timestamp_ms, m.x, m.y, m.z, m.q, posCov, 0, 0, 0);
 }
 
 void GCS_MAVLINK::handle_vision_speed_estimate(const mavlink_message_t &msg)
