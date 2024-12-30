@@ -113,13 +113,15 @@ void Vicon::update_vicon_position_estimate(const Location &loc,
         return;
     }
 
-    if (now_us - last_observation_usec < 20000) {
-        // create observations at 20ms intervals (matches EKF max rate)
+    const uint64_t dt_usec = 200000;
+    if (now_us - last_observation_usec < dt_usec) {
+        // create observations at 200ms intervals
         return;
     }
 
     // failure simulation
     if (_sitl->vicon_fail.get() != 0) {
+        posNE_variance = 0.0f; // reset variance calculation
         return;
     }
 
@@ -162,12 +164,49 @@ void Vicon::update_vicon_position_estimate(const Location &loc,
     // add yaw error reported to vehicle
     yaw = wrap_PI(yaw + radians(_sitl->vicon_yaw_error.get()));
 
-    // 25ms to 124ms delay before sending
-    uint32_t delay_ms = 25 + unsigned(random()) % 100;
-    uint64_t time_send_us = now_us + delay_ms * 1000UL;
+    // model time delay as fixed value of 50 msec plus a random variable from an exponential distribution.
+    // 50% of samples are less than 250 msec
+    float delay_ms = 50.0f + 200.0f * expRandVar(1.0f);
+    uint64_t time_send_us = now_us + (uint64_t)(1E3f * delay_ms);
+
+    // send global vision position estimate message
+    uint8_t msg_buf_index;
+    if (should_send(ViconTypeMask::GLOBAL_VISION_POSITION_ESTIMATE) && get_free_msg_buf_index(msg_buf_index)) {
+        // Use last the element in covariance to send the delay of the measurement with respect to transmission time
+        // in micro seconds. This is a temporary solution.
+        // This enables the message to be time stamped at transmission  which allows the autopilots clock offset
+        // estimation to work when there is a large range of measurement delays.
+        // TODO extend the MAVLink message definition to send this time delay as a uint32 type and
+        // coordinate with community providing evidence for why this is necessary.
+        const float delay_usec = 1E3f * (float)delay_ms; // delay of measurement wrt mavlink transmission
+        // Mimic a simple position error variance growth assuming a velocity error in an underlying odometry process
+        // that is un-correlated from frame to frame.
+        posNE_variance += sq(vel_error * 1E-6f * (float)dt_usec);
+        const float hgt_variance = sq(hgt_error);
+        const float covariance[21] = {posNE_variance, 0,        0,              0,  0,  0,
+                                                posNE_variance, 0,              0,  0,  0,
+                                                                hgt_variance,   0,  0,  0,
+                                                                                0,  0,  0,
+                                                                                    0,  0,
+                                                                                        delay_usec};
+        mavlink_msg_global_vision_position_estimate_pack_chan(
+            system_id,
+            component_id,
+            mavlink_ch,
+            &msg_buf[msg_buf_index].obs_msg,
+            time_send_us + time_offset_us, // note that we time stamp the message at transmission time
+            pos_corrected.x,
+            pos_corrected.y,
+            pos_corrected.z,
+            NULL,
+            NULL,
+            NULL,
+            covariance,
+            0);
+        msg_buf[msg_buf_index].time_send_us = time_send_us;
+    }
 
     // send vision position estimate message
-    uint8_t msg_buf_index;
     if (should_send(ViconTypeMask::VISION_POSITION_ESTIMATE) && get_free_msg_buf_index(msg_buf_index)) {
         const mavlink_vision_position_estimate_t vision_position_estimate{
         usec: now_us + time_offset_us,
@@ -316,4 +355,10 @@ void Vicon::update(const Location &loc, const Vector3d &position, const Vector3f
 
     maybe_send_heartbeat();
     update_vicon_position_estimate(loc, position, velocity, attitude);
+}
+
+float Vicon::expRandVar(float lambda) {
+    double U = (float)rand()/ (float)RAND_MAX;
+    float T  = -log(U) / lambda;
+    return T;
 }
