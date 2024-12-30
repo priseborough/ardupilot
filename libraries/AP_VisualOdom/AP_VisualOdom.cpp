@@ -198,7 +198,7 @@ void AP_VisualOdom::handle_vision_position_delta_msg(const mavlink_message_t &ms
 // general purpose method to consume position estimate data and send to EKF
 // distances in meters, roll, pitch and yaw are in radians
 // quality of -1 means failed, 0 means unknown, 1 is worst, 100 is best
-void AP_VisualOdom::handle_pose_estimate(uint64_t remote_time_us, uint32_t time_ms, float x, float y, float z, float roll, float pitch, float yaw, float posErr, float angErr, uint8_t reset_counter, int8_t quality)
+void AP_VisualOdom::handle_pose_estimate(uint64_t remote_time_us, uint32_t time_ms, float x, float y, float z, float roll, float pitch, float yaw, const float posCov[6], float angErr, uint8_t reset_counter, int8_t quality)
 {
     // exit immediately if not enabled
     if (!enabled()) {
@@ -210,13 +210,13 @@ void AP_VisualOdom::handle_pose_estimate(uint64_t remote_time_us, uint32_t time_
         // convert attitude to quaternion and call backend
         Quaternion attitude;
         attitude.from_euler(roll, pitch, yaw);
-        _driver->handle_pose_estimate(remote_time_us, time_ms, x, y, z, attitude, posErr, angErr, reset_counter, quality);
+        _driver->handle_pose_estimate(remote_time_us, time_ms, x, y, z, attitude, posCov, angErr, reset_counter, quality);
     }
 }
 
 // general purpose method to consume position estimate data and send to EKF
 // quality of -1 means failed, 0 means unknown, 1 is worst, 100 is best
-void AP_VisualOdom::handle_pose_estimate(uint64_t remote_time_us, uint32_t time_ms, float x, float y, float z, const Quaternion &attitude, float posErr, float angErr, uint8_t reset_counter, int8_t quality)
+void AP_VisualOdom::handle_pose_estimate(uint64_t remote_time_us, uint32_t time_ms, float x, float y, float z, const Quaternion &attitude, const float posCov[6], float angErr, uint8_t reset_counter, int8_t quality)
 {
     // exit immediately if not enabled
     if (!enabled()) {
@@ -225,7 +225,7 @@ void AP_VisualOdom::handle_pose_estimate(uint64_t remote_time_us, uint32_t time_
 
     // call backend
     if (_driver != nullptr) {
-        _driver->handle_pose_estimate(remote_time_us, time_ms, x, y, z, attitude, posErr, angErr, reset_counter, quality);
+        _driver->handle_pose_estimate(remote_time_us, time_ms, x, y, z, attitude, posCov, angErr, reset_counter, quality);
     }
 }
 
