@@ -31,16 +31,17 @@ void AP_DDS_External_Odom::handle_external_odom(const tf2_msgs_msg_TFMessage& ms
         // TODO what if the quaternion is NaN?
         ap_rotation.normalize();
 
-        // No error is available in TF, trust the data as-is
-        const float posErr {0.0};
-        const float angErr {0.0};
+        // No error is available in TF, setting these to NAN will cause SW to use parameter defined accuracy
+        float posCov[6];
+        posCov[0] = NAN;
+        const float angErr = NAN;
         // The odom to base_link transform used is locally consistent per ROS REP-105.
         // https://www.ros.org/reps/rep-0105.html#id16
         // Thus, there will not be any resets.
         const uint8_t reset_counter {0};
         // TODO implement jitter correction similar to GCS_MAVLINK::correct_offboard_timestamp_usec_to_ms(remote_time_us, sizeof(msg));
         const uint32_t time_ms {static_cast<uint32_t>(remote_time_us * 1E-3)};
-        visual_odom->handle_pose_estimate(remote_time_us, time_ms, ap_position.x, ap_position.y, ap_position.z, ap_rotation, posErr, angErr, reset_counter, 0);
+        visual_odom->handle_pose_estimate(remote_time_us, time_ms, ap_position.x, ap_position.y, ap_position.z, ap_rotation, posCov, angErr, reset_counter, 0);
 
     }
 }
