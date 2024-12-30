@@ -22,7 +22,8 @@ public:
         BEACON = 4,
         OPTFLOW = 5,
         EXTNAV = 6,
-        WHEEL_ENCODER = 7
+        WHEEL_ENCODER = 7,
+        GPSANDEXTNAV = 8,
     };
 
     enum class SourceZ : uint8_t {
