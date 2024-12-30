@@ -355,17 +355,21 @@ void AP_DAL::writeOptFlowMeas(const uint8_t rawFlowQuality, const Vector2f &rawF
 }
 
 // log external navigation data
-void AP_DAL::writeExtNavData(const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint16_t delay_ms, uint32_t resetTime_ms)
+void AP_DAL::writeExtNavData(const Vector3f &pos, const Quaternion &quat, const float posCov[6], float angErr, uint32_t timeStamp_ms, uint32_t resetTime_ms)
 {
     end_frame();
 
     const log_REPH old = _REPH;
     _REPH.pos = pos;
     _REPH.quat = quat;
-    _REPH.posErr = posErr;
+    _REPH.posCov_0 = posCov[0];
+    _REPH.posCov_1 = posCov[1];
+    _REPH.posCov_2 = posCov[2];
+    _REPH.posCov_3 = posCov[3];
+    _REPH.posCov_4 = posCov[4];
+    _REPH.posCov_5 = posCov[5];
     _REPH.angErr = angErr;
     _REPH.timeStamp_ms = timeStamp_ms;
-    _REPH.delay_ms = delay_ms;
     _REPH.resetTime_ms = resetTime_ms;
     WRITE_REPLAY_BLOCK_IFCHANGED(REPH, _REPH, old);
 }
