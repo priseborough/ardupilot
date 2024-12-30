@@ -295,6 +295,7 @@ void AP_NavEKF_Source::align_inactive_sources()
 bool AP_NavEKF_Source::usingGPS() const
 {
     return getPosXYSource() == SourceXY::GPS ||
+           getPosXYSource() == SourceXY::GPSANDEXTNAV ||
            getPosZSource() == SourceZ::GPS ||
            getVelXYSource() == SourceXY::GPS ||
            getVelZSource() == SourceZ::GPS ||
@@ -350,6 +351,10 @@ bool AP_NavEKF_Source::pre_arm_check(bool requires_position, char *failure_msg, 
                 beacon_required = true;
                 break;
             case SourceXY::EXTNAV:
+                visualodom_required = true;
+                break;
+            case SourceXY::GPSANDEXTNAV:
+                gps_required = true;
                 visualodom_required = true;
                 break;
             case SourceXY::OPTFLOW:
@@ -524,7 +529,7 @@ bool AP_NavEKF_Source::ext_nav_enabled(void) const
 {
     for (uint8_t i=0; i<AP_NAKEKF_SOURCE_SET_MAX; i++) {
         const auto &src = _source_set[i];
-        if (src.posxy == SourceXY::EXTNAV) {
+        if (src.posxy == SourceXY::EXTNAV || src.posxy == SourceXY::GPSANDEXTNAV) {
             return true;
         }
         if (src.posz == SourceZ::EXTNAV) {
