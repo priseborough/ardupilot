@@ -303,7 +303,7 @@ public:
     void writeDefaultAirSpeed(float airspeed, float uncertainty);
 
     // Write position and quaternion data from an external navigation system
-    void writeExtNavData(const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint16_t delay_ms, uint32_t resetTime_ms);
+    void writeExtNavData(const Vector3f &pos, const Quaternion &quat, const float posCov[6], float angErr, uint32_t timeStamp_ms, uint16_t delay_ms, uint32_t resetTime_ms);
 
     // Write velocity data from an external navigation system
     void writeExtNavVelData(const Vector3f &vel, float err, uint32_t timeStamp_ms, uint16_t delay_ms);
