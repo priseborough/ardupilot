@@ -450,35 +450,33 @@ void NavEKF3_core::CorrectGPSForAntennaOffset(gps_elements &gps_data) const
     gps_data.hgt += posOffsetEarth.z;
 }
 
-// correct external navigation earth-frame position using sensor body-frame offset
+// correct external navigation earth-frame position for sensor body-frame and earth frame origin offset
 void NavEKF3_core::CorrectExtNavForSensorOffset(ext_nav_elements &ext_nav_data)
 {
-    // return immediately if already corrected
-    if (ext_nav_data.corrected) {
-        return;
-    }
-    ext_nav_data.corrected = true;
-
     // external nav data is against the public_origin, so convert to offset from EKF_origin
     const Vector2F NE_offset = EKF_origin.get_distance_NE_ftype(public_origin);
     ext_nav_data.pos.xy() += NE_offset;
 
+
 #if HAL_VISUALODOM_ENABLED
-    const auto *visual_odom = dal.visualodom();
-    if (visual_odom != nullptr) {
-        const Vector3F posOffsetBody = visual_odom->get_pos_offset().toftype() - accelPosOffset;
-        if (!posOffsetBody.is_zero()) {
-            Vector3F posOffsetEarth = prevTnb.mul_transpose(posOffsetBody);
-            ext_nav_data.pos.x -= posOffsetEarth.x;
-            ext_nav_data.pos.y -= posOffsetEarth.y;
-            ext_nav_data.pos.z -= posOffsetEarth.z;
+    if (!ext_nav_data.corrected) {
+        const auto *visual_odom = dal.visualodom();
+        if (visual_odom != nullptr) {
+            const Vector3F posOffsetBody = visual_odom->get_pos_offset().toftype() - accelPosOffset;
+            if (!posOffsetBody.is_zero()) {
+                Vector3F posOffsetEarth = prevTnb.mul_transpose(posOffsetBody);
+                ext_nav_data.pos.x -= posOffsetEarth.x;
+                ext_nav_data.pos.y -= posOffsetEarth.y;
+                ext_nav_data.pos.z -= posOffsetEarth.z;
+            }
         }
+        ext_nav_data.corrected = true;
     }
 #endif
 
     // When simultaneously using GPS and external nav data, adjust external nav slowly to prevent
     // the external nav fighting the GPS as it drifts,
-    // TODO calculate the correction using covariance ad other data after we get replay logs
+    // TODO calculate the correction using covariance and other data after we get replay logs
     const AP_NavEKF_Source::SourceXY posxy_source = frontend->sources.getPosXYSource();
     if ((posxy_source == AP_NavEKF_Source::SourceXY::GPSANDEXTNAV) &&
         (gpsCheckStatus.bad_hAcc == false) &&
@@ -486,14 +484,24 @@ void NavEKF3_core::CorrectExtNavForSensorOffset(ext_nav_elements &ext_nav_data)
     {
         // update origin correction to track EKF
         const uint32_t dt_msec = imuDataDelayed.time_ms - lastExtNavOriginTime_ms;
-        if ((dt_msec > 5000 || posxy_source == AP_NavEKF_Source::SourceXY::GPS) && !gpsCheckStatus.bad_hAcc)  {
+        if ((dt_msec > 5000 || posxy_source == AP_NavEKF_Source::SourceXY::GPS || extNavDataDelayed.posReset) && !gpsCheckStatus.bad_hAcc)  {
             extNavOriginNED = stateStruct.position - ext_nav_data.pos;
+            extNavDataDelayed.posReset = false;
         } else {
             const ftype dt_sec = 0.001f * (float)dt_msec;
             const ftype alpha = dt_sec / (dt_sec + frontend->_extNavOriginTconst);
             extNavOriginNED = extNavOriginNED * (1.0f - alpha) + (stateStruct.position - ext_nav_data.pos) * alpha;
         }
         lastExtNavOriginTime_ms = imuDataDelayed.time_ms;
+    }
+
+    // correct position for offset of origin
+    ext_nav_data.pos += extNavOriginNED;
+
+    // action any pending reset request
+    if (extNavDataDelayed.posReset) {
+        ResetPosition(resetDataSource::EXTNAV);
+        extNavDataDelayed.posReset = false;
     }
 }
 
