@@ -198,9 +198,9 @@ void Vicon::update_vicon_position_estimate(const Location &loc,
             pos_corrected.x,
             pos_corrected.y,
             pos_corrected.z,
-            NULL,
-            NULL,
-            NULL,
+            0,
+            0,
+            0,
             covariance,
             0);
         msg_buf[msg_buf_index].time_send_us = time_send_us;

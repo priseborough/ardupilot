@@ -41,6 +41,7 @@ private:
     // TODO: make these parameters:
     const uint8_t system_id = 17;
     const uint8_t component_id = 18;
+    const uint8_t mavlink_ch = 18;
     const float vel_error = 0.25f; // 1-sigma horizontal drift rate (m/s) - TODO make this tuneable and set based on flight test data
     const float hgt_error = 5.0f; // 1-sigma height error (m) - TODO make this tuneable and set based on flight test data
 
