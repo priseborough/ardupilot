@@ -630,6 +630,10 @@ void NavEKF3_core::SelectVelPosFusion()
         fusePosData = true;
         velPosObs[3] = extNavDataDelayed.pos.x;
         velPosObs[4] = extNavDataDelayed.pos.y;
+        // handle special case where we have an absolute position measurement and the NE observation errors are correlatred
+        if (is_positive(frontend->_extNavPosNoiseMin) && !is_zero(extNavDataDelayed.posCov[1])) {
+            FusePosNE();
+        }
 #endif // EK3_FEATURE_EXTERNAL_NAV
     }
 
@@ -725,6 +729,574 @@ void NavEKF3_core::SelectVelPosFusion()
         fuseHgtData = false;
         fusePosData = false;
     }
+}
+
+void NavEKF3_core::FusePosNE()
+{
+#if EK3_FEATURE_EXTERNAL_NAV
+
+    float innovation[2];
+    innovation[0] = stateStruct.position.x - velPosObs[3];
+    innovation[1] = stateStruct.position.y - velPosObs[4];
+
+    const float obsVarNN = extNavDataDelayed.posCov[0];
+    const float obsVarNE = extNavDataDelayed.posCov[1];
+    const float obsVarEE = extNavDataDelayed.posCov[3];
+
+    // Intermediate variables
+    const ftype t0 = P[7][7]*P[8][8] + P[7][7]*obsVarEE - sq(P[7][8]) - 2*P[7][8]*obsVarNE + P[8][8]*obsVarNN + obsVarEE*obsVarNN - sq(obsVarNE);
+    const ftype t1 = 1.0F/(t0);
+    const ftype t2 = P[8][8] + obsVarEE;
+    const ftype t3 = P[7][8] + obsVarNE;
+    const ftype t4 = -t1*t3;
+    const ftype t5 = P[7][7] + obsVarNN;
+    const ftype t6 = P[0][7]*t2 - P[0][8]*t3;
+    const ftype t7 = -P[0][7]*t3 + P[0][8]*t5;
+    const ftype t8 = P[1][7]*t2 - P[1][8]*t3;
+    const ftype t9 = -P[1][7]*t3 + P[1][8]*t5;
+    const ftype t10 = P[2][7]*t2 - P[2][8]*t3;
+    const ftype t11 = -P[2][7]*t3 + P[2][8]*t5;
+    const ftype t12 = P[3][7]*t2 - P[3][8]*t3;
+    const ftype t13 = -P[3][7]*t3 + P[3][8]*t5;
+    const ftype t14 = P[4][7]*t2 - P[4][8]*t3;
+    const ftype t15 = -P[4][7]*t3 + P[4][8]*t5;
+    const ftype t16 = P[5][7]*t2 - P[5][8]*t3;
+    const ftype t17 = -P[5][7]*t3 + P[5][8]*t5;
+    const ftype t18 = P[6][7]*t2 - P[6][8]*t3;
+    const ftype t19 = -P[6][7]*t3 + P[6][8]*t5;
+    const ftype t20 = -P[7][8]*t3;
+    const ftype t21 = P[7][7]*t2 + t20;
+    const ftype t22 = -P[7][7]*t3 + P[7][8]*t5;
+    const ftype t23 = P[7][8]*t2 - P[8][8]*t3;
+    const ftype t24 = P[8][8]*t5 + t20;
+    const ftype t25 = P[7][9]*t2 - P[8][9]*t3;
+    const ftype t26 = -P[7][9]*t3 + P[8][9]*t5;
+
+    ftype t27;
+    ftype t28;
+    ftype t29;
+    ftype t30;
+    ftype t31;
+    ftype t32;
+    if (!inhibitDelAngBiasStates) {
+        t27 = P[7][10]*t2 - P[8][10]*t3;
+        t28 = -P[7][10]*t3 + P[8][10]*t5;
+        t29 = P[7][11]*t2 - P[8][11]*t3;
+        t30 = -P[7][11]*t3 + P[8][11]*t5;
+        t31 = P[7][12]*t2 - P[8][12]*t3;
+        t32 = -P[7][12]*t3 + P[8][12]*t5;
+    } else {
+        t27 = t28 = t29 = t30 = t31 = t32 = 0;
+    }
+
+    ftype t33;
+    ftype t34;
+    ftype t35;
+    ftype t36;
+    ftype t37;
+    ftype t38;
+    if (!inhibitDelVelBiasStates && !badIMUdata) {
+        t33 = P[7][13]*t2 - P[8][13]*t3;
+        t34 = -P[7][13]*t3 + P[8][13]*t5;
+        t35 = P[7][14]*t2 - P[8][14]*t3;
+        t36 = -P[7][14]*t3 + P[8][14]*t5;
+        t37 = P[7][15]*t2 - P[8][15]*t3;
+        t38 = -P[7][15]*t3 + P[8][15]*t5;
+    } else {
+        t33 = t34 = t35 = t36 = t37 = t38 = 0;
+    }
+
+    ftype t39;
+    ftype t40;
+    ftype t41;
+    ftype t42;
+    ftype t43;
+    ftype t44;
+    ftype t45;
+    ftype t46;
+    ftype t47;
+    ftype t48;
+    ftype t49;
+    ftype t50;
+    if (!inhibitMagStates) {
+        t39 = P[7][16]*t2 - P[8][16]*t3;
+        t40 = -P[7][16]*t3 + P[8][16]*t5;
+        t41 = P[7][17]*t2 - P[8][17]*t3;
+        t42 = -P[7][17]*t3 + P[8][17]*t5;
+        t43 = P[7][18]*t2 - P[8][18]*t3;
+        t44 = -P[7][18]*t3 + P[8][18]*t5;
+        t45 = P[7][19]*t2 - P[8][19]*t3;
+        t46 = -P[7][19]*t3 + P[8][19]*t5;
+        t47 = P[7][20]*t2 - P[8][20]*t3;
+        t48 = -P[7][20]*t3 + P[8][20]*t5;
+        t49 = P[7][21]*t2 - P[8][21]*t3;
+        t50 = -P[7][21]*t3 + P[8][21]*t5;
+    } else {
+        t39 = t40 = t41 = t42 = t43 = t44 = t45 = t46 = t47 = t48 = t49 = t50 = 0;
+    }
+
+    ftype t51;
+    ftype t52;
+    ftype t53;
+    ftype t54;
+    if (!inhibitWindStates && !treatWindStatesAsTruth) {
+        t51 = P[7][22]*t2 - P[8][22]*t3;
+        t52 = -P[7][22]*t3 + P[8][22]*t5;
+        t53 = P[7][23]*t2 - P[8][23]*t3;
+        t54 = -P[7][23]*t3 + P[8][23]*t5;
+    } else {
+        t51 = t52 = t53 = t54 = 0;
+    }
+
+    const ftype t55 = 1.0F/sq(t0);
+    const ftype t56 = t55*(t2*t7 + t3*t6);
+    const ftype t57 = t55*(t3*t7 + t5*t6);
+    const ftype t58 = t55*(t2*t9 + t3*t8);
+    const ftype t59 = t55*(t3*t9 + t5*t8);
+    const ftype t60 = t55*(t10*t3 + t11*t2);
+    const ftype t61 = t55*(t10*t5 + t11*t3);
+    const ftype t62 = t55*(t12*t3 + t13*t2);
+    const ftype t63 = t55*(t12*t5 + t13*t3);
+    const ftype t64 = t55*(t14*t3 + t15*t2);
+    const ftype t65 = t55*(t14*t5 + t15*t3);
+    const ftype t66 = t55*(t16*t3 + t17*t2);
+    const ftype t67 = t55*(t16*t5 + t17*t3);
+    const ftype t68 = t55*(t18*t3 + t19*t2);
+    const ftype t69 = t55*(t18*t5 + t19*t3);
+    const ftype t70 = t55*(t2*t22 + t21*t3);
+    const ftype t71 = t55*(t21*t5 + t22*t3);
+    const ftype t72 = t55*(t2*t24 + t23*t3);
+    const ftype t73 = t55*(t23*t5 + t24*t3);
+    const ftype t74 = t55*(t2*t26 + t25*t3);
+    const ftype t75 = t55*(t25*t5 + t26*t3);
+    const ftype t76 = t55*(t2*t28 + t27*t3);
+    const ftype t77 = t55*(t27*t5 + t28*t3);
+    const ftype t78 = t55*(t2*t30 + t29*t3);
+    const ftype t79 = t55*(t29*t5 + t3*t30);
+    const ftype t80 = t55*(t2*t32 + t3*t31);
+    const ftype t81 = t55*(t3*t32 + t31*t5);
+    const ftype t82 = t55*(t2*t34 + t3*t33);
+    const ftype t83 = t55*(t3*t34 + t33*t5);
+    const ftype t84 = t55*(t2*t36 + t3*t35);
+    const ftype t85 = t55*(t3*t36 + t35*t5);
+    const ftype t86 = t55*(t2*t38 + t3*t37);
+    const ftype t87 = t55*(t3*t38 + t37*t5);
+    const ftype t88 = t55*(t2*t40 + t3*t39);
+    const ftype t89 = t55*(t3*t40 + t39*t5);
+    const ftype t90 = t55*(t2*t42 + t3*t41);
+    const ftype t91 = t55*(t3*t42 + t41*t5);
+    const ftype t92 = t55*(t2*t44 + t3*t43);
+    const ftype t93 = t55*(t3*t44 + t43*t5);
+    const ftype t94 = t55*(t2*t46 + t3*t45);
+    const ftype t95 = t55*(t3*t46 + t45*t5);
+    const ftype t96 = t55*(t2*t48 + t3*t47);
+    const ftype t97 = t55*(t3*t48 + t47*t5);
+    const ftype t98 = t55*(t2*t50 + t3*t49);
+    const ftype t99 = t55*(t3*t50 + t49*t5);
+    const ftype t100 = t55*(t2*t52 + t3*t51);
+    const ftype t101 = t55*(t3*t52 + t5*t51);
+    const ftype t102 = t55*(t2*t54 + t3*t53);
+    const ftype t103 = t55*(t3*t54 + t5*t53);
+
+    // Equations for NE position innovation variance inverse elements
+    const ftype S_inv_NN = t1*t2;
+    const ftype S_inv_NE = t4;
+    const ftype S_inv_EE = t1*t5;
+
+    // The following expression was derived from test ratio = transpose(innovation) * inverse(innovation variance) * innovation = [1x2] * [2,2] * [2,1] = [1,1]
+    const ftype test_ratio = innovation[0]*(innovation[0]*S_inv_NN + innovation[1]*S_inv_NE) + innovation[1]*(innovation[0]*S_inv_NE + innovation[1]*S_inv_EE);
+
+    // these innovation variances are approximate and used for reporting only
+    varInnovVelPos[3] = t5;
+    varInnovVelPos[4] = t2;
+
+    if (test_ratio < 25.0f) {
+        lastGpsPosPassTime_ms = imuSampleTime_ms;
+    } else {
+        return;
+    }
+
+    // Equations for NE position Kalman gain
+    ftype K[24][2];
+    K[0][0] = t1*t6;
+    K[1][0] = t1*t8;
+    K[2][0] = t1*t10;
+    K[3][0] = t1*t12;
+    K[4][0] = t1*t14;
+    K[5][0] = t1*t16;
+    K[6][0] = t1*t18;
+    K[7][0] = t1*t21;
+    K[8][0] = t1*t23;
+    K[9][0] = t1*t25;
+    K[10][0] = t1*t27;
+    K[11][0] = t1*t29;
+    K[12][0] = t1*t31;
+    K[13][0] = t1*t33;
+    K[14][0] = t1*t35;
+    K[15][0] = t1*t37;
+    K[16][0] = t1*t39;
+    K[17][0] = t1*t41;
+    K[18][0] = t1*t43;
+    K[19][0] = t1*t45;
+    K[20][0] = t1*t47;
+    K[21][0] = t1*t49;
+    K[22][0] = t1*t51;
+    K[23][0] = t1*t53;
+    K[0][1] = t1*t7;
+    K[1][1] = t1*t9;
+    K[2][1] = t1*t11;
+    K[3][1] = t1*t13;
+    K[4][1] = t1*t15;
+    K[5][1] = t1*t17;
+    K[6][1] = t1*t19;
+    K[7][1] = t1*t22;
+    K[8][1] = t1*t24;
+    K[9][1] = t1*t26;
+    K[10][1] = t1*t28;
+    K[11][1] = t1*t30;
+    K[12][1] = t1*t32;
+    K[13][1] = t1*t34;
+    K[14][1] = t1*t36;
+    K[15][1] = t1*t38;
+    K[16][1] = t1*t40;
+    K[17][1] = t1*t42;
+    K[18][1] = t1*t44;
+    K[19][1] = t1*t46;
+    K[20][1] = t1*t48;
+    K[21][1] = t1*t50;
+    K[22][1] = t1*t52;
+    K[23][1] = t1*t54;
+
+    // correct the state vector
+    for (uint8_t obsIndex= 0; obsIndex<=1; obsIndex++) {
+        for (uint8_t stateIndex= 0; stateIndex<=stateIndexLim; stateIndex++) {
+            statesArray[stateIndex] = statesArray[stateIndex] - K[stateIndex][obsIndex] * innovation[obsIndex];
+        }
+    }
+    stateStruct.quat.normalize();
+
+    // Equations for covariance matrix update
+    P[0][0] = P[0][0] - t56*t7 - t57*t6;
+    P[0][1] = P[0][1] - t56*t9 - t57*t8;
+    P[1][1] = P[1][1] - t58*t9 - t59*t8;
+    P[0][2] = P[0][2] - t10*t57 - t11*t56;
+    P[1][2] = P[1][2] - t10*t59 - t11*t58;
+    P[2][2] = P[2][2] - t10*t61 - t11*t60;
+    P[0][3] = P[0][3] - t12*t57 - t13*t56;
+    P[1][3] = P[1][3] - t12*t59 - t13*t58;
+    P[2][3] = P[2][3] - t12*t61 - t13*t60;
+    P[3][3] = P[3][3] - t12*t63 - t13*t62;
+    P[0][4] = P[0][4] - t14*t57 - t15*t56;
+    P[1][4] = P[1][4] - t14*t59 - t15*t58;
+    P[2][4] = P[2][4] - t14*t61 - t15*t60;
+    P[3][4] = P[3][4] - t14*t63 - t15*t62;
+    P[4][4] = P[4][4] - t14*t65 - t15*t64;
+    P[0][5] = P[0][5] - t16*t57 - t17*t56;
+    P[1][5] = P[1][5] - t16*t59 - t17*t58;
+    P[2][5] = P[2][5] - t16*t61 - t17*t60;
+    P[3][5] = P[3][5] - t16*t63 - t17*t62;
+    P[4][5] = P[4][5] - t16*t65 - t17*t64;
+    P[5][5] = P[5][5] - t16*t67 - t17*t66;
+    P[0][6] = P[0][6] - t18*t57 - t19*t56;
+    P[1][6] = P[1][6] - t18*t59 - t19*t58;
+    P[2][6] = P[2][6] - t18*t61 - t19*t60;
+    P[3][6] = P[3][6] - t18*t63 - t19*t62;
+    P[4][6] = P[4][6] - t18*t65 - t19*t64;
+    P[5][6] = P[5][6] - t18*t67 - t19*t66;
+    P[6][6] = P[6][6] - t18*t69 - t19*t68;
+    P[0][7] = P[0][7] - t21*t57 - t22*t56;
+    P[1][7] = P[1][7] - t21*t59 - t22*t58;
+    P[2][7] = P[2][7] - t21*t61 - t22*t60;
+    P[3][7] = P[3][7] - t21*t63 - t22*t62;
+    P[4][7] = P[4][7] - t21*t65 - t22*t64;
+    P[5][7] = P[5][7] - t21*t67 - t22*t66;
+    P[6][7] = P[6][7] - t21*t69 - t22*t68;
+    P[7][7] = P[7][7] - t21*t71 - t22*t70;
+    P[0][8] = P[0][8] - t23*t57 - t24*t56;
+    P[1][8] = P[1][8] - t23*t59 - t24*t58;
+    P[2][8] = P[2][8] - t23*t61 - t24*t60;
+    P[3][8] = P[3][8] - t23*t63 - t24*t62;
+    P[4][8] = P[4][8] - t23*t65 - t24*t64;
+    P[5][8] = P[5][8] - t23*t67 - t24*t66;
+    P[6][8] = P[6][8] - t23*t69 - t24*t68;
+    P[7][8] = P[7][8] - t23*t71 - t24*t70;
+    P[8][8] = P[8][8] - t23*t73 - t24*t72;
+    P[0][9] = P[0][9] - t25*t57 - t26*t56;
+    P[1][9] = P[1][9] - t25*t59 - t26*t58;
+    P[2][9] = P[2][9] - t25*t61 - t26*t60;
+    P[3][9] = P[3][9] - t25*t63 - t26*t62;
+    P[4][9] = P[4][9] - t25*t65 - t26*t64;
+    P[5][9] = P[5][9] - t25*t67 - t26*t66;
+    P[6][9] = P[6][9] - t25*t69 - t26*t68;
+    P[7][9] = P[7][9] - t25*t71 - t26*t70;
+    P[8][9] = P[8][9] - t25*t73 - t26*t72;
+    P[9][9] = P[9][9] - t25*t75 - t26*t74;
+
+    if (stateIndexLim > 9) {
+        P[0][10] = P[0][10] - t27*t57 - t28*t56;
+        P[1][10] = P[1][10] - t27*t59 - t28*t58;
+        P[2][10] = P[2][10] - t27*t61 - t28*t60;
+        P[3][10] = P[3][10] - t27*t63 - t28*t62;
+        P[4][10] = P[4][10] - t27*t65 - t28*t64;
+        P[5][10] = P[5][10] - t27*t67 - t28*t66;
+        P[6][10] = P[6][10] - t27*t69 - t28*t68;
+        P[7][10] = P[7][10] - t27*t71 - t28*t70;
+        P[8][10] = P[8][10] - t27*t73 - t28*t72;
+        P[9][10] = P[9][10] - t27*t75 - t28*t74;
+        P[10][10] = P[10][10] - t27*t77 - t28*t76;
+        P[0][11] = P[0][11] - t29*t57 - t30*t56;
+        P[1][11] = P[1][11] - t29*t59 - t30*t58;
+        P[2][11] = P[2][11] - t29*t61 - t30*t60;
+        P[3][11] = P[3][11] - t29*t63 - t30*t62;
+        P[4][11] = P[4][11] - t29*t65 - t30*t64;
+        P[5][11] = P[5][11] - t29*t67 - t30*t66;
+        P[6][11] = P[6][11] - t29*t69 - t30*t68;
+        P[7][11] = P[7][11] - t29*t71 - t30*t70;
+        P[8][11] = P[8][11] - t29*t73 - t30*t72;
+        P[9][11] = P[9][11] - t29*t75 - t30*t74;
+        P[10][11] = P[10][11] - t29*t77 - t30*t76;
+        P[11][11] = P[11][11] - t29*t79 - t30*t78;
+        P[0][12] = P[0][12] - t31*t57 - t32*t56;
+        P[1][12] = P[1][12] - t31*t59 - t32*t58;
+        P[2][12] = P[2][12] - t31*t61 - t32*t60;
+        P[3][12] = P[3][12] - t31*t63 - t32*t62;
+        P[4][12] = P[4][12] - t31*t65 - t32*t64;
+        P[5][12] = P[5][12] - t31*t67 - t32*t66;
+        P[6][12] = P[6][12] - t31*t69 - t32*t68;
+        P[7][12] = P[7][12] - t31*t71 - t32*t70;
+        P[8][12] = P[8][12] - t31*t73 - t32*t72;
+        P[9][12] = P[9][12] - t31*t75 - t32*t74;
+        P[10][12] = P[10][12] - t31*t77 - t32*t76;
+        P[11][12] = P[11][12] - t31*t79 - t32*t78;
+        P[12][12] = P[12][12] - t31*t81 - t32*t80;
+
+        if (stateIndexLim > 12) {
+            P[0][13] = P[0][13] - t33*t57 - t34*t56;
+            P[1][13] = P[1][13] - t33*t59 - t34*t58;
+            P[2][13] = P[2][13] - t33*t61 - t34*t60;
+            P[3][13] = P[3][13] - t33*t63 - t34*t62;
+            P[4][13] = P[4][13] - t33*t65 - t34*t64;
+            P[5][13] = P[5][13] - t33*t67 - t34*t66;
+            P[6][13] = P[6][13] - t33*t69 - t34*t68;
+            P[7][13] = P[7][13] - t33*t71 - t34*t70;
+            P[8][13] = P[8][13] - t33*t73 - t34*t72;
+            P[9][13] = P[9][13] - t33*t75 - t34*t74;
+            P[10][13] = P[10][13] - t33*t77 - t34*t76;
+            P[11][13] = P[11][13] - t33*t79 - t34*t78;
+            P[12][13] = P[12][13] - t33*t81 - t34*t80;
+            P[13][13] = P[13][13] - t33*t83 - t34*t82;
+            P[0][14] = P[0][14] - t35*t57 - t36*t56;
+            P[1][14] = P[1][14] - t35*t59 - t36*t58;
+            P[2][14] = P[2][14] - t35*t61 - t36*t60;
+            P[3][14] = P[3][14] - t35*t63 - t36*t62;
+            P[4][14] = P[4][14] - t35*t65 - t36*t64;
+            P[5][14] = P[5][14] - t35*t67 - t36*t66;
+            P[6][14] = P[6][14] - t35*t69 - t36*t68;
+            P[7][14] = P[7][14] - t35*t71 - t36*t70;
+            P[8][14] = P[8][14] - t35*t73 - t36*t72;
+            P[9][14] = P[9][14] - t35*t75 - t36*t74;
+            P[10][14] = P[10][14] - t35*t77 - t36*t76;
+            P[11][14] = P[11][14] - t35*t79 - t36*t78;
+            P[12][14] = P[12][14] - t35*t81 - t36*t80;
+            P[13][14] = P[13][14] - t35*t83 - t36*t82;
+            P[14][14] = P[14][14] - t35*t85 - t36*t84;
+            P[0][15] = P[0][15] - t37*t57 - t38*t56;
+            P[1][15] = P[1][15] - t37*t59 - t38*t58;
+            P[2][15] = P[2][15] - t37*t61 - t38*t60;
+            P[3][15] = P[3][15] - t37*t63 - t38*t62;
+            P[4][15] = P[4][15] - t37*t65 - t38*t64;
+            P[5][15] = P[5][15] - t37*t67 - t38*t66;
+            P[6][15] = P[6][15] - t37*t69 - t38*t68;
+            P[7][15] = P[7][15] - t37*t71 - t38*t70;
+            P[8][15] = P[8][15] - t37*t73 - t38*t72;
+            P[9][15] = P[9][15] - t37*t75 - t38*t74;
+            P[10][15] = P[10][15] - t37*t77 - t38*t76;
+            P[11][15] = P[11][15] - t37*t79 - t38*t78;
+            P[12][15] = P[12][15] - t37*t81 - t38*t80;
+            P[13][15] = P[13][15] - t37*t83 - t38*t82;
+            P[14][15] = P[14][15] - t37*t85 - t38*t84;
+            P[15][15] = P[15][15] - t37*t87 - t38*t86;
+
+            if (stateIndexLim > 15) {
+                P[0][16] = P[0][16] - t39*t57 - t40*t56;
+                P[1][16] = P[1][16] - t39*t59 - t40*t58;
+                P[2][16] = P[2][16] - t39*t61 - t40*t60;
+                P[3][16] = P[3][16] - t39*t63 - t40*t62;
+                P[4][16] = P[4][16] - t39*t65 - t40*t64;
+                P[5][16] = P[5][16] - t39*t67 - t40*t66;
+                P[6][16] = P[6][16] - t39*t69 - t40*t68;
+                P[7][16] = P[7][16] - t39*t71 - t40*t70;
+                P[8][16] = P[8][16] - t39*t73 - t40*t72;
+                P[9][16] = P[9][16] - t39*t75 - t40*t74;
+                P[10][16] = P[10][16] - t39*t77 - t40*t76;
+                P[11][16] = P[11][16] - t39*t79 - t40*t78;
+                P[12][16] = P[12][16] - t39*t81 - t40*t80;
+                P[13][16] = P[13][16] - t39*t83 - t40*t82;
+                P[14][16] = P[14][16] - t39*t85 - t40*t84;
+                P[15][16] = P[15][16] - t39*t87 - t40*t86;
+                P[16][16] = P[16][16] - t39*t89 - t40*t88;
+                P[0][17] = P[0][17] - t41*t57 - t42*t56;
+                P[1][17] = P[1][17] - t41*t59 - t42*t58;
+                P[2][17] = P[2][17] - t41*t61 - t42*t60;
+                P[3][17] = P[3][17] - t41*t63 - t42*t62;
+                P[4][17] = P[4][17] - t41*t65 - t42*t64;
+                P[5][17] = P[5][17] - t41*t67 - t42*t66;
+                P[6][17] = P[6][17] - t41*t69 - t42*t68;
+                P[7][17] = P[7][17] - t41*t71 - t42*t70;
+                P[8][17] = P[8][17] - t41*t73 - t42*t72;
+                P[9][17] = P[9][17] - t41*t75 - t42*t74;
+                P[10][17] = P[10][17] - t41*t77 - t42*t76;
+                P[11][17] = P[11][17] - t41*t79 - t42*t78;
+                P[12][17] = P[12][17] - t41*t81 - t42*t80;
+                P[13][17] = P[13][17] - t41*t83 - t42*t82;
+                P[14][17] = P[14][17] - t41*t85 - t42*t84;
+                P[15][17] = P[15][17] - t41*t87 - t42*t86;
+                P[16][17] = P[16][17] - t41*t89 - t42*t88;
+                P[17][17] = P[17][17] - t41*t91 - t42*t90;
+                P[0][18] = P[0][18] - t43*t57 - t44*t56;
+                P[1][18] = P[1][18] - t43*t59 - t44*t58;
+                P[2][18] = P[2][18] - t43*t61 - t44*t60;
+                P[3][18] = P[3][18] - t43*t63 - t44*t62;
+                P[4][18] = P[4][18] - t43*t65 - t44*t64;
+                P[5][18] = P[5][18] - t43*t67 - t44*t66;
+                P[6][18] = P[6][18] - t43*t69 - t44*t68;
+                P[7][18] = P[7][18] - t43*t71 - t44*t70;
+                P[8][18] = P[8][18] - t43*t73 - t44*t72;
+                P[9][18] = P[9][18] - t43*t75 - t44*t74;
+                P[10][18] = P[10][18] - t43*t77 - t44*t76;
+                P[11][18] = P[11][18] - t43*t79 - t44*t78;
+                P[12][18] = P[12][18] - t43*t81 - t44*t80;
+                P[13][18] = P[13][18] - t43*t83 - t44*t82;
+                P[14][18] = P[14][18] - t43*t85 - t44*t84;
+                P[15][18] = P[15][18] - t43*t87 - t44*t86;
+                P[16][18] = P[16][18] - t43*t89 - t44*t88;
+                P[17][18] = P[17][18] - t43*t91 - t44*t90;
+                P[18][18] = P[18][18] - t43*t93 - t44*t92;
+                P[0][19] = P[0][19] - t45*t57 - t46*t56;
+                P[1][19] = P[1][19] - t45*t59 - t46*t58;
+                P[2][19] = P[2][19] - t45*t61 - t46*t60;
+                P[3][19] = P[3][19] - t45*t63 - t46*t62;
+                P[4][19] = P[4][19] - t45*t65 - t46*t64;
+                P[5][19] = P[5][19] - t45*t67 - t46*t66;
+                P[6][19] = P[6][19] - t45*t69 - t46*t68;
+                P[7][19] = P[7][19] - t45*t71 - t46*t70;
+                P[8][19] = P[8][19] - t45*t73 - t46*t72;
+                P[9][19] = P[9][19] - t45*t75 - t46*t74;
+                P[10][19] = P[10][19] - t45*t77 - t46*t76;
+                P[11][19] = P[11][19] - t45*t79 - t46*t78;
+                P[12][19] = P[12][19] - t45*t81 - t46*t80;
+                P[13][19] = P[13][19] - t45*t83 - t46*t82;
+                P[14][19] = P[14][19] - t45*t85 - t46*t84;
+                P[15][19] = P[15][19] - t45*t87 - t46*t86;
+                P[16][19] = P[16][19] - t45*t89 - t46*t88;
+                P[17][19] = P[17][19] - t45*t91 - t46*t90;
+                P[18][19] = P[18][19] - t45*t93 - t46*t92;
+                P[19][19] = P[19][19] - t45*t95 - t46*t94;
+                P[0][20] = P[0][20] - t47*t57 - t48*t56;
+                P[1][20] = P[1][20] - t47*t59 - t48*t58;
+                P[2][20] = P[2][20] - t47*t61 - t48*t60;
+                P[3][20] = P[3][20] - t47*t63 - t48*t62;
+                P[4][20] = P[4][20] - t47*t65 - t48*t64;
+                P[5][20] = P[5][20] - t47*t67 - t48*t66;
+                P[6][20] = P[6][20] - t47*t69 - t48*t68;
+                P[7][20] = P[7][20] - t47*t71 - t48*t70;
+                P[8][20] = P[8][20] - t47*t73 - t48*t72;
+                P[9][20] = P[9][20] - t47*t75 - t48*t74;
+                P[10][20] = P[10][20] - t47*t77 - t48*t76;
+                P[11][20] = P[11][20] - t47*t79 - t48*t78;
+                P[12][20] = P[12][20] - t47*t81 - t48*t80;
+                P[13][20] = P[13][20] - t47*t83 - t48*t82;
+                P[14][20] = P[14][20] - t47*t85 - t48*t84;
+                P[15][20] = P[15][20] - t47*t87 - t48*t86;
+                P[16][20] = P[16][20] - t47*t89 - t48*t88;
+                P[17][20] = P[17][20] - t47*t91 - t48*t90;
+                P[18][20] = P[18][20] - t47*t93 - t48*t92;
+                P[19][20] = P[19][20] - t47*t95 - t48*t94;
+                P[20][20] = P[20][20] - t47*t97 - t48*t96;
+                P[0][21] = P[0][21] - t49*t57 - t50*t56;
+                P[1][21] = P[1][21] - t49*t59 - t50*t58;
+                P[2][21] = P[2][21] - t49*t61 - t50*t60;
+                P[3][21] = P[3][21] - t49*t63 - t50*t62;
+                P[4][21] = P[4][21] - t49*t65 - t50*t64;
+                P[5][21] = P[5][21] - t49*t67 - t50*t66;
+                P[6][21] = P[6][21] - t49*t69 - t50*t68;
+                P[7][21] = P[7][21] - t49*t71 - t50*t70;
+                P[8][21] = P[8][21] - t49*t73 - t50*t72;
+                P[9][21] = P[9][21] - t49*t75 - t50*t74;
+                P[10][21] = P[10][21] - t49*t77 - t50*t76;
+                P[11][21] = P[11][21] - t49*t79 - t50*t78;
+                P[12][21] = P[12][21] - t49*t81 - t50*t80;
+                P[13][21] = P[13][21] - t49*t83 - t50*t82;
+                P[14][21] = P[14][21] - t49*t85 - t50*t84;
+                P[15][21] = P[15][21] - t49*t87 - t50*t86;
+                P[16][21] = P[16][21] - t49*t89 - t50*t88;
+                P[17][21] = P[17][21] - t49*t91 - t50*t90;
+                P[18][21] = P[18][21] - t49*t93 - t50*t92;
+                P[19][21] = P[19][21] - t49*t95 - t50*t94;
+                P[20][21] = P[20][21] - t49*t97 - t50*t96;
+                P[21][21] = P[21][21] - t49*t99 - t50*t98;
+
+                if (stateIndexLim > 21) {
+                    P[0][22] = P[0][22] - t51*t57 - t52*t56;
+                    P[1][22] = P[1][22] - t51*t59 - t52*t58;
+                    P[2][22] = P[2][22] - t51*t61 - t52*t60;
+                    P[3][22] = P[3][22] - t51*t63 - t52*t62;
+                    P[4][22] = P[4][22] - t51*t65 - t52*t64;
+                    P[5][22] = P[5][22] - t51*t67 - t52*t66;
+                    P[6][22] = P[6][22] - t51*t69 - t52*t68;
+                    P[7][22] = P[7][22] - t51*t71 - t52*t70;
+                    P[8][22] = P[8][22] - t51*t73 - t52*t72;
+                    P[9][22] = P[9][22] - t51*t75 - t52*t74;
+                    P[10][22] = P[10][22] - t51*t77 - t52*t76;
+                    P[11][22] = P[11][22] - t51*t79 - t52*t78;
+                    P[12][22] = P[12][22] - t51*t81 - t52*t80;
+                    P[13][22] = P[13][22] - t51*t83 - t52*t82;
+                    P[14][22] = P[14][22] - t51*t85 - t52*t84;
+                    P[15][22] = P[15][22] - t51*t87 - t52*t86;
+                    P[16][22] = P[16][22] - t51*t89 - t52*t88;
+                    P[17][22] = P[17][22] - t51*t91 - t52*t90;
+                    P[18][22] = P[18][22] - t51*t93 - t52*t92;
+                    P[19][22] = P[19][22] - t51*t95 - t52*t94;
+                    P[20][22] = P[20][22] - t51*t97 - t52*t96;
+                    P[21][22] = P[21][22] - t51*t99 - t52*t98;
+                    P[22][22] = P[22][22] - t100*t52 - t101*t51;
+                    P[0][23] = P[0][23] - t53*t57 - t54*t56;
+                    P[1][23] = P[1][23] - t53*t59 - t54*t58;
+                    P[2][23] = P[2][23] - t53*t61 - t54*t60;
+                    P[3][23] = P[3][23] - t53*t63 - t54*t62;
+                    P[4][23] = P[4][23] - t53*t65 - t54*t64;
+                    P[5][23] = P[5][23] - t53*t67 - t54*t66;
+                    P[6][23] = P[6][23] - t53*t69 - t54*t68;
+                    P[7][23] = P[7][23] - t53*t71 - t54*t70;
+                    P[8][23] = P[8][23] - t53*t73 - t54*t72;
+                    P[9][23] = P[9][23] - t53*t75 - t54*t74;
+                    P[10][23] = P[10][23] - t53*t77 - t54*t76;
+                    P[11][23] = P[11][23] - t53*t79 - t54*t78;
+                    P[12][23] = P[12][23] - t53*t81 - t54*t80;
+                    P[13][23] = P[13][23] - t53*t83 - t54*t82;
+                    P[14][23] = P[14][23] - t53*t85 - t54*t84;
+                    P[15][23] = P[15][23] - t53*t87 - t54*t86;
+                    P[16][23] = P[16][23] - t53*t89 - t54*t88;
+                    P[17][23] = P[17][23] - t53*t91 - t54*t90;
+                    P[18][23] = P[18][23] - t53*t93 - t54*t92;
+                    P[19][23] = P[19][23] - t53*t95 - t54*t94;
+                    P[20][23] = P[20][23] - t53*t97 - t54*t96;
+                    P[21][23] = P[21][23] - t53*t99 - t54*t98;
+                    P[22][23] = P[22][23] - t100*t54 - t101*t53;
+                    P[23][23] = P[23][23] - t102*t54 - t103*t53;
+                }
+            }
+        }
+    }
+
+    // force the covariance matrix to be symmetrical and limit the variances to prevent ill-conditioning.
+    ForceSymmetry();
+    ConstrainVariances();
+
+    fusePosData = false;
+
+#endif // EK3_FEATURE_EXTERNAL_NAV
+    return;
 }
 
 // fuse selected position, velocity and height measurements
