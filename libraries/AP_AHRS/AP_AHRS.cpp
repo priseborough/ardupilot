@@ -2415,11 +2415,25 @@ void  AP_AHRS::writeBodyFrameOdom(float quality, const Vector3f &delPos, const V
 // Write position and quaternion data from an external navigation system
 void AP_AHRS::writeExtNavData(const Vector3f &pos, const Quaternion &quat, const float posCov[6], float angErr, uint32_t timeStamp_ms, uint16_t delay_ms, uint32_t resetTime_ms)
 {
+    float posCovNE[3];
+    if (is_positive(posCov[0]) && is_positive(posCov[3]) && !isnan(posCov[1])) {
+        posCovNE[0] = posCov[0];
+        posCovNE[1] = posCov[1];
+        posCovNE[2] = posCov[3];
+    } else {
+        posCovNE[0] = posCovNE[1] = posCovNE[2] = NAN;
+    }
+    float posErrD;
+    if (is_positive(posCov[5])) {
+        posErrD = sqrtf(posCov[5]);
+    } else {
+        posErrD = NAN;
+    }
 #if HAL_NAVEKF2_AVAILABLE
-    EKF2.writeExtNavData(pos, quat, posCov, angErr, timeStamp_ms-delay_ms, resetTime_ms);
+    EKF2.writeExtNavData(pos, quat, posCovNE, posErrD, angErr, timeStamp_ms-delay_ms, resetTime_ms);
 #endif
 #if HAL_NAVEKF3_AVAILABLE
-    EKF3.writeExtNavData(pos, quat, posCov, angErr, timeStamp_ms-delay_ms, resetTime_ms);
+    EKF3.writeExtNavData(pos, quat, posCovNE, posErrD, angErr, timeStamp_ms-delay_ms, resetTime_ms);
 #endif
 }
 
