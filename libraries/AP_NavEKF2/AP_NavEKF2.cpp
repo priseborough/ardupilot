@@ -1512,22 +1512,23 @@ void NavEKF2::updateLaneSwitchPosDownResetData(uint8_t new_primary, uint8_t old_
 /*
  * Write position and quaternion data from an external navigation system
  *
-     * pos        : position in the RH navigation frame. Frame is assumed to be NED if frameIsNED is true. (m)
-     * quat       : quaternion desribing the rotation from navigation frame to body frame
-     * posCov     ; Row-major representation of position 3x3 cross-covariance matrix upper right triangle (states: x_global, y_global, z_global; first three entries are the first ROW, next 2 entries are the second ROW, etc.). If position variances are unknown, assign NaN value to element [0].
-     * angErr     : 1-sigma spherical angle error (rad). Assign NaN value if not known.
-     * timeStamp_ms : system time the measurement was taken, not the time it was received (mSec)
-     * resetTime_ms : system time of the last position reset request (mSec)     *
+    * pos        : position in the RH navigation frame. Frame is assumed to be NED if frameIsNED is true. (m)
+    * quat       : quaternion desribing the rotation from navigation frame to body frame
+    * posCovNE   : Row-major representation of position 2x2 cross-covariance matrix upper right triangle (states: x_global, y_global; first two entries are the first ROW, next  entries is the second ROW). If position variances are unknown, assign NaN value to element [0].
+    * posErrD    : 1-sigma vertical position error (m). Assign NaN value if not known.
+    * angErr     : 1-sigma spherical angle error (rad). Assign NaN value if not known.
+    * timeStamp_ms : system time the measurement was taken, not the time it was received (mSec)
+    * resetTime_ms : system time of the last position reset request (mSec)     *
  *
  * Sensor offsets are pulled directly from the AP_VisualOdom library
  *
 */
-void NavEKF2::writeExtNavData(const Vector3f &pos, const Quaternion &quat, const float posCov[6], float angErr, uint32_t timeStamp_ms, uint32_t resetTime_ms)
+void NavEKF2::writeExtNavData(const Vector3f &pos, const Quaternion &quat, const float posCovNE[3], float posErrD, float angErr, uint32_t timeStamp_ms, uint32_t resetTime_ms)
 {
-    AP::dal().writeExtNavData(pos, quat, posCov, angErr, timeStamp_ms, resetTime_ms);
+    AP::dal().writeExtNavData(pos, quat, posCovNE, posErrD, angErr, timeStamp_ms, resetTime_ms);
     if (!option_is_set(Option::DisableExternalNav) && core) {
         for (uint8_t i=0; i<num_cores; i++) {
-            core[i].writeExtNavData(pos, quat, posCov, angErr, timeStamp_ms, resetTime_ms);
+            core[i].writeExtNavData(pos, quat, posCovNE, posErrD, angErr, timeStamp_ms, resetTime_ms);
         }
     }
 }

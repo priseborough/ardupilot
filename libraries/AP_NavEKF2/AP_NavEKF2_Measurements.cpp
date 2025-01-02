@@ -935,10 +935,10 @@ void NavEKF2_core::updateTimingStatistics(void)
     timing.count++;
 }
 
-void NavEKF2_core::writeExtNavData(const Vector3f &pos, const Quaternion &quat, const float posCov[6], float angErr, uint32_t timeStamp_ms, uint32_t resetTime_ms)
+void NavEKF2_core::writeExtNavData(const Vector3f &pos, const Quaternion &quat, const float posCovNE[3], float posErrD, float angErr, uint32_t timeStamp_ms, uint32_t resetTime_ms)
 {
-    // protect against NaN
-    if (pos.is_nan() || isnan(posCov[0]) || isnan(posCov[3]) || isnan(posCov[5]) || quat.is_nan() || isnan(angErr)) {
+    // protect against NaN and negtive numbers
+    if (pos.is_nan() || quat.is_nan() || !is_positive(posCovNE[0]) || !is_positive(posCovNE[2]) || !is_positive(posErrD) || !is_positive(angErr)) {
         return;
     }
 
@@ -959,7 +959,7 @@ void NavEKF2_core::writeExtNavData(const Vector3f &pos, const Quaternion &quat, 
 
     extNavDataNew.pos = pos.toftype();
     extNavDataNew.quat = quat.toftype();
-    extNavDataNew.posErr = sqrtf((posCov[0]+posCov[3]+posCov[5]) / 3.0f);
+    extNavDataNew.posErr = sqrtf((posCovNE[0]+posCovNE[2]+sq(posErrD)) / 3.0f);
     extNavDataNew.angErr = angErr;
     timeStamp_ms = timeStamp_ms;
     // Correct for the average intersampling delay due to the filter updaterate
