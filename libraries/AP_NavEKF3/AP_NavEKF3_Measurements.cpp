@@ -1054,7 +1054,7 @@ void NavEKF3_core::writeDefaultAirSpeed(float airspeed, float uncertainty)
 *            External Navigation Measurements           *
 ********************************************************/
 
-void NavEKF3_core::writeExtNavData(const Vector3f &pos, const Quaternion &quat, const float posCov[6], float angErr, uint32_t timeStamp_ms, uint32_t resetTime_ms)
+void NavEKF3_core::writeExtNavData(const Vector3f &pos, const Quaternion &quat, const float posCovNE[3], float posErr, float angErr, uint32_t timeStamp_ms, uint32_t resetTime_ms)
 {
 #if EK3_FEATURE_EXTERNAL_NAV
     // protect against NaN

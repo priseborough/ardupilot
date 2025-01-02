@@ -333,14 +333,15 @@ public:
     *
     * pos        : position in the RH navigation frame. Frame is assumed to be NED if frameIsNED is true. (m)
     * quat       : quaternion desribing the rotation from navigation frame to body frame
-    * posErr     : 1-sigma spherical position error (m)
+    * posCovNE   : Row-major representation of position 2x2 cross-covariance matrix upper right triangle (states: x_global, y_global; first two entries are the first ROW, next  entries is the second ROW). If position variances are unknown, assign NaN value to element [0].
+    * posErrD    : 1-sigma vertical position error (m). Assign NaN value if not known.
     * angErr     : 1-sigma spherical angle error (rad)
     * timeStamp_ms : system time the measurement was taken, not the time it was received (mSec)
     * delay_ms   : average delay of external nav system measurements relative to inertial measurements
     * resetTime_ms : system time of the last position reset request (mSec)
     *
     */
-    void writeExtNavData(const Vector3f &pos, const Quaternion &quat, const float posCov[6], float angErr, uint32_t timeStamp_ms, uint32_t resetTime_ms);
+    void writeExtNavData(const Vector3f &pos, const Quaternion &quat, const float posCovNE[3], float posErrD, float angErr, uint32_t timeStamp_ms, uint32_t resetTime_ms);
 
     /*
      * Write velocity data from an external navigation system
@@ -649,8 +650,9 @@ private:
 
     struct ext_nav_elements : EKF_obs_element_t {
         Vector3F    pos;            // XYZ position measured in a RH navigation frame (m)
-        ftype       posCov[6];      // top right diagonal covariance matrix for NED position states in descending row order
+        ftype       posCovNE[3];    // top right diagonal covariance matrix for NE position states in descending row order
         ftype       hposVarIncr;    // increment added to horizontal position observation variance to account for time shifting induced errors (m^2)
+        ftype       posErrD;        // vertical position 1-sigma observation uncertainty (m)
         bool        posReset;       // true when the position measurement has been reset
         bool        corrected;      // true when the position has been corrected for sensor position
         uint32_t    timeStamp_ms;   // time stamp of message as received by the EKF and before correction for delays
@@ -1492,7 +1494,7 @@ private:
     uint32_t last_extnav_yaw_fusion_ms; // system time that external nav yaw was last fused
     Vector3F extNavOriginNED;           // exernal navigation origin offset wrt EKF's internal NED origin
     uint32_t lastExtNavOriginTime_ms;   // last time we updated the external nav origin offset (msec)
-    ftype extNavPosCovPrev[6];          // previous value of the external navigation position covairance data.
+    ftype extNavPosCovPrev[3];          // previous value of the external navigation NE position covairance data.
 #endif // EK3_FEATURE_EXTERNAL_NAV
     bool useExtNavVel;                  // true if external nav velocity should be used
 

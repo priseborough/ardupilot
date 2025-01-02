@@ -179,8 +179,8 @@ void NavEKF3_core::ResetPosition(resetDataSource posResetSource)
             stateStruct.position.x = extNavDataDelayed.pos.x;
             stateStruct.position.y = extNavDataDelayed.pos.y;
             // set the variances as received from external nav system data
-            P[7][7] = extNavDataDelayed.posCov[0] + extNavDataNew.hposVarIncr;
-            P[8][8] = extNavDataDelayed.posCov[3] + extNavDataNew.hposVarIncr;
+            P[7][7] = extNavDataDelayed.posCovNE[0] + extNavDataNew.hposVarIncr;
+            P[8][8] = extNavDataDelayed.posCovNE[2] + extNavDataNew.hposVarIncr;
 #endif // EK3_FEATURE_EXTERNAL_NAV
         }
     }
@@ -793,12 +793,12 @@ void NavEKF3_core::FuseVelPosNED()
                 // Check if configured to use external nav data as an odometry source, ie no absolute position
                 // Use the growth in poiiton uncertainty to define observation noise
                 if (is_positive(frontend->_extNavPosNoiseMin)) {
-                    R_OBS[3] = MAX(extNavDataDelayed.posCov[0] - extNavPosCovPrev[0], sq(frontend->_extNavPosNoiseMin));
-                    R_OBS[4] = MAX(extNavDataDelayed.posCov[3] - extNavPosCovPrev[3], sq(frontend->_extNavPosNoiseMin));
-                    memcpy(extNavPosCovPrev, extNavDataDelayed.posCov, sizeof(extNavPosCovPrev));
+                    R_OBS[3] = MAX(extNavDataDelayed.posCovNE[0] - extNavPosCovPrev[0], sq(frontend->_extNavPosNoiseMin));
+                    R_OBS[4] = MAX(extNavDataDelayed.posCovNE[2] - extNavPosCovPrev[2], sq(frontend->_extNavPosNoiseMin));
+                    memcpy(extNavPosCovPrev, extNavDataDelayed.posCovNE, sizeof(extNavPosCovPrev));
                 } else {
-                    R_OBS[3] = constrain_ftype(extNavDataDelayed.posCov[0], sq(0.01f), sq(10.0f));
-                    R_OBS[4] = constrain_ftype(extNavDataDelayed.posCov[3], sq(0.01f), sq(10.0f));
+                    R_OBS[3] = constrain_ftype(extNavDataDelayed.posCovNE[0], sq(0.01f), sq(10.0f));
+                    R_OBS[4] = constrain_ftype(extNavDataDelayed.posCovNE[2], sq(0.01f), sq(10.0f));
                 }
                 R_OBS[3] += extNavDataNew.hposVarIncr;
                 R_OBS[4] += extNavDataNew.hposVarIncr;
@@ -1372,7 +1372,7 @@ void NavEKF3_core::selectHeightForFusion()
     if (extNavDataToFuse && (activeHgtSource == AP_NavEKF_Source::SourceZ::EXTNAV)) {
         hgtMea = -extNavDataDelayed.pos.z;
         velPosObs[5] = -hgtMea;
-        posDownObsNoise = constrain_ftype(extNavDataDelayed.posCov[5], sq(0.1f), sq(10.0f));
+        posDownObsNoise = sq(constrain_ftype(extNavDataDelayed.posErrD, 0.1f, 10.0f));
         fuseHgtData = true;
     } else
 #endif // EK3_FEATURE_EXTERNAL_NAV
