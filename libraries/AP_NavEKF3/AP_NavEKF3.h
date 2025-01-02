@@ -240,14 +240,14 @@ public:
     void writeEulerYawAngle(float yawAngle, float yawAngleErr, uint32_t timeStamp_ms, uint8_t type);
 
     /*
-     * Write pose and covariance data from an external navigation system     *
-     * pos        : position in the RH navigation frame. Frame is assumed to be NED if frameIsNED is true. (m)
-     * quat       : quaternion desribing the rotation from navigation frame to body frame
-     * posCovNE   : Row-major representation of position 2x2 cross-covariance matrix upper right triangle (states: x_global, y_global; first two entries are the first ROW, next  entries is the second ROW). If position variances are unknown, assign NaN value to element [0].
-     * posErrD    : 1-sigma vertical position error (m). Assign NaN value if not known.
-     * angErr     : 1-sigma spherical angle error (rad). Assign NaN value if not known.
+     * Write pose and covariance data from an external navigation system
+     * pos          : position in a NED navigation frame (m).
+     * quat         : quaternion desribing the rotation from navigation frame to body frame. Assign NaN to element [0] if rotation is unknown.
+     * posCovNE     : Row-major representation of position 2x2 cross-covariance matrix upper right triangle (states: x_global, y_global; first two entries are the first ROW, next  entries is the second ROW). If position variances are unknown, assign NaN value to element [0].
+     * posErrD      : 1-sigma vertical position error (m). Assign NaN value if not known.
+     * angErr       : 1-sigma spherical angle error (rad). Assign NaN value if not known.
      * timeStamp_ms : system time the measurement was taken, not the time it was received (mSec)
-     * resetTime_ms : system time of the last position reset request (mSec)     *
+     * resetTime_ms : system time of the last position reset request (mSec)
     */
     void writeExtNavData(const Vector3f &pos, const Quaternion &quat, const float posCovNE[3], float posErrD, float angErr, uint32_t timeStamp_ms, uint32_t resetTime_ms);
 

@@ -331,13 +331,12 @@ public:
     /*
     * Write position and quaternion data from an external navigation system
     *
-    * pos        : position in the RH navigation frame. Frame is assumed to be NED if frameIsNED is true. (m)
-    * quat       : quaternion desribing the rotation from navigation frame to body frame
-    * posCovNE   : Row-major representation of position 2x2 cross-covariance matrix upper right triangle (states: x_global, y_global; first two entries are the first ROW, next  entries is the second ROW). If position variances are unknown, assign NaN value to element [0].
-    * posErrD    : 1-sigma vertical position error (m). Assign NaN value if not known.
-    * angErr     : 1-sigma spherical angle error (rad)
+    * pos          : position in a NED navigation frame (m).
+    * quat         : quaternion desribing the rotation from navigation frame to body frame. Assign NaN to element [0] if rotation is unknown.
+    * posCovNE     : Row-major representation of position 2x2 cross-covariance matrix upper right triangle (states: x_global, y_global; first two entries are the first ROW, next  entries is the second ROW). If position variances are unknown, assign NaN value to element [0].
+    * posErrD      : 1-sigma vertical position error (m). Assign NaN value if not known.
+    * angErr       : 1-sigma spherical angle error (rad). Assign NaN value if not known.
     * timeStamp_ms : system time the measurement was taken, not the time it was received (mSec)
-    * delay_ms   : average delay of external nav system measurements relative to inertial measurements
     * resetTime_ms : system time of the last position reset request (mSec)
     *
     */
