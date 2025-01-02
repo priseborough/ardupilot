@@ -1085,6 +1085,16 @@ void NavEKF3_core::writeExtNavData(const Vector3f &pos, const Quaternion &quat, 
         extNavDataNew.hposVarIncr = 0.0F;
     }
 
+    if (is_positive(posCovNE[0]) && !isnan(posCovNE[1]) && is_positive(posCovNE[2])) {
+        extNavDataNew.posCovNE[0] = posCovNE[0];
+        extNavDataNew.posCovNE[1] = posCovNE[1];
+        extNavDataNew.posCovNE[2] = posCovNE[3];
+    } else {
+        // If no accuracy provided use same default noise values as GPS and Baro sensor configuration
+        extNavDataNew.posCovNE[0] = extNavDataNew.posCovNE[1] = sq(frontend->_gpsHorizPosNoise);
+        extNavDataNew.posCovNE[2] = sq(frontend->_baroAltNoise);
+    }
+
     if (resetTime_ms != extNavLastPosResetTime_ms) {
         extNavDataNew.posReset = true;
         extNavLastPosResetTime_ms = resetTime_ms;
@@ -1120,6 +1130,13 @@ void NavEKF3_core::writeExtNavData(const Vector3f &pos, const Quaternion &quat, 
             Vector3F euler312 = stateStruct.quat.to_vector312();
             extNavYawAngDataNew.yawAng = euler312.z;
         }
+
+        if (is_positive(angErr)) {
+            extNavYawAngDataNew.yawAngErr = angErr;
+        } else {
+            extNavYawAngDataNew.yawAngErr = frontend->_yawNoise;
+        }
+
         extNavYawAngDataNew.time_ms = timeStamp_ms;
 
         storedExtNavYawAng.push(extNavYawAngDataNew);
