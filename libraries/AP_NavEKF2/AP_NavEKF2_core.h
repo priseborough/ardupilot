@@ -302,6 +302,7 @@ public:
      * resetTime_ms : system time of the last position reset request (mSec)     *
      *
      * Sensor offsets are pulled directly from the AP_VisualOdom library
+     * A NaN in any field or a negative value for posCovNE diagonals, posErrD or angErr will cause the interface to reject all data.
      *
     */
     void writeExtNavData(const Vector3f &pos, const Quaternion &quat, const float posCov[6], float angErr, uint32_t timeStamp_ms, uint32_t resetTime_ms);
