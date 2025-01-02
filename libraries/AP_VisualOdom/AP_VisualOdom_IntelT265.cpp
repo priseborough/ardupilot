@@ -34,25 +34,49 @@ void AP_VisualOdom_IntelT265::handle_pose_estimate(uint64_t remote_time_us, uint
     const float scale_factor = _frontend.get_pos_scale();
     Vector3f pos{x * scale_factor, y * scale_factor, z * scale_factor};
     Quaternion att = attitude;
+    // euler orientation for logging
+    float roll;
+    float pitch;
+    float yaw;
 
-    // handle voxl camera reset jumps in attitude and position
-    handle_voxl_camera_reset_jump(pos, att, reset_counter);
+    if (_frontend.get_options() & OPTIONS_NED_POS_ONLY) {
+        // data is in a global reference frame with no attitude data
+        // set first element to NAN to indicate no data available
+        att[0] = NAN;
+        // logging cannot handle NAN so set rpy to 0
+        roll = pitch = yaw = 0.f;
+    } else {
+        att.to_euler(roll, pitch, yaw);
 
-    // handle request to align sensor's yaw with vehicle's AHRS/EKF attitude
-    if (_align_yaw) {
-        if (align_yaw_to_ahrs(pos, attitude)) {
-            _align_yaw = false;
+        // handle voxl camera reset jumps in attitude and position
+        handle_voxl_camera_reset_jump(pos, att, reset_counter);
+
+        // handle request to align sensor's yaw with vehicle's AHRS/EKF attitude
+        if (_align_yaw) {
+            if (align_yaw_to_ahrs(pos, attitude)) {
+                _align_yaw = false;
+            }
+        }
+
+        if (_align_posxy || _align_posz) {
+            if (align_position_to_ahrs(pos, _align_posxy, _align_posz)) {
+                _align_posxy = _align_posz = false;
+            }
+        }
+
+        // rotate position and attitude to align with vehicle
+        rotate_and_correct_position(pos);
+        rotate_attitude(att);
+
+        // store corrected attitude for use in pre-arm checks
+        _attitude_last = att;
+
+        if (isnan(angErr)) {
+            angErr = constrain_float(_frontend.get_yaw_noise(), 0.05f, 1.0f);
+        } else {
+            angErr = constrain_float(angErr, 0.05f, 1.0f);
         }
     }
-    if (_align_posxy || _align_posz) {
-        if (align_position_to_ahrs(pos, _align_posxy, _align_posz)) {
-            _align_posxy = _align_posz = false;
-        }
-    }
-
-    // rotate position and attitude to align with vehicle
-    rotate_and_correct_position(pos);
-    rotate_attitude(att);
 
     // record position for voxl reset jump handling
     record_voxl_position_and_reset_count(pos, reset_counter);
@@ -65,12 +89,6 @@ void AP_VisualOdom_IntelT265::handle_pose_estimate(uint64_t remote_time_us, uint
         memcpy(posCovMod, posCov, sizeof(posCovMod));
     }
 
-    if (isnan(angErr)) {
-        angErr = constrain_float(_frontend.get_yaw_noise(), 0.05f, 1.0f);
-    } else {
-        angErr = constrain_float(angErr, 0.05f, 1.0f);
-    }
-
     // record quality
     _quality = quality;
 
@@ -81,20 +99,11 @@ void AP_VisualOdom_IntelT265::handle_pose_estimate(uint64_t remote_time_us, uint
         AP::ahrs().writeExtNavData(pos, att, posCovMod, angErr, time_ms, _frontend.get_delay_ms(), get_reset_timestamp_ms(reset_counter));
     }
 
-    // calculate euler orientation for logging
-    float roll;
-    float pitch;
-    float yaw;
-    att.to_euler(roll, pitch, yaw);
-
 #if HAL_LOGGING_ENABLED
     // log sensor data
     const float posErr = sqrtf((posCovMod[0] + posCovMod[3] + posCovMod[5]) / 3.0f);
     Write_VisualPosition(remote_time_us, time_ms, pos.x, pos.y, pos.z, degrees(roll), degrees(pitch), wrap_360(degrees(yaw)), posErr, angErr, reset_counter, !consume, _quality);
 #endif
-
-    // store corrected attitude for use in pre-arm checks
-    _attitude_last = att;
 
     // record time for health monitoring
     _last_update_ms = AP_HAL::millis();
@@ -285,6 +294,11 @@ bool AP_VisualOdom_IntelT265::pre_arm_check(char *failure_msg, uint8_t failure_m
         return false;
     }
 
+    if (_frontend.get_options() & OPTIONS_NED_POS_ONLY) {
+        // No attitude data to check
+        return true;
+    }
+
     // check if roll and pitch is different by > 10deg (using NED so cannot determine whether roll or pitch specifically)
     const float rp_diff_deg = degrees(ahrs_quat.roll_pitch_difference(_attitude_last));
     if (rp_diff_deg > 10.0f) {
@@ -300,7 +314,6 @@ bool AP_VisualOdom_IntelT265::pre_arm_check(char *failure_msg, uint8_t failure_m
         hal.util->snprintf(failure_msg, failure_msg_len, "yaw diff %4.1f deg (>10)",(double)yaw_diff_deg);
         return false;
     }
-
     return true;
 }
 

@@ -53,6 +53,8 @@ public:
 #endif
     };
 
+#define OPTIONS_NED_POS_ONLY (1<<0)
+
     // detect and initialise any sensors
     void init();
 
@@ -124,6 +126,8 @@ public:
         return _type;
     }
 
+    int8_t get_options() const { return _options; }
+
 private:
 
     static AP_VisualOdom *_singleton;
@@ -138,6 +142,7 @@ private:
     AP_Float _pos_noise;        // position measurement noise in meters
     AP_Float _yaw_noise;        // yaw measurement noise in radians
     AP_Int8 _quality_min;       // positions and velocities will only be sent to EKF if over this value.  if 0 all values sent to EKF
+    AP_Int8 _options;           // bitmask of processing options
 
     // reference to backends
     AP_VisualOdom_Backend *_driver;

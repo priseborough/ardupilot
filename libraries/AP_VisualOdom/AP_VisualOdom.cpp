@@ -114,6 +114,13 @@ const AP_Param::GroupInfo AP_VisualOdom::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("_QUAL_MIN", 8, AP_VisualOdom, _quality_min, 0),
 
+    // @Param: _OPTIONS
+    // @DisplayName: Visual odometery options
+    // @Description: A range of options that can be applied to processing of visual odometry data. IgnoreRPY causes roll, pitch and yaw dara in the message to be ignored.
+    // @Bitmask: 0:Position is in a NED reference frame with no attitude data
+    // @User: Advanced
+    AP_GROUPINFO("_OPTIONS", 9, AP_VisualOdom, _options, 0),
+
     AP_GROUPEND
 };
 
