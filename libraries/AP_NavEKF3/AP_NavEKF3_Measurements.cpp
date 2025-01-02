@@ -1114,7 +1114,7 @@ void NavEKF3_core::writeExtNavData(const Vector3f &pos, const Quaternion &quat, 
     storedExtNav.push(extNavDataNew);
 
     // protect against yaw angle being NaN or too old
-    if (!isnan(quat[0]) && extNavMeasTime_ms >= imuDataDelayed.time_ms) {
+    if (!quat.is_nan() && extNavMeasTime_ms >= imuDataDelayed.time_ms) {
         // extract yaw from the attitude
         extNavYawAngDataNew.timeStamp_ms = extNavMeasTime_ms;
         Matrix3f Tnb; // matrix that rotates a vector from navigation to body frame
