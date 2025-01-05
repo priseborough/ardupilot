@@ -3754,7 +3754,10 @@ void GCS_MAVLINK::handle_system_time_message(const mavlink_message_t &msg)
 {
     mavlink_system_time_t packet;
     mavlink_msg_system_time_decode(&msg, &packet);
-
+    // This message is also be used to improve the remote to local time stamp conversion because
+    // the larger navigation messages can be time stamped at the measurement time that can be substantially
+    // and consistently delayed due to remote computer processing which casues an incorrect time stamp conversion
+    correct_offboard_timestamp_usec_to_ms(packet.time_unix_usec, PAYLOAD_SIZE(chan, SYSTEM_TIME));
     AP::rtc().set_utc_usec(packet.time_unix_usec, AP_RTC::SOURCE_MAVLINK_SYSTEM_TIME);
 }
 #endif
