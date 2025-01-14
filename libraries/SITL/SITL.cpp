@@ -589,7 +589,7 @@ const AP_Param::GroupInfo SIM::var_info3[] = {
     // @Param: VICON_TMASK
     // @DisplayName: SITL vicon type mask
     // @Description: SITL vicon messages sent
-    // @Bitmask: 0:VISION_POSITION_ESTIMATE, 1:VISION_SPEED_ESTIMATE, 2:VICON_POSITION_ESTIMATE, 3:VISION_POSITION_DELTA, 4:ODOMETRY
+    // @Bitmask: 0:VISION_POSITION_ESTIMATE, 1:VISION_SPEED_ESTIMATE, 2:VICON_POSITION_ESTIMATE, 3:VISION_POSITION_DELTA, 4:ODOMETRY, 5:GLOBAL_VISION_POSITION_ESTIMATE
     // @User: Advanced
     AP_GROUPINFO("VICON_TMASK",   20, SIM,  vicon_type_mask, 3),
 
