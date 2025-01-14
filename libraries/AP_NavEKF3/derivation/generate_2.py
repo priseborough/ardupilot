@@ -550,41 +550,6 @@ def quaternion_error_propagation():
     quat_code_generator.write_matrix(Matrix(P_rot_vec_simple[1]), "tiltErrCovMat", False, "[", "]")
     quat_code_generator.close()
 
-# yaw estimator prediction and observation code
-def posNE_observation(P):
-    # derive the covariance update equation for a NE position observation
-    H = Matrix([[0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-                [0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]])
-
-    obsVarNN = symbols("obsVarNN", real=True) # position observation variance m^2
-    obsVarNE = symbols("obsVarNE", real=True) # position observation covariance m^2
-    obsVarEE = symbols("obsVarEE", real=True) # position observation variance m^2
-
-    R = Matrix([[obsVarNN , obsVarNE],
-                [obsVarNE , obsVarEE]])
-
-    S = H * P * H.T + R
-    S_det_inv = 1 / S.det()
-    S_inv = S.inv()
-    K = (P * H.T) * S_inv
-    P_new = P - K * S * K.T
-
-    # optimize code
-    t, [S_det_inv_s, S_inv_s, K_s, P_new_s] = cse([S_det_inv, S_inv, K, P_new], symbols("t0:1000"), optimizations='basic')
-
-    posNE_observation_generator = CodeGenerator("./generated/posNE_measurement_update.cpp")
-    posNE_observation_generator.print_string("Intermediate variables")
-    posNE_observation_generator.write_subexpressions(t)
-    posNE_observation_generator.print_string("Equations for NE position innovation variance's determinant inverse")
-    posNE_observation_generator.write_matrix(Matrix([[S_det_inv_s]]), "S_det_inverse", False)
-    posNE_observation_generator.print_string("Equations for NE position innovation variance inverse")
-    posNE_observation_generator.write_matrix(Matrix(S_inv_s), "S_inverse", True)
-    posNE_observation_generator.print_string("Equations for NE position Kalman gain")
-    posNE_observation_generator.write_matrix(Matrix(K_s), "K", False)
-    posNE_observation_generator.print_string("Equations for covariance matrix update")
-    posNE_observation_generator.write_matrix(Matrix(P_new_s), "P", True)
-    posNE_observation_generator.close()
-
 def generate_code():
     print('Starting code generation:')
     print('Creating symbolic variables ...')
@@ -723,9 +688,6 @@ def generate_code():
     body_frame_accel_observation(P,state,R_to_body,vx,vy,vz,wx,wy)
     # print('Generating yaw estimator code ...')
     # yaw_estimator()
-    print('Generating NE position observation code ...')
-    posNE_observation(P)
-
     print('Code generation finished!')
 
 

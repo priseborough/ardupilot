@@ -721,9 +721,6 @@ private:
     // constrain earth field using WMM tables
     void MagTableConstrain(void);
 
-    // fuse NE position using a full observation covariance matrix
-    void FusePosNE();
-
     // fuse selected position, velocity and height measurements
     void FuseVelPosNED();
 
