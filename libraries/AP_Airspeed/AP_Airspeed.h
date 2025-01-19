@@ -103,6 +103,10 @@ public:
     float get_raw_airspeed(uint8_t i) const;
     float get_raw_airspeed(void) const { return get_raw_airspeed(primary); }
 
+    // return the unfiltered angle of attack in degrees
+    bool get_raw_aoa(uint8_t i, float &aoa_deg) const;
+    bool get_raw_aoa(float &aoa_deg) const { return get_raw_aoa(primary, aoa_deg); }
+
     // return the current airspeed ratio (dimensionless)
     float get_airspeed_ratio(uint8_t i) const {
 #ifndef HAL_BUILD_AP_PERIPH
@@ -251,6 +255,8 @@ private:
         uint32_t last_update_ms;
         bool use_zero_offset;
         bool	healthy;
+        float   aoa_deg;
+        bool    aoa_healthy;
 
         // state of runtime calibration
         struct {

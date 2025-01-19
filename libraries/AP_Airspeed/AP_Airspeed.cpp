@@ -898,6 +898,16 @@ float AP_Airspeed::get_raw_airspeed(uint8_t i) const {
     return state[i].raw_airspeed;
 }
 
+// return the unfiltered angle of attack in m/s
+// return false if not measured
+bool AP_Airspeed::get_raw_aoa(uint8_t i, float &aoa_deg) const {
+    if (!state[i].aoa_healthy) {
+        return false;
+    }
+    aoa_deg = state[i].aoa_deg;
+    return true;
+}
+
 // return the differential pressure in Pascal for the last airspeed reading
 float AP_Airspeed::get_differential_pressure(uint8_t i) const {
     if (!enabled(i)) {
