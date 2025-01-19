@@ -67,6 +67,9 @@ private:
 
     AP_PIDInfo _pid_info;
 
+    LowPassFilterFloat probe_aoa_lpf;
+    LowPassFilterFloat inertial_aoa_lpf;
+
     float _get_rate_out(float desired_rate, float scaler, bool disable_integrator, float aspeed, bool ground_mode);
     float _get_coordination_rate_offset(float &aspeed, bool &inverted) const;
 };

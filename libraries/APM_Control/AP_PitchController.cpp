@@ -21,6 +21,7 @@
 #include <AP_AHRS/AP_AHRS.h>
 #include <AP_Scheduler/AP_Scheduler.h>
 #include <GCS_MAVLink/GCS.h>
+#include <Filter/Filter.h>
 
 extern const AP_HAL::HAL& hal;
 
@@ -158,6 +159,24 @@ const AP_Param::GroupInfo AP_PitchController::var_info[] = {
 
     AP_SUBGROUPINFO(rate_pid, "_RATE_", 11, AP_PitchController, AC_PID),
 
+    // @Param: AOA_MAX
+    // @DisplayName: Maximum angle of attack
+    // @Description: The pitch rate upper limit will be adjusted to prevent the angle of attack exceeding this value. Set to 0 to disable the limit.
+    // @Range: 0 30
+    // @Units: deg
+    // @Increment: 1
+    // @User: Advanced
+    AP_GROUPINFO("AOA_MAX", 12, AP_PitchController, gains.aoa_max,   0.0f),
+
+    // @Param: AOA_FREQ
+    // @DisplayName: AoA Crossover Frequency
+    // @Description: The frequency above which the inertial AoA will be used and below which the the probe AoA will be used.
+    // @Range: 0.1 10.0
+    // @Units: Hz
+    // @Increment: 0.1
+    // @User: Advanced
+    AP_GROUPINFO("AOA_FREQ", 13, AP_PitchController, gains.aoa_freq,   1.0f),
+
     AP_GROUPEND
 };
 
@@ -166,6 +185,10 @@ AP_PitchController::AP_PitchController(const AP_FixedWing &parms)
 {
     AP_Param::setup_object_defaults(this, var_info);
     rate_pid.set_slew_limit_scale(45);
+    probe_aoa_lpf.reset(0);
+    probe_aoa_lpf.set_cutoff_frequency(gains.aoa_freq);
+    inertial_aoa_lpf.reset(0);
+    inertial_aoa_lpf.set_cutoff_frequency(gains.aoa_freq);
 }
 
 /*
@@ -185,6 +208,26 @@ float AP_PitchController::_get_rate_out(float desired_rate, float scaler, bool d
     bool underspeed = aspeed <= 0.5*float(aparm.airspeed_min);
     if (underspeed) {
         limit_I = true;
+    }
+
+    if (is_positive(gains.aoa_max)) {
+        // get AOA sensor
+        const float inertial_aoa = _ahrs.getAOA();
+        float probe_aoa;
+        float aoa_estimate;
+        AP_Airspeed *airspeed = AP_Airspeed::get_singleton();
+        if (airspeed != nullptr && airspeed->get_raw_aoa(probe_aoa)) {
+            // apply a crossover filter using inertial AoA at higher frequencies to prevent
+            // probe data spikes and wake induced transients from causing unwanted vehicle
+            // pitch response
+            // TODO apply a rate limiter before the LPF
+            aoa_estimate = probe_aoa_lpf.apply(probe_aoa,dt) + inertial_aoa - inertial_aoa_lpf.apply(inertial_aoa,dt);
+        } else {
+            aoa_estimate = inertial_aoa;
+        }
+        // apply a soft limiter to the rate demand to prevent the aoa_max being exceeded
+        const float upper_rate_limit = (gains.aoa_max - aoa_estimate) / gains.tau;
+        desired_rate = MIN(desired_rate, upper_rate_limit);
     }
 
     // the P and I elements are scaled by sq(scaler). To use an
