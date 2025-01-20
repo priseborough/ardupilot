@@ -67,6 +67,7 @@ private:
 
     AP_PIDInfo _pid_info;
 
+    float probe_aoa_rate_limited;
     LowPassFilterFloat probe_aoa_lpf;
     LowPassFilterFloat inertial_aoa_lpf;
 

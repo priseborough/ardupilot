@@ -189,6 +189,7 @@ AP_PitchController::AP_PitchController(const AP_FixedWing &parms)
     probe_aoa_lpf.set_cutoff_frequency(gains.aoa_freq);
     inertial_aoa_lpf.reset(0);
     inertial_aoa_lpf.set_cutoff_frequency(gains.aoa_freq);
+    probe_aoa_rate_limited = 0.0f;
 }
 
 /*
@@ -217,11 +218,25 @@ float AP_PitchController::_get_rate_out(float desired_rate, float scaler, bool d
         float aoa_estimate;
         AP_Airspeed *airspeed = AP_Airspeed::get_singleton();
         if (airspeed != nullptr && airspeed->get_raw_aoa(probe_aoa)) {
-            // apply a crossover filter using inertial AoA at higher frequencies to prevent
-            // probe data spikes and wake induced transients from causing unwanted vehicle
-            // pitch response
-            // TODO apply a rate limiter before the LPF
-            aoa_estimate = probe_aoa_lpf.apply(probe_aoa,dt) + inertial_aoa - inertial_aoa_lpf.apply(inertial_aoa,dt);
+            // rate limit the probe if vehicle pitch limits are provided to prevent
+            // large transients pumping the low pass filter
+            if (gains.rmax_neg > 0 || gains.rmax_pos > 0) {
+                const float aoa_rate_limit = (float)MAX(gains.rmax_neg, gains.rmax_pos);
+                if (probe_aoa_rate_limited - probe_aoa > aoa_rate_limit * dt) {
+                    probe_aoa_rate_limited = probe_aoa + aoa_rate_limit * dt;
+                } else if (probe_aoa_rate_limited - probe_aoa < -aoa_rate_limit * dt) {
+                    probe_aoa_rate_limited = probe_aoa - aoa_rate_limit * dt;
+                } else {
+                    probe_aoa_rate_limited = probe_aoa;
+                }
+            } else {
+                probe_aoa_rate_limited = probe_aoa;
+            }
+            // high pass filter the inertial AoA estimate
+            const float aoa_inertial_hpf = inertial_aoa - inertial_aoa_lpf.apply(inertial_aoa,dt);
+            // apply a crossover filter using low pass filtered probe data and high pass filtered inertial data
+            // to prevent probe data spikes and wake induced transients from causing unwanted vehicle pitch response
+            aoa_estimate = probe_aoa_lpf.apply(probe_aoa_rate_limited, dt) + aoa_inertial_hpf;
         } else {
             aoa_estimate = inertial_aoa;
         }
