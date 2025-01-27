@@ -1072,8 +1072,13 @@ void NavEKF3_core::writeExtNavData(const Vector3f &pos, const Quaternion &quat, 
     extNavMeasTime_ms = MIN(timeStamp_ms, imuSampleTime_ms); // measurement can't be from the future
     // If this data is timestamped further behind that the current EKF fusion time horizon, correct using
     // velocity state estimates back to the fusion time horizon.
-    if (is_positive(frontend->_extNavMaxTshift) && extNavMeasTime_ms < imuDataDelayed.time_ms) {
-        const float timeShift = 1E-3f * (ftype)(imuDataDelayed.time_ms - extNavMeasTime_ms);
+    if (is_positive(frontend->_extNavMaxTshift)) {
+        float timeShift;
+        if (extNavMeasTime_ms < imuDataDelayed.time_ms) {
+            timeShift = 1E-3f * (ftype)(imuDataDelayed.time_ms - extNavMeasTime_ms);
+        } else {
+            timeShift = 1E-3f * (ftype)(extNavMeasTime_ms - imuDataDelayed.time_ms);
+        }
         if (timeShift > frontend->_extNavMaxTshift) {
             // data is too old to correct
             return;

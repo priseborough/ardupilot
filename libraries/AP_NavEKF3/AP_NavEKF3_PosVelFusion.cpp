@@ -480,7 +480,7 @@ void NavEKF3_core::CorrectExtNavForSensorOffset(ext_nav_elements &ext_nav_data)
     const AP_NavEKF_Source::SourceXY posxy_source = frontend->sources.getPosXYSource();
     if ((posxy_source == AP_NavEKF_Source::SourceXY::GPSANDEXTNAV) &&
         (gpsCheckStatus.bad_hAcc == false) &&
-        (imuDataDelayed.time_ms - gpsDataDelayed.time_ms < 1000))
+        ((imuDataDelayed.time_ms - gpsDataDelayed.time_ms < 500) || (gpsDataDelayed.time_ms - imuDataDelayed.time_ms < 500)))
     {
         // update origin correction to track EKF
         const uint32_t dt_msec = imuDataDelayed.time_ms - lastExtNavOriginTime_ms;
