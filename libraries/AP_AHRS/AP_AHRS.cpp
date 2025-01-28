@@ -2433,22 +2433,6 @@ void AP_AHRS::writeExtNavData(const Vector3f &pos, const Quaternion &quat, const
     EKF2.writeExtNavData(pos, quat, posCovNE, posErrD, angErr, timeStamp_ms-delay_ms, resetTime_ms);
 #endif
 #if HAL_NAVEKF3_AVAILABLE
-AP::logger().Write("RAW1", "TimeUS,X,Y,Z,Q0,Q1,Q2,Q3,XX,XY,YY,AE,T,DT,RT", "QfffffffffffIII",
-                                        AP_HAL::micros64(),
-                                        pos.x,
-                                        pos.y,
-                                        pos.z,
-                                        quat[0],
-                                        quat[1],
-                                        quat[2],
-                                        quat[3],
-                                        posCovNE[0],
-                                        posCovNE[1],
-                                        posCovNE[2],
-                                        angErr,
-                                        timeStamp_ms,
-                                        delay_ms,
-                                        resetTime_ms);
     EKF3.writeExtNavData(pos, quat, posCovNE, posErrD, angErr, timeStamp_ms-delay_ms, resetTime_ms);
 #endif
 }

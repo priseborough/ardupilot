@@ -1079,9 +1079,6 @@ void NavEKF3_core::writeExtNavData(const Vector3f &pos, const Quaternion &quat, 
         } else {
             timeShift = 1E-3f * (ftype)(extNavMeasTime_ms - imuDataDelayed.time_ms);
         }
-AP::logger().Write("RAW2", "TimeUS,TS", "Qf",
-                                        AP_HAL::micros64(),
-                                        timeShift);
         if (timeShift > frontend->_extNavMaxTshift) {
             // data is too old to correct
             return;

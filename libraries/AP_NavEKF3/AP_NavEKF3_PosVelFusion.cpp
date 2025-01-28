@@ -4,7 +4,6 @@
 #include "AP_NavEKF3_core.h"
 #include <GCS_MAVLink/GCS.h>
 #include <AP_DAL/AP_DAL.h>
-#include <AP_Logger/AP_Logger.h>
 
 /********************************************************
 *                   RESET FUNCTIONS                     *
@@ -494,19 +493,6 @@ void NavEKF3_core::CorrectExtNavForSensorOffset(ext_nav_elements &ext_nav_data)
             const ftype alpha = dt_sec / (dt_sec + frontend->_extNavOriginTconst);
             extNavOriginNED = extNavOriginNED * (1.0f - alpha) + (stateStruct.position - extNavPosNED - extNavOriginNED) * alpha;
         }
-AP::logger().Write("RAW3", "TimeUS,OX,OY,OZ,PX,PY,PZ,SX,SY,SZ,DT", "Qffffffffff",
-                                        AP_HAL::micros64(),
-                                        extNavOriginNED.x,
-                                        extNavOriginNED.y,
-                                        extNavOriginNED.z,
-                                        ext_nav_data.pos.x,
-                                        ext_nav_data.pos.y,
-                                        ext_nav_data.pos.z,
-                                        stateStruct.position.x,
-                                        stateStruct.position.y,
-                                        stateStruct.position.z,
-                                        dt_sec
-                                        );
     }
 
     // correct position for offset of origin
