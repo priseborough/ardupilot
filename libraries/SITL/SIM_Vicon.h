@@ -47,6 +47,7 @@ private:
 
     uint64_t last_observation_usec; // time last observation was sent
     uint64_t time_offset_us;        // simulated time offset between external system and autopilot
+    const float posNE_variance_min = sq(1.0f); // simulated minimum NE position variance (m^2)
     float posNE_variance;           // simulated NE position variance calculation (m^2)
 
     // buffer of messages to send

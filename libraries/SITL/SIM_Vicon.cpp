@@ -121,7 +121,7 @@ void Vicon::update_vicon_position_estimate(const Location &loc,
 
     // failure simulation
     if (_sitl->vicon_fail.get() != 0) {
-        posNE_variance = 0.0f; // reset variance calculation
+        posNE_variance = posNE_variance_min; // reset variance calculation
         return;
     }
 
@@ -190,6 +190,7 @@ void Vicon::update_vicon_position_estimate(const Location &loc,
                 // Mimic a simple position error variance growth assuming a velocity error in an underlying odometry process
                 // that is un-correlated from frame to frame.
                 posNE_variance += sq(vel_error * 1E-6f * (float)dt_usec);
+                posNE_variance = MAX(posNE_variance, posNE_variance_min);
                 const float hgt_variance = sq(hgt_error);
 
                 const mavlink_global_vision_position_estimate_t global_vision_position_estimate{
