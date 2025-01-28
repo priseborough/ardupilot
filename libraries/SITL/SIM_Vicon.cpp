@@ -168,45 +168,68 @@ void Vicon::update_vicon_position_estimate(const Location &loc,
 
     // send global vision position estimate message
     uint8_t msg_buf_index;
-    if (should_send(ViconTypeMask::GLOBAL_VISION_POSITION_ESTIMATE) && get_free_msg_buf_index(msg_buf_index)) {
-        // Mimic a simple position error variance growth assuming a velocity error in an underlying odometry process
-        // that is un-correlated from frame to frame.
-        posNE_variance += sq(vel_error * 1E-6f * (float)dt_usec);
-        const float hgt_variance = sq(hgt_error);
+    if (should_send(ViconTypeMask::GLOBAL_VISION_POSITION_ESTIMATE)) {
+        static uint32_t last_send_ms=0;
+        if (AP_HAL::millis() - last_send_ms > 200) {
+            if (get_free_msg_buf_index(msg_buf_index)) {
+                const mavlink_system_time_t system_time{
+                    time_unix_usec: now_us,     /*< [us] Timestamp (UNIX epoch time).*/
+                    time_boot_ms: (uint32_t)(now_us/1000)   /*< [ms] Timestamp (time since system boot).*/
+                };
+                mavlink_msg_system_time_encode_status(
+                    system_id,
+                    component_id,
+                    &mav_status,
+                    &msg_buf[msg_buf_index].obs_msg,
+                    &system_time
+                );
+                msg_buf[msg_buf_index].time_send_us = now_us; // this message should be sent immediately for best time stamp accuracy
+            }
 
-        const mavlink_global_vision_position_estimate_t global_vision_position_estimate{
-        usec: time_send_us + time_offset_us,
-        x: float(pos_corrected.x),
-        y: float(pos_corrected.y),
-        z: float(pos_corrected.z),
-        roll: roll,
-        pitch: pitch,
-        yaw: yaw,
-        covariance:
-        {
-            posNE_variance, // [0]
-            0.0f, 0.0f, 0.0f, 0.0f, 0.0f, // [1 ... 5]
-            posNE_variance, // [6]
-            0.0f, 0.0f, 0.0f, 0.0f, // [7 ... 10]
-            hgt_variance, // [11]
-            0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f // [12 ... 20]
-        },
-        reset_counter: 0
-        };
+            if (get_free_msg_buf_index(msg_buf_index)) {
+                // Mimic a simple position error variance growth assuming a velocity error in an underlying odometry process
+                // that is un-correlated from frame to frame.
+                posNE_variance += sq(vel_error * 1E-6f * (float)dt_usec);
+                const float hgt_variance = sq(hgt_error);
 
-        mavlink_msg_global_vision_position_estimate_encode_status(
-            system_id,
-            component_id,
-            &mav_status,
-            &msg_buf[msg_buf_index].obs_msg,
-            &global_vision_position_estimate
-        );
+                const mavlink_global_vision_position_estimate_t global_vision_position_estimate{
+                usec: time_send_us + time_offset_us,
+                x: float(pos_corrected.x),
+                y: float(pos_corrected.y),
+                z: float(pos_corrected.z),
+                roll: roll,
+                pitch: pitch,
+                yaw: yaw,
+                covariance:
+                {
+                    posNE_variance, // [0]
+                    0.0f, 0.0f, 0.0f, 0.0f, 0.0f, // [1 ... 5]
+                    posNE_variance, // [6]
+                    0.0f, 0.0f, 0.0f, 0.0f, // [7 ... 10]
+                    hgt_variance, // [11]
+                    0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f // [12 ... 20]
+                },
+                reset_counter: 0
+                };
 
-        // model computational time delay as fixed value of 50 msec plus a random variable from an exponential distribution.
-        // 50% of samples are less than 250 msec
-        uint64_t delay_us = (uint64_t)(1000.0f * (50.0f + 200.0f * expRandVar(1.0f)));
+                mavlink_msg_global_vision_position_estimate_encode_status(
+                    system_id,
+                    component_id,
+                    &mav_status,
+                    &msg_buf[msg_buf_index].obs_msg,
+                    &global_vision_position_estimate
+                );
 
-        msg_buf[msg_buf_index].time_send_us = time_send_us + delay_us; // delay sending to simulate computational delay
+                // model computational time delay as fixed value of 50 msec plus a random variable from an exponential distribution.
+                // 50% of samples are less than 250 msec
+                // uint64_t delay_us = (uint64_t)(1000.0f * (50.0f + 200.0f * expRandVar(1.0f)));
+                uint64_t delay_us = 50000;
+
+                msg_buf[msg_buf_index].time_send_us = time_send_us + delay_us; // delay sending to simulate computational delay
+
+                last_send_ms = AP_HAL::millis();
+            }
+        }
     }
 
     // send vision position estimate message
