@@ -3713,86 +3713,97 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
 
         """Setup parameters including switching to EKF3"""
         self.context_push()
-        ex = None
-        try:
-            self.set_parameters({
-                "SIM_SPEEDUP": 1,    # slow down to prevent posible loss of MAVLink messages
-                "VISO_TYPE": 2,      # use Intel RealSense T265 interface
-                "VISO_OPTIONS": 1,   # ignore rpy data
-                "SERIAL5_PROTOCOL": 2,
-                "EK3_ENABLE": 1,
-                "EK3_SRC1_POSXY": 8, # Enables combined use of GPS and external nav
-                "EK3_IMU_MASK": 1,   # only use 1 EKF lane to speed up analysis
-                "EK2_ENABLE": 0,     # EKF2 doesn't support combined use of GPS and External Nav
-                "AHRS_EKF_TYPE": 3,
-                "SIM_VICON_TMASK": 32, # send global position messages only
-                "SIM_VICON_FAIL": 1, # simulate taking off without external nav
-                "SIM_VICON_YAW": 0,  # external nav uses NE reference frame so no yaw misalignment
-                "LOG_REPLAY": 1,
-                "LOG_DISARMED": 1,
-            })
-            self.reboot_sitl()
 
-            # ensure we can get a global position:
-            self.poll_home_position(timeout=120)
+        self.set_parameters({
+            "VISO_TYPE": 2,      # use Intel RealSense T265 interface
+            "VISO_OPTIONS": 1,   # ignore rpy data
+            "SERIAL5_PROTOCOL": 2,
+            "EK3_ENABLE": 1,
+            "EK3_SRC1_POSXY": 8, # Enables combined use of GPS and external nav
+            "EK3_IMU_MASK": 1,   # only use 1 EKF lane to speed up analysis
+            "EK2_ENABLE": 0,     # EKF2 doesn't support combined use of GPS and External Nav
+            "AHRS_EKF_TYPE": 3,
+            "SIM_VICON_TMASK": 32, # send global position messages only
+            "SIM_VICON_FAIL": 1, # simulate taking off without external nav
+            "SIM_VICON_YAW": 0,  # external nav uses NE reference frame so no yaw misalignment
+            "LOG_REPLAY": 1,
+            "LOG_DISARMED": 1,
+            "EK2_ENABLE": 1,     # use for reference purposes
+        })
+        self.reboot_sitl()
 
-            # record starting position using GPS
-            old_pos = self.get_global_position_int()
-            print("old_pos=%s" % str(old_pos))
+        # ensure we can get a global position:
+        self.poll_home_position(timeout=120)
 
-            # enable vicon
-            self.set_parameter("SIM_VICON_FAIL", 0)
+        # record starting position using GPS
+        old_pos = self.get_global_position_int()
+        print("old_pos=%s" % str(old_pos))
 
-            # takeoff to 10m in Loiter
-            self.progress("Moving to ensure location is tracked")
-            self.takeoff(10, mode="LOITER", require_absolute=True, timeout=720)
+        # enable vicon
+        self.set_parameter("SIM_VICON_FAIL", 0)
 
-            # fly forward in Loiter
-            self.set_rc(2, 1300)
+        # takeoff to 20m in Loiter
+        self.progress("Moving to ensure location is tracked")
+        self.takeoff(20, mode="LOITER", require_absolute=True, timeout=720)
 
-            # disable vicon after moving for 30 seconds
-            self.delay_sim_time(30)
-            self.set_parameter("SIM_VICON_FAIL", 1)
+        # fly forward in Loiter
+        self.set_rc(2, 1000)
 
-            # ensure vehicle remains in Loiter for 10 seconds
-            tstart = self.get_sim_time()
-            while self.get_sim_time() - tstart < 10:
-                if not self.mode_is('LOITER'):
-                    raise NotAchievedException("Expected to stay in loiter for >10 seconds")
+        # disable vicon after moving for 20 seconds
+        self.delay_sim_time(20)
+        self.set_parameter("SIM_VICON_FAIL", 1)
 
-            # re-enable vicon
-            self.set_parameter("SIM_VICON_FAIL", 0)
+        # ensure vehicle remains in Loiter for 10 seconds
+        tstart = self.get_sim_time()
+        while self.get_sim_time() - tstart < 10:
+            if not self.mode_is('LOITER'):
+                raise NotAchievedException("Expected to stay in loiter for >10 seconds")
 
-            # ensure vehicle remains in Loiter for 10 seconds
-            tstart = self.get_sim_time()
-            while self.get_sim_time() - tstart < 10:
-                if not self.mode_is('LOITER'):
-                    raise NotAchievedException("Expected to stay in loiter for >10 seconds")
+        # re-enable vicon
+        self.set_parameter("SIM_VICON_FAIL", 0)
 
-            # disable GPS
-            self.set_parameter("SIM_GPS_DISABLE", 1)
+        # ensure vehicle remains in Loiter for 10 seconds
+        tstart = self.get_sim_time()
+        while self.get_sim_time() - tstart < 10:
+            if not self.mode_is('LOITER'):
+                raise NotAchievedException("Expected to stay in loiter for >10 seconds")
 
-            # ensure vehicle remains in Loiter for 10 seconds
-            tstart = self.get_sim_time()
-            while self.get_sim_time() - tstart < 10:
-                if not self.mode_is('LOITER'):
-                    raise NotAchievedException("Expected to stay in loiter for >10 seconds")
+        # disable GPS
+        self.set_parameter("SIM_GPS1_ENABLE", 0)
 
-            # re-enable GPS
-            self.set_parameter("SIM_GPS_DISABLE", 0)
+        # ensure vehicle remains in Loiter for 20 seconds
+        tstart = self.get_sim_time()
+        while self.get_sim_time() - tstart < 20:
+            if not self.mode_is('LOITER'):
+                raise NotAchievedException("Expected to stay in loiter for >10 seconds")
 
-            # RTL and check vehicle arrives within 10m of home
-            self.set_rc(2, 1500)
-            self.do_RTL()
+        self.set_rc(2, 1500)
+        self.delay_sim_time(5)
 
-        except Exception as e:
-            self.print_exception_caught(e)
-            ex = e
-        self.context_pop()
+        # check nav accuracy
+        sim_state = self.mav.recv_match(type='SIM_STATE',
+                                    blocking=True)
+        global_position_int = self.mav.recv_match(type='GLOBAL_POSITION_INT',
+                                    blocking=True)
+        error = self.distance_lat_lon(sim_state.lat, sim_state.lon, global_position_int.lat*1E-7, global_position_int.lon*1E-7)
+        if not error < 10:
+            raise NotAchievedException("vision aiding has high error")
+
+        # re-enable GPS
+        self.set_parameter("SIM_GPS1_ENABLE", 1)
+        self.delay_sim_time(10)
+
+        # check nav accuracy
+        sim_state = self.mav.recv_match(type='SIM_STATE',
+                                    blocking=True)
+        global_position_int = self.mav.recv_match(type='GLOBAL_POSITION_INT',
+                                    blocking=True)
+        error = self.distance_lat_lon(sim_state.lat, sim_state.lon, global_position_int.lat*1E-7, global_position_int.lon*1E-7)
+        if not error < 5:
+            raise NotAchievedException("EKF doesn't handle switch to GPS")
+
         self.disarm_vehicle(force=True)
         self.reboot_sitl()
-        if ex is not None:
-            raise ex
 
     def RTLSpeed(self):
         """Test RTL Speed parameters"""
