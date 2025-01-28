@@ -486,8 +486,14 @@ void AP_DAL::handle_message(const log_ROFH &msg, NavEKF2 &ekf2, NavEKF3 &ekf3)
 void AP_DAL::handle_message(const log_REPH &msg, NavEKF2 &ekf2, NavEKF3 &ekf3)
 {
     _REPH = msg;
-    ekf2.writeExtNavData(msg.pos, msg.quat, msg.posErr, msg.angErr, msg.timeStamp_ms, msg.delay_ms, msg.resetTime_ms);
-    ekf3.writeExtNavData(msg.pos, msg.quat, msg.posErr, msg.angErr, msg.timeStamp_ms, msg.delay_ms, msg.resetTime_ms);
+
+    float posCovNE[3];
+    posCovNE[0] = msg.posCov_0;
+    posCovNE[1] = msg.posCov_1;
+    posCovNE[2] = msg.posCov_2;
+
+    ekf2.writeExtNavData(msg.pos, msg.quat, posCovNE, msg.posErrD, msg.angErr, msg.timeStamp_ms, msg.resetTime_ms);
+    ekf3.writeExtNavData(msg.pos, msg.quat, posCovNE, msg.posErrD, msg.angErr, msg.timeStamp_ms, msg.resetTime_ms);
 }
 
 /*
