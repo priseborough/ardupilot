@@ -3715,6 +3715,7 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
         self.context_push()
 
         self.set_parameters({
+            "SIM_SPEEDUP": 1,
             "VISO_TYPE": 2,      # use Intel RealSense T265 interface
             "VISO_OPTIONS": 1,   # ignore rpy data
             "SERIAL5_PROTOCOL": 2,
@@ -3728,7 +3729,6 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
             "SIM_VICON_YAW": 0,  # external nav uses NE reference frame so no yaw misalignment
             "LOG_REPLAY": 1,
             "LOG_DISARMED": 1,
-            "EK2_ENABLE": 1,     # use for reference purposes
         })
         self.reboot_sitl()
 
