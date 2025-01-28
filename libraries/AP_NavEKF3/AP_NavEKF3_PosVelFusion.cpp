@@ -453,10 +453,7 @@ void NavEKF3_core::CorrectGPSForAntennaOffset(gps_elements &gps_data) const
 // correct external navigation earth-frame position for sensor body-frame and earth frame origin offset
 void NavEKF3_core::CorrectExtNavForSensorOffset(ext_nav_elements &ext_nav_data)
 {
-    // external nav data is against the public_origin, so convert to offset from EKF_origin
-    const Vector2F NE_offset = EKF_origin.get_distance_NE_ftype(public_origin);
-    ext_nav_data.pos.xy() += NE_offset;
-
+    Vector3F extNavPosNED = ext_nav_data.pos;
 
 #if HAL_VISUALODOM_ENABLED
     if (!ext_nav_data.corrected) {
@@ -465,14 +462,18 @@ void NavEKF3_core::CorrectExtNavForSensorOffset(ext_nav_elements &ext_nav_data)
             const Vector3F posOffsetBody = visual_odom->get_pos_offset().toftype() - accelPosOffset;
             if (!posOffsetBody.is_zero()) {
                 Vector3F posOffsetEarth = prevTnb.mul_transpose(posOffsetBody);
-                ext_nav_data.pos.x -= posOffsetEarth.x;
-                ext_nav_data.pos.y -= posOffsetEarth.y;
-                ext_nav_data.pos.z -= posOffsetEarth.z;
+                extNavPosNED.x -= posOffsetEarth.x;
+                extNavPosNED.y -= posOffsetEarth.y;
+                extNavPosNED.z -= posOffsetEarth.z;
             }
         }
         ext_nav_data.corrected = true;
     }
 #endif
+
+    // external nav data is against the public_origin, so convert to offset from EKF_origin
+    const Vector2F NE_offset = EKF_origin.get_distance_NE_ftype(public_origin);
+    extNavPosNED.xy() += NE_offset;
 
     // When simultaneously using GPS and external nav data, adjust external nav slowly to prevent
     // the external nav fighting the GPS as it drifts,
@@ -484,19 +485,19 @@ void NavEKF3_core::CorrectExtNavForSensorOffset(ext_nav_elements &ext_nav_data)
     {
         // update origin correction to track EKF
         const uint32_t dt_msec = imuDataDelayed.time_ms - lastExtNavOriginTime_ms;
-        if ((dt_msec > 5000 || posxy_source == AP_NavEKF_Source::SourceXY::GPS || extNavDataDelayed.posReset) && !gpsCheckStatus.bad_hAcc)  {
-            extNavOriginNED = stateStruct.position - ext_nav_data.pos;
+        lastExtNavOriginTime_ms = imuDataDelayed.time_ms;
+        if ((dt_msec > 5000 || posxy_source == AP_NavEKF_Source::SourceXY::GPS || extNavDataDelayed.posReset))  {
+            extNavOriginNED = stateStruct.position - extNavPosNED;
             extNavDataDelayed.posReset = false;
         } else {
             const ftype dt_sec = 0.001f * (float)dt_msec;
             const ftype alpha = dt_sec / (dt_sec + frontend->_extNavOriginTconst);
-            extNavOriginNED = extNavOriginNED * (1.0f - alpha) + (stateStruct.position - ext_nav_data.pos) * alpha;
+            extNavOriginNED = extNavOriginNED * (1.0f - alpha) + (stateStruct.position - extNavPosNED - extNavOriginNED) * alpha;
         }
-        lastExtNavOriginTime_ms = imuDataDelayed.time_ms;
     }
 
     // correct position for offset of origin
-    ext_nav_data.pos += extNavOriginNED;
+    ext_nav_data.pos = extNavPosNED + extNavOriginNED;
 
     // action any pending reset request
     if (extNavDataDelayed.posReset) {
