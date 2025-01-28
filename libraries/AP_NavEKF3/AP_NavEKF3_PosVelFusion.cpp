@@ -484,13 +484,12 @@ void NavEKF3_core::CorrectExtNavForSensorOffset(ext_nav_elements &ext_nav_data)
         ((imuDataDelayed.time_ms - gpsDataDelayed.time_ms < 500) || (gpsDataDelayed.time_ms - imuDataDelayed.time_ms < 500)))
     {
         // update origin correction to track EKF
-        const uint32_t dt_msec = imuDataDelayed.time_ms - lastExtNavOriginTime_ms;
+        const ftype dt_sec = 0.001f * (ftype)(imuDataDelayed.time_ms - lastExtNavOriginTime_ms);
         lastExtNavOriginTime_ms = imuDataDelayed.time_ms;
-        if ((dt_msec > 5000 || posxy_source == AP_NavEKF_Source::SourceXY::GPS || extNavDataDelayed.posReset))  {
+        if ((dt_sec > 5.0f || posxy_source == AP_NavEKF_Source::SourceXY::GPS || extNavDataDelayed.posReset))  {
             extNavOriginNED = stateStruct.position - extNavPosNED;
             extNavDataDelayed.posReset = false;
         } else {
-            const ftype dt_sec = 0.001f * (float)dt_msec;
             const ftype alpha = dt_sec / (dt_sec + frontend->_extNavOriginTconst);
             extNavOriginNED = extNavOriginNED * (1.0f - alpha) + (stateStruct.position - extNavPosNED - extNavOriginNED) * alpha;
         }
