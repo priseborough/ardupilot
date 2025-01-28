@@ -171,20 +171,20 @@ void Vicon::update_vicon_position_estimate(const Location &loc,
     if (should_send(ViconTypeMask::GLOBAL_VISION_POSITION_ESTIMATE)) {
         static uint32_t last_send_ms=0;
         if (AP_HAL::millis() - last_send_ms > 200) {
-            if (get_free_msg_buf_index(msg_buf_index)) {
-                const mavlink_system_time_t system_time{
-                    time_unix_usec: now_us,     /*< [us] Timestamp (UNIX epoch time).*/
-                    time_boot_ms: (uint32_t)(now_us/1000)   /*< [ms] Timestamp (time since system boot).*/
-                };
-                mavlink_msg_system_time_encode_status(
-                    system_id,
-                    component_id,
-                    &mav_status,
-                    &msg_buf[msg_buf_index].obs_msg,
-                    &system_time
-                );
-                msg_buf[msg_buf_index].time_send_us = now_us; // this message should be sent immediately for best time stamp accuracy
-            }
+            // if (get_free_msg_buf_index(msg_buf_index)) {
+            //     const mavlink_system_time_t system_time{
+            //         time_unix_usec: now_us,     /*< [us] Timestamp (UNIX epoch time).*/
+            //         time_boot_ms: (uint32_t)(now_us/1000)   /*< [ms] Timestamp (time since system boot).*/
+            //     };
+            //     mavlink_msg_system_time_encode_status(
+            //         system_id,
+            //         component_id,
+            //         &mav_status,
+            //         &msg_buf[msg_buf_index].obs_msg,
+            //         &system_time
+            //     );
+            //     msg_buf[msg_buf_index].time_send_us = now_us; // this message should be sent immediately for best time stamp accuracy
+            // }
 
             if (get_free_msg_buf_index(msg_buf_index)) {
                 // Mimic a simple position error variance growth assuming a velocity error in an underlying odometry process
