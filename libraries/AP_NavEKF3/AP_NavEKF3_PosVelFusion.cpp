@@ -492,7 +492,9 @@ void NavEKF3_core::CorrectExtNavForSensorOffset(ext_nav_elements &ext_nav_data)
             extNavDataDelayed.posReset = false;
         } else {
             const ftype alpha = dt_sec / (dt_sec + frontend->_extNavOriginTconst);
-            extNavOriginNED = extNavOriginNED * (1.0f - alpha) + (stateStruct.position - extNavPosNED) * alpha;
+            extNavOriginNED.x = extNavOriginNED.x * (1.0f - alpha) + (stateStruct.position.x - extNavPosNED.x) * alpha;
+            extNavOriginNED.y = extNavOriginNED.y * (1.0f - alpha) + (stateStruct.position.y - extNavPosNED.y) * alpha;
+            extNavOriginNED.z = extNavOriginNED.z * (1.0f - alpha) + (stateStruct.position.z - extNavPosNED.z) * alpha;
         }
 AP::logger().Write("RAW3", "TimeUS,OX,OY,OZ,PX,PY,PZ,PLX,PLY,PLZ,SX,SY,SZ", "Qffffffffffff",
                                         AP_HAL::micros64(),
