@@ -494,7 +494,7 @@ void NavEKF3_core::CorrectExtNavForSensorOffset(ext_nav_elements &ext_nav_data)
             const ftype alpha = dt_sec / (dt_sec + frontend->_extNavOriginTconst);
             extNavOriginNED = extNavOriginNED * (1.0f - alpha) + (stateStruct.position - extNavPosNED) * alpha;
         }
-AP::logger().Write("RAW3", "TimeUS,OX,OY,OZ,PX,PY,PZ,SX,SY,SZ,DT", "Qffffffffff",
+AP::logger().Write("RAW3", "TimeUS,OX,OY,OZ,PX,PY,PZ,PLX,PLY,PLZ,SX,SY,SZ", "Qffffffffffff",
                                         AP_HAL::micros64(),
                                         extNavOriginNED.x,
                                         extNavOriginNED.y,
@@ -502,10 +502,12 @@ AP::logger().Write("RAW3", "TimeUS,OX,OY,OZ,PX,PY,PZ,SX,SY,SZ,DT", "Qffffffffff"
                                         ext_nav_data.pos.x,
                                         ext_nav_data.pos.y,
                                         ext_nav_data.pos.z,
+                                        extNavPosNED.x,
+                                        extNavPosNED.y,
+                                        extNavPosNED.z,
                                         stateStruct.position.x,
                                         stateStruct.position.y,
-                                        stateStruct.position.z,
-                                        dt_sec
+                                        stateStruct.position.z
                                         );
     }
 
