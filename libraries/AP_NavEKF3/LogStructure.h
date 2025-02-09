@@ -19,7 +19,8 @@
     LOG_XKV1_MSG, \
     LOG_XKV2_MSG, \
     LOG_XKY0_MSG, \
-    LOG_XKY1_MSG
+    LOG_XKY1_MSG, \
+    LOG_XKFG_MSG
 
 // @LoggerMessage: XKF0
 // @Description: EKF3 beacon sensor diagnostics
@@ -268,6 +269,22 @@ struct PACKED log_XKFD {
     float velInnovVarZ;
 };
 
+// @LoggerMessage: XKFG
+// @Description: EKF3 Global Positon External Nav Origin
+// @Field: TimeUS: Time since system startup
+// @Field: C: EKF3 core this data is for
+// @Field: OPN: Origin Position North (m)
+// @Field: OPE: Origin Position East (m)
+// @Field: OPD: Origin Position Down (m)
+struct PACKED log_XKFG {
+    LOG_PACKET_HEADER;
+    uint64_t time_us;
+    uint8_t core;
+    float extNavOriginN;
+    float extNavOriginE;
+    float extNavOriginD;
+};
+
 // @LoggerMessage: XKT
 // @Description: EKF3 timing information
 // @Field: TimeUS: Time since system startup
@@ -456,7 +473,9 @@ struct PACKED log_XKV {
     { LOG_XKV1_MSG, sizeof(log_XKV), \
       "XKV1","QBffffffffffff","TimeUS,C,V00,V01,V02,V03,V04,V05,V06,V07,V08,V09,V10,V11", "s#------------", "F-------------" , true }, \
     { LOG_XKV2_MSG, sizeof(log_XKV), \
-      "XKV2","QBffffffffffff","TimeUS,C,V12,V13,V14,V15,V16,V17,V18,V19,V20,V21,V22,V23", "s#------------", "F-------------" , true },
+      "XKV2","QBffffffffffff","TimeUS,C,V12,V13,V14,V15,V16,V17,V18,V19,V20,V21,V22,V23", "s#------------", "F-------------" , true }, \
+    { LOG_XKFG_MSG, sizeof(log_XKFG), \
+      "XKFG","QBfff","TimeUS,C,OPN,OPE,OPD", "s#---", "F----" , true },
 #else
   #define LOG_STRUCTURE_FROM_NAVEKF3
 #endif

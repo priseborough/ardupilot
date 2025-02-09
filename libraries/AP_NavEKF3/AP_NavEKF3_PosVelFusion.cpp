@@ -496,21 +496,7 @@ void NavEKF3_core::CorrectExtNavForSensorOffset(ext_nav_elements &ext_nav_data)
             extNavOriginNED.y = extNavOriginNED.y * (1.0f - alpha) + (stateStruct.position.y - extNavPosNED.y) * alpha;
             extNavOriginNED.z = extNavOriginNED.z * (1.0f - alpha) + (stateStruct.position.z - extNavPosNED.z) * alpha;
         }
-AP::logger().Write("RAW3", "TimeUS,OX,OY,OZ,PX,PY,PZ,PLX,PLY,PLZ,SX,SY,SZ", "Qffffffffffff",
-                                        AP_HAL::micros64(),
-                                        extNavOriginNED.x,
-                                        extNavOriginNED.y,
-                                        extNavOriginNED.z,
-                                        ext_nav_data.pos.x,
-                                        ext_nav_data.pos.y,
-                                        ext_nav_data.pos.z,
-                                        extNavPosNED.x,
-                                        extNavPosNED.y,
-                                        extNavPosNED.z,
-                                        stateStruct.position.x,
-                                        stateStruct.position.y,
-                                        stateStruct.position.z
-                                        );
+        Log_Write_ExtNav(AP::dal().micros64());
     }
 
     // correct position for offset of origin

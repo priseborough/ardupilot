@@ -308,6 +308,19 @@ void NavEKF3_core::Log_Write_BodyOdom(uint64_t time_us)
 }
 #endif
 
+void NavEKF3_core::Log_Write_ExtNav(uint64_t time_us)
+{
+    const struct log_XKFG pkt{
+        LOG_PACKET_HEADER_INIT(LOG_XKFG_MSG),
+        time_us       : time_us,
+        core          : DAL_CORE(core_index),
+        extNavOriginN : extNavOriginNED.x,
+        extNavOriginE : extNavOriginNED.y,
+        extNavOriginD : extNavOriginNED.z
+    };
+    AP::logger().WriteBlock(&pkt, sizeof(pkt));
+}
+
 void NavEKF3_core::Log_Write_State_Variances(uint64_t time_us)
 {
     if (core_index != frontend->primary) {
