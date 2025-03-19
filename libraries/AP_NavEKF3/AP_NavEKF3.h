@@ -370,6 +370,9 @@ public:
     // degraded by vibration
     bool isVibrationAffected() const;
 
+    // set inFlight to status and onGround to !status
+    void setIsFlying(bool status);
+
     // get a yaw estimator instance
     const EKFGSF_yaw *get_yawEstimator(void) const;
 

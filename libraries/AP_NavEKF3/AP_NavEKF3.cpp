@@ -2095,3 +2095,15 @@ const EKFGSF_yaw *NavEKF3::get_yawEstimator(void) const
     }
     return nullptr;
 }
+
+// set inFlight to status and onGround to !status
+void NavEKF3::setIsFlying(bool status)
+{
+    AP::dal().log_event3(AP_DAL::Event::resetHeightDatum);
+
+    if (core) {
+        for (uint8_t i=0; i<num_cores; i++) {
+            core[i].setIsFlying(status);
+        }
+    }
+}

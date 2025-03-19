@@ -912,3 +912,10 @@ void NavEKF3_core::EKFGSF_requestYawReset()
 {
     EKFGSF_yaw_reset_request_ms = imuSampleTime_ms;
 }
+
+// set inFlight to status and onGround to !status
+void NavEKF3_core::setIsFlying(bool status)
+{
+    inFlight = status;
+    onGround = !status;
+}

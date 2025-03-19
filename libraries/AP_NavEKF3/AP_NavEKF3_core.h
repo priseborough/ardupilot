@@ -479,6 +479,9 @@ public:
     // get a yaw estimator instance
     const EKFGSF_yaw *get_yawEstimator(void) const { return yawEstimator; }
 
+    // set inFlight to status and onGround to !status
+    void setIsFlying(bool status);
+
 private:
     EKFGSF_yaw *yawEstimator;
     AP_DAL &dal;
