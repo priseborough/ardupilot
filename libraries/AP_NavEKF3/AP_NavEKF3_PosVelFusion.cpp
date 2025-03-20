@@ -781,7 +781,9 @@ void NavEKF3_core::FuseVelPosNED()
 #if EK3_FEATURE_EXTERNAL_NAV
             if (extNavVelToFuse) {
                 obs_data_chk = sq(constrain_ftype(extNavVelDelayed.err, 0.05f, 5.0f)) + sq(frontend->extNavVelVarAccScale * accNavMag);
-            } else if (setLatLngDataToFuse) {
+            } else
+#endif
+            if (setLatLngDataToFuse) {
                 obs_data_chk = sq(setLatLngPosAcc);
             } else {
                 obs_data_chk = sq(constrain_ftype(frontend->_gpsHorizVelNoise, 0.05f, 5.0f)) + sq(frontend->gpsNEVelVarAccScale * accNavMag);
