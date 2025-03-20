@@ -218,6 +218,7 @@ private:
     AP_Float _pitch_ff_v0;
     AP_Float _pitch_ff_k;
     AP_Float _accel_gf;
+    AP_Float _thr_min_ext_rate;
 
     // current height estimate (above field elevation)
     float _height;
@@ -364,9 +365,11 @@ private:
     // Maximum and minimum floating point throttle limits
     float _THRmaxf;
     float _THRminf;
+
     // Maximum and minimum throttle safety limits, set externally, typically by servos.cpp:apply_throttle_limits()
     float _THRmaxf_ext = 1.0f;
     float _THRminf_ext = -1.0f;
+
     // Maximum and minimum pitch limits, set externally, typically by the takeoff logic.
     float _PITCHmaxf_ext = 90.0f;
     float _PITCHminf_ext = -90.0f;
