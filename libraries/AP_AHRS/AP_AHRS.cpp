@@ -3377,6 +3377,39 @@ void AP_AHRS::request_yaw_reset(void)
     }
 }
 
+// Set the is flying status in the EKF
+// Set status to true to let the EKF know the vehicle is flying
+// Set status to false to let the EKF know the vehicle has stopped flying
+void AP_AHRS::set_ekf_is_flying(bool status)
+{
+    switch (active_EKF_type()) {
+#if AP_AHRS_DCM_ENABLED
+    case EKFType::DCM:
+        break;
+#endif
+#if AP_AHRS_SIM_ENABLED
+    case EKFType::SIM:
+        break;
+#endif
+
+#if AP_AHRS_EXTERNAL_ENABLED
+    case EKFType::EXTERNAL:
+        break;
+#endif
+
+#if HAL_NAVEKF2_AVAILABLE
+    case EKFType::TWO:
+        break;
+#endif
+
+#if HAL_NAVEKF3_AVAILABLE
+    case EKFType::THREE:
+        EKF3.setIsFlying(status);
+        break;
+#endif
+    }
+}
+
 // set position, velocity and yaw sources to either 0=primary, 1=secondary, 2=tertiary
 void AP_AHRS::set_posvelyaw_source_set(uint8_t source_set_idx)
 {

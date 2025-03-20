@@ -420,6 +420,11 @@ public:
     // request EKF yaw reset to try and avoid the need for an EKF lane switch or failsafe
     void request_yaw_reset(void);
 
+    // Set the is flying status in the EKF
+    // Set status to true to let the EKF know the vehicle is flying
+    // Set status to false to let the EKF know the vehicle has stopped flying
+    void set_ekf_is_flying(bool status);
+
     // set position, velocity and yaw sources to either 0=primary, 1=secondary, 2=tertiary
     void set_posvelyaw_source_set(uint8_t source_set_idx);
 
