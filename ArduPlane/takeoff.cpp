@@ -48,8 +48,12 @@ bool Plane::auto_takeoff_check(void)
        takeoff_state.waiting_for_rudder_neutral = false;
     }  
 
+    const bool no_gps_launch_expected = plane.flight_option_enabled(FlightOptions::ALLOW_NO_GPS_AUTO_TAKEOFF) &&
+                                        is_positive(g.takeoff_throttle_min_accel) &&
+                                        is_zero(g.takeoff_throttle_min_speed);
+
     // Check for bad GPS
-    if (gps.status() < AP_GPS::GPS_OK_FIX_3D) {
+    if (gps.status() < AP_GPS::GPS_OK_FIX_3D && !no_gps_launch_expected) {
         // no auto takeoff without GPS lock
         return false;
     }
@@ -88,6 +92,11 @@ bool Plane::auto_takeoff_check(void)
     if (!takeoff_state.launchTimerStarted) {
         takeoff_state.launchTimerStarted = true;
         takeoff_state.last_tkoff_arm_time = now;
+        ahrs.set_ekf_is_flying(true);
+        if (wait_time_ms > 0) {
+            // reset yaw now before motor starts and magnetic interference will be higher
+            ahrs.request_yaw_reset();
+        }
         if (now - takeoff_state.last_report_ms > 2000) {
             gcs().send_text(MAV_SEVERITY_INFO, "Armed AUTO, xaccel = %.1f m/s/s, waiting %.1f sec",
                               (double)TECS_controller.get_VXdot(), (double)(wait_time_ms*0.001f));
@@ -129,6 +138,7 @@ bool Plane::auto_takeoff_check(void)
     return false;
 
 no_launch:
+    ahrs.set_ekf_is_flying(false);
     takeoff_state.launchTimerStarted = false;
     takeoff_state.last_tkoff_arm_time = 0;
     return false;
