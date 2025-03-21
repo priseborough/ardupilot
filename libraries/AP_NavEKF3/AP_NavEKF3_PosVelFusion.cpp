@@ -221,7 +221,7 @@ bool NavEKF3_core::setLatLng(const Location &loc, float posAccuracy, uint32_t ti
                 setLatLngPosOffsetNE.y = ekfPosNE.y - newPosNE.y;
             }
         }
-        if (!gpsGoodToAlign) {
+        if (!gpsGoodToAlign || imuSampleTime_ms - lastTimeGpsReceived_ms > 1000) {
             velPosObs[3] = newPosNE.x + setLatLngPosOffsetNE.x;
             velPosObs[4] = newPosNE.y + setLatLngPosOffsetNE.y;
             if ((imuSampleTime_ms - lastSetlatLngPassTime_ms) < 5000) {
@@ -237,6 +237,8 @@ bool NavEKF3_core::setLatLng(const Location &loc, float posAccuracy, uint32_t ti
                 P[7][7] = P[8][8] = sq(setLatLngPosAcc);
 
                 ResetPositionNE(velPosObs[3], velPosObs[4]);
+
+                lastSetlatLngPassTime_ms = imuSampleTime_ms;
             }
         }
     } else {
