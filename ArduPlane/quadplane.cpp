@@ -1458,11 +1458,11 @@ void SLT_Transition::update()
     if (quadplane.tiltrotor.fully_fwd() && transition_state != TRANSITION_AIRSPEED_WAIT) {
         if (transition_state == TRANSITION_TIMER) {
             gcs().send_text(MAV_SEVERITY_INFO, "Transition FW done");
+            plane.TECS_controller.set_throttle_min(0.01f*SRV_Channels::get_output_scaled(SRV_Channel::k_throttle));
         }
         transition_state = TRANSITION_DONE;
         transition_start_ms = 0;
         transition_low_airspeed_ms = 0;
-        plane.TECS_controller.set_throttle_min(0.01f*SRV_Channels::get_output_scaled(SRV_Channel::k_throttle));
     }
 
     if (transition_state < TRANSITION_DONE) {
