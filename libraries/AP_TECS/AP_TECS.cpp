@@ -266,7 +266,7 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
 
     // @Param: THR_ERATE
     // @DisplayName: Forward throttle external limit slew rate
-    // @Description: The forward throttle lower limit controlled by TECS when set externally will be reduced at this rate. This can be used to prevent a sudden reduction in lift or change in pitch trim on completion of transtition for setups where the motors used for forward flight have a significant effect on aerodynamic forces and/or moments. Set to a non positive value to hold the lower limit for one frame only
+    // @Description: The forward throttle lower limit controlled by TECS when set externally will be reduced at this rate. Set to a non positive value to hold the lower limit for one frame only
     // @Units: ms
     // @Range: 0 1.0
     // @User: Advanced
@@ -1366,11 +1366,15 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
 }
 
 // set minimum throttle override, [-1, -1] range
-// it is applicable for one control cycle only
-void AP_TECS::set_throttle_min(const float thr_min) {
+// if reset_output is true the output slew limiter will also be reset to respect the lower limit
+// its decay is controlled by TECS_THR_ERATE
+void AP_TECS::set_throttle_min(const float thr_min, bool reset_output) {
     // Don't change the limit if it is already covered.
     if (thr_min > _THRminf_ext) {
         _THRminf_ext = thr_min;
+        if (reset_output) {
+            _throttle_dem = MAX(_throttle_dem, _THRminf_ext);
+        }
     }
 }
 
