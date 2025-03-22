@@ -847,7 +847,6 @@ void Tailsitter_Transition::update()
                 plane.nav_pitch_cd = fw_limit_initial_pitch;
                 plane.nav_roll_cd = 0;
             }
-            plane.TECS_controller.set_throttle_min(0.01f*SRV_Channels::get_output_scaled(SRV_Channel::k_throttle));
             break;
         }
         quadplane.set_desired_spool_state(AP_Motors::DesiredSpoolState::THROTTLE_UNLIMITED);
