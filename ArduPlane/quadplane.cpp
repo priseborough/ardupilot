@@ -1462,7 +1462,7 @@ void SLT_Transition::update()
             if (!plane.quadplane.tiltrotor.get_forward_throttle(throttle)) {
                 throttle = 0.01f * (float)plane.aparm.throttle_cruise;
             }
-            plane.TECS_controller.set_throttle_min(throttle);
+            plane.TECS_controller.set_throttle_min(throttle, true);
         }
         transition_state = TRANSITION_DONE;
         transition_start_ms = 0;
@@ -1582,7 +1582,7 @@ void SLT_Transition::update()
             if (!plane.quadplane.tiltrotor.get_forward_throttle(throttle)) {
                 throttle = 0.01f * SRV_Channels::get_output_scaled(SRV_Channel::k_throttle);
             }
-            plane.TECS_controller.set_throttle_min(throttle);
+            plane.TECS_controller.set_throttle_min(throttle, true);
             gcs().send_text(MAV_SEVERITY_INFO, "Transition done");
         }
 
