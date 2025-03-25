@@ -12,7 +12,7 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-/* 
+/*
     Simulator Connector for JSON based interfaces
 */
 
@@ -27,7 +27,6 @@
 #include <AP_HAL/AP_HAL.h>
 #include <AP_Logger/AP_Logger.h>
 #include <AP_HAL/utility/replace.h>
-#include <SRV_Channel/SRV_Channel.h>
 
 #define UDP_TIMEOUT_MS 100
 
@@ -101,34 +100,20 @@ void JSON::set_interface_ports(const char* address, const int port_in, const int
 */
 void JSON::output_servos(const struct sitl_input &input)
 {
-    size_t pkt_size = 0;
-    ssize_t send_ret = -1;
-    if (SRV_Channels::have_32_channels()) {
-      servo_packet_32 pkt;
-      pkt.frame_rate = rate_hz;
-      pkt.frame_count = frame_counter;
-      for (uint8_t i=0; i<32; i++) {
-          pkt.pwm[i] = input.servos[i];
-      }
-      pkt_size = sizeof(pkt);
-      send_ret = sock.sendto(&pkt, pkt_size, target_ip, control_port);
-    } else {
-      servo_packet_16 pkt;
-      pkt.frame_rate = rate_hz;
-      pkt.frame_count = frame_counter;
-      for (uint8_t i=0; i<16; i++) {
-          pkt.pwm[i] = input.servos[i];
-      }
-      pkt_size = sizeof(pkt);
-      send_ret = sock.sendto(&pkt, pkt_size, target_ip, control_port);
+    servo_packet pkt;
+    pkt.frame_rate = rate_hz;
+    pkt.frame_count = frame_counter;
+    for (uint8_t i=0; i<16; i++) {
+        pkt.pwm[i] = input.servos[i];
     }
 
-    if ((size_t)send_ret != pkt_size) {
+    size_t send_ret = sock.sendto(&pkt, sizeof(pkt), target_ip, control_port);
+    if (send_ret != sizeof(pkt)) {
         if (send_ret <= 0) {
             printf("Unable to send servo output to %s:%u - Error: %s, Return value: %ld\n",
                    target_ip, control_port, strerror(errno), (long)send_ret);
         } else {
-            printf("Sent %ld bytes instead of %lu bytes\n", (long)send_ret, (unsigned long)pkt_size);
+            printf("Sent %ld bytes instead of %lu bytes\n", (long)send_ret, (unsigned long)sizeof(pkt));
         }
     }
 }
@@ -323,18 +308,18 @@ void JSON::recv_fdm(const struct sitl_input &input)
 
         airspeed_pitot = state.airspeed;
     } else {
-        
-        // wind is not supported yet for JSON sim, assume zero for now        
-        wind_ef.zero(); 
-
-        // velocity relative to airmass in Earth's frame
-        velocity_air_ef = velocity_ef - wind_ef;
-
         // velocity relative to airmass in body frame
-        velocity_air_bf = dcm.transposed() * velocity_air_ef;
+        velocity_air_bf = dcm.transposed() * velocity_ef;
 
-        // airspeed fix for eas2tas
-        update_eas_airspeed();
+        // airspeed
+        airspeed = velocity_air_bf.length();
+
+        // airspeed as seen by a fwd pitot tube (limited to 120m/s)
+        airspeed_pitot = constrain_float(velocity_air_bf * Vector3f(1.0f, 0.0f, 0.0f), 0.0f, 120.0f);
+    }
+
+    if ((received_bitmask & WIND_VEL) != 0) {
+        wind_ef = state.velocity_wind;
     }
 
     // Convert from a meters from origin physics to a lat long alt
@@ -356,6 +341,22 @@ void JSON::recv_fdm(const struct sitl_input &input)
         wind_vane_apparent.speed = state.wind_vane_apparent.speed;
     }
 
+    // update RC input
+    rcin_chan_count = 10;
+    for (uint8_t i=0; i<rcin_chan_count; i++) {
+        if ((received_bitmask &  1U << (i+18)) != 0) {
+            rcin[i] = (state.rc[i] - 1000.0f) / 1000.0f;
+        }
+    }
+
+    // update battery state
+    if ((received_bitmask & BAT_VOLT) != 0) {
+        battery_voltage = state.bat_volt; 
+    }
+    if ((received_bitmask & BAT_AMP) != 0) {
+        battery_current = state.bat_amp; 
+    }
+
     double deltat;
     if (state.timestamp_s < last_timestamp_s) {
         // Physics time has gone backwards, don't reset AP
@@ -369,9 +370,9 @@ void JSON::recv_fdm(const struct sitl_input &input)
 
     if (is_positive(deltat) && deltat < 0.1) {
         // time in us to hz
-        if (use_time_sync) {
-            adjust_frame_time(1.0 / deltat);
-        }
+        //if (use_time_sync) { // SIMNET: Disable
+        //    adjust_frame_time(1.0 / deltat);
+        //}
         // match actual frame rate with desired speedup
         time_advance();
     }
@@ -460,7 +461,7 @@ void JSON::update(const struct sitl_input &input)
     update_mag_field_bf();
 
     // allow for changes in physics step
-    adjust_frame_time(constrain_float(sitl->loop_rate_hz, rate_hz-1, rate_hz+1));
+    //adjust_frame_time(constrain_float(sitl->loop_rate_hz, rate_hz-1, rate_hz+1)); // SIMNET: Disable
 
 #if 0
     // report frame rate
