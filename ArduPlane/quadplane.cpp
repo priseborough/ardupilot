@@ -1464,7 +1464,7 @@ void SLT_Transition::update()
             // Reset the TECS minimum throttle to match throttle of forward thrust motors
             // and reset the throttle channel slew rate limiter to prevent a sudden drop in throttle
             plane.TECS_controller.set_throttle_min(throttle, true);
-            SRV_Channels::set_slew_rate(SRV_Channel::k_throttle, 0.0, 100, plane.G_Dt);
+            SRV_Channels::set_slew_last_scaled_output(SRV_Channel::k_throttle, throttle);
             SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, throttle);
             gcs().send_text(MAV_SEVERITY_INFO, "Transition FW done");
         }
@@ -1589,7 +1589,7 @@ void SLT_Transition::update()
             // Reset the TECS minimum throttle to match throttle of forward thrust motors
             // and reset the throttle channel slew rate limiter to prevent a sudden drop in throttle
             plane.TECS_controller.set_throttle_min(throttle, true);
-            SRV_Channels::set_slew_rate(SRV_Channel::k_throttle, 0.0, 100, plane.G_Dt);
+            SRV_Channels::set_slew_last_scaled_output(SRV_Channel::k_throttle, throttle);
             SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, throttle);
             gcs().send_text(MAV_SEVERITY_INFO, "Transition done");
         }
