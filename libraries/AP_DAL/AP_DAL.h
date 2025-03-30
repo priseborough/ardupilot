@@ -36,8 +36,8 @@ public:
     enum class Event : uint8_t {
         resetGyroBias             =  0,
         resetHeightDatum          =  1,
-        //setInhibitGPS           =  2, // removed
-        //setTakeoffExpected        =  3, // removed
+        setIsFlying               =  2,
+        unSetIsFlying             =  3,
         //unsetTakeoffExpected      =  4, // removed
         //setTouchdownExpected      =  5, // removed
         //unsetTouchdownExpected    =  6, // removed
