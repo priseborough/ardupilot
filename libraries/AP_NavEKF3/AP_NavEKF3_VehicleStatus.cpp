@@ -361,7 +361,7 @@ void NavEKF3_core::detectFlight()
 
         if (motorsArmed) {
             onGround = false;
-            if (highGndSpd && (dal.get_takeoff_expected() || highAirSpd || largeHgtChange)) {
+            if (!inFlight && highGndSpd && (dal.get_takeoff_expected() || highAirSpd || largeHgtChange)) {
                 // to a high certainty we are flying
                 inFlight = true;
             }
