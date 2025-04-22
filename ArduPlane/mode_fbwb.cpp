@@ -3,6 +3,11 @@
 
 bool ModeFBWB::_enter()
 {
+    float posD;
+    if (!ahrs.get_relative_position_D_origin(posD)) {
+        // can't fly in this mode if no vertical position is available
+        return false;
+    }
 #if HAL_SOARING_ENABLED
     // for ArduSoar soaring_controller
     plane.g2.soaring_controller.init_cruising();
