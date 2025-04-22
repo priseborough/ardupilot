@@ -188,7 +188,10 @@ void Plane::set_target_altitude_current(void)
 {
     // record altitude above sea level at the current time as our
     // target altitude
-    target_altitude.amsl_cm = current_loc.alt;
+    float posD;
+    if (ahrs.get_relative_position_D_origin(posD)) {
+        target_altitude.amsl_cm = - (int32_t)(100.0 * (double)posD);
+    }
 
     // reset any glide slope offset
     reset_offset_altitude();
