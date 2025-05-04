@@ -212,7 +212,7 @@ bool NavEKF3_core::setLatLng(const Location &loc, float posAccuracy, uint32_t ti
 
     if (frontend->option_is_enabled(NavEKF3::Option::SetLatLngFusion)) {
         // treat as an alternative position source
-        // if GPS is passing alignment quality checks and is beig fused, then update an offset to allow for drift
+        // if GPS is passing alignment quality checks and is being fused, then update an offset to allow for drift
         // of this position source.
         if (gpsGoodToAlign && (imuSampleTime_ms - lastGpsPosPassTime_ms) < 1000) {
             Vector2f ekfPosNE;
