@@ -555,6 +555,8 @@ void NavEKF3_core::readGpsData()
     if (gps.status(selected_gps) < AP_DAL_GPS::GPS_OK_FIX_3D) {
         // report GPS fix status
         gpsCheckStatus.bad_fix = true;
+        gpsGoodToAlign = false;
+        gpsAccuracyGood = false;
         dal.snprintf(prearm_fail_string, sizeof(prearm_fail_string), "Waiting for 3D fix");
         return;
     }
