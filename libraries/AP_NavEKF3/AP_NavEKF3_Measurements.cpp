@@ -683,7 +683,7 @@ void NavEKF3_core::readGpsData()
     calcGpsGoodForFlight();
 
     // A degraded GPS and use of an alternative navigation source blocks GPS use
-    if (frontend->option_is_enabled(NavEKF3::Option::SetLatLngFusion) && !gpsGoodToAlign && (imuSampleTime_ms - lastSetlatLngPassTime_ms) < 1000) {
+    if (frontend->option_is_enabled(NavEKF3::Option::SetLatLngFusion) && !gpsGoodToAlign && (imuSampleTime_ms - lastSetlatLngPassTime_ms) < 2000) {
         return;
     }
 
