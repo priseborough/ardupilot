@@ -214,14 +214,12 @@ bool NavEKF3_core::setLatLng(const Location &loc, float posAccuracy, uint32_t ti
         // treat as an alternative position source
         // if GPS is passing alignment quality checks and is being fused, then update an offset to allow for drift
         // of this position source.
-        if (gpsGoodToAlign && (imuSampleTime_ms - lastGpsPosPassTime_ms) < 1000) {
+        const bool useGPS = gpsGoodToAlign && (imuSampleTime_ms - lastGpsPosPassTime_ms) < 1000;
+        if (useGPS) {
             Vector2f ekfPosNE;
-            if (getPosNE(ekfPosNE, true)) {
-                setLatLngPosOffsetNE.x = ekfPosNE.x - newPosNE.x;
-                setLatLngPosOffsetNE.y = ekfPosNE.y - newPosNE.y;
-            }
-        }
-        if (!gpsGoodToAlign || imuSampleTime_ms - lastTimeGpsReceived_ms > 1000) {
+                setLatLngPosOffsetNE.x = stateStruct.position.x - newPosNE.x;
+                setLatLngPosOffsetNE.y = stateStruct.position.y - newPosNE.y;
+        } else {
             velPosObs[3] = newPosNE.x + setLatLngPosOffsetNE.x;
             velPosObs[4] = newPosNE.y + setLatLngPosOffsetNE.y;
             if ((imuSampleTime_ms - lastSetlatLngPassTime_ms) < 5000) {
