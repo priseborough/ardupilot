@@ -216,9 +216,12 @@ bool NavEKF3_core::setLatLng(const Location &loc, float posAccuracy, uint32_t ti
         // of this position source.
         const bool useGPS = gpsGoodToAlign && (imuSampleTime_ms - lastGpsPosPassTime_ms) < 1000;
         if (useGPS) {
-            Vector2f ekfPosNE;
+            if (frontend->option_is_enabled(NavEKF3::Option::SetLatLngOffset)) {
                 setLatLngPosOffsetNE.x = stateStruct.position.x - newPosNE.x;
                 setLatLngPosOffsetNE.y = stateStruct.position.y - newPosNE.y;
+            } else {
+                setLatLngPosOffsetNE.zero();
+            }
         } else {
             velPosObs[3] = newPosNE.x + setLatLngPosOffsetNE.x;
             velPosObs[4] = newPosNE.y + setLatLngPosOffsetNE.y;
