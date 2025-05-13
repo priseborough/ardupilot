@@ -455,7 +455,8 @@ private:
     // enum for processing options
     enum class Option {
         JammingExpected     = (1<<0),
-        SetLatLngFusion     = (1<<1),
+        SetLatLngFusion     = (1<<1), // When set, the setLatLng data will be used as an EKF observation instead of source for a hard state reset
+        SetLatLngOffset     = (1<<2), // When set in combination with SetLatLngFusion, an offset will be learned when SetLatLngFusion data is being received and there is GPS data passing alignment checks.
     };
     bool option_is_enabled(Option option) const {
         return (_options & (uint32_t)option) != 0;
