@@ -1090,7 +1090,9 @@ void NavEKF3_core::CovariancePrediction(Vector3F *rotVarVecPtr)
     if (!inhibitMagStates) {
         ftype magEarthVar = sq(dt * constrain_ftype(frontend->_magEarthProcessNoise, 0.0f, 1.0f));
         ftype magBodyVar  = sq(dt * constrain_ftype(frontend->_magBodyProcessNoise, 0.0f, 1.0f));
-        for (uint8_t i=6; i<=8; i++) processNoiseVariance[i] = magEarthVar;
+        // allow for more variaton in earth frame for first part of flight before clearing ground
+        const ftype noiseScaler = ((!finalInflightMagInit || onGround) && (effectiveMagCal == MagCal::ALWAYS_MODIFIED)) ? sq(5.0f) : 1.0f;
+        for (uint8_t i=6; i<=8; i++) processNoiseVariance[i] = magEarthVar * noiseScaler;
         for (uint8_t i=9; i<=11; i++) processNoiseVariance[i] = magBodyVar;
     }
     lastInhibitMagStates = inhibitMagStates;

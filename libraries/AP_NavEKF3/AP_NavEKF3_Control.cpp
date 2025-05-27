@@ -113,11 +113,12 @@ void NavEKF3_core::setWindMagStateLearningMode()
         ((effectiveMagCal == MagCal::WHEN_FLYING) && inFlight) || // when flying
         ((effectiveMagCal == MagCal::WHEN_MANOEUVRING) && manoeuvring)  || // when manoeuvring
         ((effectiveMagCal == MagCal::AFTER_FIRST_CLIMB) && finalInflightYawInit && finalInflightMagInit) || // when initial in-air yaw and mag field reset is complete
-        (effectiveMagCal == MagCal::ALWAYS); // all the time
+        (effectiveMagCal == MagCal::ALWAYS)|| // all the time
+        (effectiveMagCal == MagCal::ALWAYS_MODIFIED); // all the time with protection against ground based magnetic interference
 
     // Deny mag calibration request if we aren't using the compass, it has been inhibited by the user,
     // we do not have an absolute position reference or are on the ground (unless explicitly requested by the user)
-    bool magCalDenied = !use_compass() || (effectiveMagCal == MagCal::NEVER) || (onGround && effectiveMagCal != MagCal::ALWAYS);
+    bool magCalDenied = !use_compass() || (effectiveMagCal == MagCal::NEVER) || (onGround && (effectiveMagCal != MagCal::ALWAYS) && (effectiveMagCal != MagCal::ALWAYS_MODIFIED));
 
     // Inhibit the magnetic field calibration if not requested or denied
     bool setMagInhibit = !magCalRequested || magCalDenied;

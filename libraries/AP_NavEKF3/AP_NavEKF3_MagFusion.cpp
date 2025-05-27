@@ -439,7 +439,9 @@ void NavEKF3_core::SelectMagFusion()
             // We also fuse declination if we are using the WMM tables
             if (PV_AidingMode != AID_ABSOLUTE ||
                 (frontend->_mag_ef_limit > 0 && have_table_earth_field)) {
-                FuseDeclination(0.34f);
+                // prevent field rotation and resultant yaw drift for first part of flight before clearing ground
+                ftype declErr = ((!finalInflightMagInit || onGround) && (effectiveMagCal == MagCal::ALWAYS_MODIFIED)) ? 0.05f : 0.34f;
+                FuseDeclination(declErr);
             }
             // fuse the three magnetometer componenents using sequential fusion for each axis
             FuseMagnetometer();
