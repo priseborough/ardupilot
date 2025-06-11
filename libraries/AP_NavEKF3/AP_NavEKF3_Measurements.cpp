@@ -679,6 +679,11 @@ void NavEKF3_core::readGpsData()
     // Post-alignment checks
     calcGpsGoodForFlight();
 
+    // A degraded GPS and use of an alternative navigation source blocks GPS use
+    if (frontend->option_is_enabled(NavEKF3::Option::SetLatLngFusion) && !gpsGoodToAlign && (imuSampleTime_ms - lastSetlatLngPassTime_ms) < 1000) {
+        return;
+    }
+
     // Read the GPS location in WGS-84 lat,long,height coordinates
     const Location &gpsloc = gps.location(selected_gps);
 

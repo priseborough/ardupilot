@@ -739,8 +739,8 @@ const AP_Param::GroupInfo NavEKF3::var_info2[] = {
 
     // @Param: OPTIONS
     // @DisplayName: Optional EKF behaviour
-    // @Description: EKF optional behaviour. Bit 0 (JammingExpected): Setting JammingExpected will change the EKF behaviour such that if dead reckoning navigation is possible it will require the preflight alignment GPS quality checks controlled by EK3_GPS_CHECK and EK3_CHECK_SCALE to pass before resuming GPS use if GPS lock is lost for more than 2 seconds to prevent bad position estimate. Bit 1 (Manual lane switching): DANGEROUS – If enabled, this disables automatic lane switching. If the active lane becomes unhealthy, no automatic switching will occur. Users must manually set EK3_PRIMARY to change lanes. No health checks will be performed on the selected lane. Use with extreme caution.
-    // @Bitmask: 0:JammingExpected, 1: ManualLaneSwitching
+    // @Description: EKF optional behaviour. Bit 0 (JammingExpected): Setting JammingExpected will change the EKF behaviour such that if dead reckoning navigation is possible it will require the preflight alignment GPS quality checks controlled by EK3_GPS_CHECK and EK3_CHECK_SCALE to pass before resuming GPS use if GPS lock is lost for more than 2 seconds to prevent bad position estimate. Bit 1 (Manual lane switching): DANGEROUS – If enabled, this disables automatic lane switching. If the active lane becomes unhealthy, no automatic switching will occur. Users must manually set EK3_PRIMARY to change lanes. No health checks will be performed on the selected lane. Use with extreme caution. SetLatLngFusion will enable frequent position setting via MAV_CMD_EXTERNAL_POSITION_ESTIMATE to be used as a GPS alternative when the GPS fails quality checks.
+    // @Bitmask: 0:JammingExpected, 1: ManualLaneSwitching, 2:SetLatLngFusion
     // @User: Advanced
     AP_GROUPINFO("OPTIONS",  11, NavEKF3, _options, 0),
 

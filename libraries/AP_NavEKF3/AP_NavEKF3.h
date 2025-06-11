@@ -459,6 +459,7 @@ private:
     enum class Option {
         JammingExpected     = (1<<0),
         ManualLaneSwitch   = (1<<1),
+        SetLatLngFusion     = (1<<2),
     };
     bool option_is_enabled(Option option) const {
         return (_options & (uint32_t)option) != 0;
