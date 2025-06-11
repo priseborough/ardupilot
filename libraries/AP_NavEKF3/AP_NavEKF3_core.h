@@ -1653,6 +1653,7 @@ private:
     bool setLatLngDataToFuse;      // true when there is new setLatLng position data to fuse
     float setLatLngPosAcc;         // 1-sigma horizontal accuray of setLatLng position
     uint32_t lastSetlatLngPassTime_ms; // last time setLatLng position data was fused
+    uint32_t lastResetlatLngTime_ms; // last time setLatLng position data was reset
 
     // logging functions shared by cores:
     void Log_Write_XKF1(uint64_t time_us) const;
