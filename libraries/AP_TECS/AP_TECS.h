@@ -213,7 +213,8 @@ private:
 
     enum class Option {
         GLIDER_ONLY     = (1<<0),
-        DESCENT_SPEEDUP = (1<<1)
+        DESCENT_SPEEDUP = (1<<1),
+        STRONG_UNDERSPEED_PROTECTION = (1<<2),
     };
 
     bool option_is_set(const Option option) const {
@@ -441,6 +442,8 @@ private:
     bool _flag_have_reset_after_takeoff;
 
     float _SKE_weighting;
+
+    float _SKE_weight_min;
 
     AP_Int8 _use_synthetic_airspeed;
     
