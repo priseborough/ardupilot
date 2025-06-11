@@ -216,6 +216,12 @@ bool NavEKF3_core::setLatLng(const Location &loc, float posAccuracy, uint32_t ti
         // of this position source.
         const bool useGPS = gpsGoodToAlign && (imuSampleTime_ms - lastGpsPosPassTime_ms) < 1000;
         if (useGPS) {
+            if ((imuSampleTime_ms - lastResetlatLngTime_ms) < 10000) {
+                // prior bad data is likely so states are suspect and should be reset
+                ResetVelocity(resetDataSource::GPS);
+                ResetPosition(resetDataSource::GPS);
+                lastResetlatLngTime_ms = 0;
+            }
             if (frontend->option_is_enabled(NavEKF3::Option::SetLatLngOffset)) {
                 setLatLngPosOffsetNE.x = stateStruct.position.x - newPosNE.x;
                 setLatLngPosOffsetNE.y = stateStruct.position.y - newPosNE.y;
@@ -240,6 +246,7 @@ bool NavEKF3_core::setLatLng(const Location &loc, float posAccuracy, uint32_t ti
                 ResetPositionNE(velPosObs[3], velPosObs[4]);
 
                 lastSetlatLngPassTime_ms = imuSampleTime_ms;
+                lastResetlatLngTime_ms = imuSampleTime_ms;
             }
         }
     } else {
