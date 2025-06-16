@@ -682,8 +682,19 @@ void NavEKF3_core::readGpsData()
     calcGpsGoodForFlight();
 
     // A degraded GPS and use of an alternative navigation source blocks GPS use
-    if (frontend->option_is_enabled(NavEKF3::Option::SetLatLngFusion) && !gpsGoodToAlign && (imuSampleTime_ms - lastSetlatLngPassTime_ms) < 2000) {
-        return;
+    if (frontend->option_is_enabled(NavEKF3::Option::SetLatLngFusion) && useSetLatLngAsMeasurement) {
+        const uint32_t timeoutThreshold = (uint32_t)MAX(((int32_t)frontend->posRetryTimeNoVel_ms-(int32_t)1000),1000);
+        useSetLatLngAsMeasurement = imuSampleTime_ms - lastSetlatLngPassTime_ms < timeoutThreshold;
+        if (useSetLatLngAsMeasurement) {
+            if (frontend->option_is_enabled(NavEKF3::Option::JammingExpected)) {
+                useSetLatLngAsMeasurement = !gpsGoodToAlign;
+            } else {
+                useSetLatLngAsMeasurement = gpsPosAccuracy > safe_sqrt(P[7][7]+P[9][8]);
+            }
+        }
+        if (useSetLatLngAsMeasurement) {
+            return;
+        }
     }
 
     // Read the GPS location in WGS-84 lat,long,height coordinates
