@@ -476,9 +476,10 @@ void AP_TECS::_update_speed(float DT)
 
 void AP_TECS::_update_speed_demand(void)
 {
-    if (option_is_set(Option::DESCENT_SPEEDUP)) {
-        // Allow demanded speed to  go to maximum when descending at maximum descent rate
-        _TAS_dem = _TAS_dem + (_TASmax - _TAS_dem) * _sink_fraction;
+    if (option_is_set(Option::DESCENT_SPEEDUP) && _flags.thrLowDescending && _STE_error <= 0.0f) {
+        // Allow demanded speed to go to maximum when descending at maximum descent rate
+        // Speed increment is calculated by amount required to absorb excess total energy
+        _TAS_dem = MIN(_TAS_dem_adj + sqrtf(2.0f * - _STE_error),_TASmax);
     }
 
     // Set the airspeed demand to the minimum value if an underspeed condition exists
@@ -738,7 +739,9 @@ void AP_TECS::_update_throttle_with_airspeed(void)
     _SPEdot_dem = (_SPE_dem - _SPE_est) / timeConstant();
 
     // Calculate total energy error
-    _STE_error = constrain_float((_SPE_dem - _SPE_est), SPE_err_min, SPE_err_max) + _SKE_dem - _SKE_est;
+    const float SPE_error = constrain_float((_SPE_dem - _SPE_est), SPE_err_min, SPE_err_max);
+    const float SKE_error = _SKE_dem - _SKE_est;
+    _STE_error = SPE_error + SKE_error;
     float STEdot_dem = constrain_float((_SPEdot_dem + _SKEdot_dem), _STEdot_min, _STEdot_max);
     float STEdot_error = STEdot_dem - _SPEdot - _SKEdot;
 
@@ -791,7 +794,9 @@ void AP_TECS::_update_throttle_with_airspeed(void)
                 // ensure we run at full throttle until we reach the target airspeed
                 _throttle_dem = MAX(_throttle_dem, _THRmaxf - _integTHR_state);
             }
+            _flags.thrLowDescending = false;
         } else {
+            _flags.thrLowDescending = (_integTHR_state < integ_min) && (SPE_error < 0.0f);
             _integTHR_state = constrain_float(_integTHR_state, integ_min, integ_max);
         }
 

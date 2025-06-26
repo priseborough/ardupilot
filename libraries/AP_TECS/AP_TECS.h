@@ -347,6 +347,8 @@ private:
         // true when a reset of airspeed and height states to current is performed on this frame
         bool reset:1;
 
+        // Throttle demand is saturated on the lower limit with vehicle trying to descend
+        bool thrLowDescending:1;
     };
     union {
         struct flags _flags;
