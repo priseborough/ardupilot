@@ -197,8 +197,12 @@ bool NavEKF3_core::setLatLng(const Location &loc, float posAccuracy, uint32_t ti
     }
 
     // Correct the position for time delay relative to fusion time horizon assuming a constant velocity
-    // Limit time stamp to a range between current time and 5 seconds ago
-    const uint32_t timeStampConstrained_ms = MAX(MIN(timestamp_ms, imuSampleTime_ms), imuSampleTime_ms - 5000);
+    // Don't use data more than 5 seconds old
+    if (imuSampleTime_ms - timestamp_ms > 5000) {
+        return false;
+    }
+    // Don't allow data to time travel into the future
+    const uint32_t timeStampConstrained_ms = MIN(timestamp_ms, imuSampleTime_ms);
     const int32_t delta_ms = int32_t(imuDataDelayed.time_ms - timeStampConstrained_ms);
     const ftype delaySec = 1E-3F * ftype(delta_ms);
     const Vector2F newPosNE = EKF_origin.get_distance_NE_ftype(loc) + stateStruct.velocity.xy() * delaySec;
