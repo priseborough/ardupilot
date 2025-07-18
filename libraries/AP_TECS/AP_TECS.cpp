@@ -618,7 +618,6 @@ void AP_TECS::_update_height_demand(void)
 
         if (!_flare_initialised) {
             _flare_hgt_dem_adj = _hgt_dem;
-            _flare_hgt_dem_ideal = _hgt_afe;
             _hgt_at_start_of_flare = _hgt_afe;
             _hgt_rate_at_flare_entry = _climb_rate;
             _flare_initialised = true;
@@ -636,11 +635,10 @@ void AP_TECS::_update_height_demand(void)
         }
         _hgt_rate_dem = _hgt_rate_at_flare_entry * (1.0f - p) - land_sink_rate_adj * p;
 
-        _flare_hgt_dem_ideal += _DT * _hgt_rate_dem; // the ideal height profile to follow
         _flare_hgt_dem_adj   += _DT * _hgt_rate_dem; // the demanded height profile that includes the pre-flare height tracking offset
 
         // fade across to the ideal height profile
-        _hgt_dem = _flare_hgt_dem_adj * (1.0f - p) + _flare_hgt_dem_ideal * p;
+        _hgt_dem = _flare_hgt_dem_adj;
 
         // correct for offset between height above ground and height above datum used by control loops
         _hgt_dem += (_hgt_afe - _height);
@@ -1573,7 +1571,6 @@ void AP_TECS::offset_altitude(const float alt_offset)
     // demands which incorporate the home change are compatible with the
     // (now updated) internal height state.
 
-    _flare_hgt_dem_ideal    -= alt_offset;
     _flare_hgt_dem_adj      -= alt_offset;
     _hgt_at_start_of_flare  -= alt_offset;
     _hgt_dem_in_prev        -= alt_offset;
