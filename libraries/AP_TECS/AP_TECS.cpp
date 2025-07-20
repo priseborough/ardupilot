@@ -734,8 +734,7 @@ void AP_TECS::_update_throttle_with_airspeed(void)
         SPE_err_max = SPE_err_min = 0;
     }
 
-    // rate of change of potential energy is proportional to height error
-    _SPEdot_dem = (_SPE_dem - _SPE_est) / timeConstant();
+    _SPEdot_dem = _hgt_rate_dem * GRAVITY_MSS;
 
     // Calculate total energy error
     _STE_error = constrain_float((_SPE_dem - _SPE_est), SPE_err_min, SPE_err_max) + _SKE_dem - _SKE_est;
