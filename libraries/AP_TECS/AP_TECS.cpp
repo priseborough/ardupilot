@@ -291,6 +291,14 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("HDEM_TCONST", 33, AP_TECS, _hgt_dem_tconst, 3.0f),
 
+    // @Param: THR_GAIN
+    // @DisplayName: Throttle Control Gain Factor
+    // @Description: This is a gfain factor applied to the throttle control loop. It is used to adjust the speed of the throttle loop relative to the value set by TECS_TIME_CONST. Reduce if throttle use is too aggressive.
+    // @Range: 0.1 2.0
+    // @Increment: 0.1
+    // @User: Advanced
+    AP_GROUPINFO("THR_GAIN", 34, AP_TECS, _thr_gain_factor, 1.0),
+
     AP_GROUPEND
 };
 
@@ -756,7 +764,7 @@ void AP_TECS::_update_throttle_with_airspeed(void)
     } else {
         // Calculate gain scaler from specific energy error to throttle
         const float K_thr2STE = (_STEdot_max - _STEdot_min) / (_THRmaxf - _THRminf); // This is the derivative of STEdot wrt throttle measured across the max allowed throttle range.
-        const float K_STE2Thr = 1 / (timeConstant() * K_thr2STE);
+        const float K_STE2Thr = constrain_float(_thr_gain_factor, 0.1f, 2.0f) / (timeConstant() * K_thr2STE);
 
         // Calculate feed-forward throttle
         const float nomThr = aparm.throttle_cruise * 0.01f;
