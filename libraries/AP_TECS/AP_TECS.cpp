@@ -623,6 +623,7 @@ void AP_TECS::_update_height_demand(void)
             _flare_hgt_dem_ideal = _hgt_atp;
             _hgt_at_start_of_flare = _hgt_atp;
             _hgt_rate_at_flare_entry = _climb_rate;
+            _flare_entry_hgt_rate_err = _climb_rate - _hgt_rate_dem;
             _flare_initialised = true;
         }
 
@@ -637,6 +638,10 @@ void AP_TECS::_update_height_demand(void)
             p = 1.0f;
         }
         _hgt_rate_dem = _hgt_rate_at_flare_entry * (1.0f - p) - land_sink_rate_adj * p;
+
+        // fade out the offset between the height rate demand and height rate at flare entry
+        // so we don't have a step change in demanded height rate at flare entry
+        _hgt_rate_dem -= _flare_entry_hgt_rate_err * (1.0f - p);
 
         _flare_hgt_dem_ideal += _DT * _hgt_rate_dem; // the ideal height profile to follow
         _flare_hgt_dem_adj   += _DT * _hgt_rate_dem; // the demanded height profile that includes the pre-flare height tracking offset

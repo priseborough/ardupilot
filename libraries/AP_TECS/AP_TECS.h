@@ -407,6 +407,7 @@ private:
     float _hgt_rate_at_flare_entry;
     float _hgt_atp; // height above touchdown point
     float _pitch_min_at_flare_entry;
+    float _flare_entry_hgt_rate_err;
 
     // used to scale max climb and sink limits to match vehicle ability
     float _max_climb_scaler;
