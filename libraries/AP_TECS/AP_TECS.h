@@ -225,7 +225,10 @@ private:
     AP_Float _accel_gf;
     AP_Int8 _thr_min_pct_ext_rate_lim;
 
-    // current height estimate (above field elevation)
+    // current height estimate (above home)
+    float _hgt_above_home;
+
+    // current height used by control loop which can fade between height above home and height above touchdown point
     float _height;
 
     // throttle demand in the range from -1.0 to 1.0, usually positive unless reverse thrust is enabled via _THRminf < 0
@@ -292,7 +295,7 @@ private:
     float _hgt_dem_in;          // height demand input from autopilot after unachievable climb or descent limiting (m)
     float _hgt_dem_in_prev;     // previous value of _hgt_dem_in (m)
     float _hgt_dem_lpf;         // height demand after application of low pass filtering (m)
-    float _flare_hgt_dem_adj;   // height rate demand during flare adjusted for height tracking offset at flare entry (m)
+    float _flare_hgt_dem_adj;   // height demand during flare adjusted for height tracking offset at flare entry (m)
     float _flare_hgt_dem_ideal; // height we want to fly at during flare (m)
     float _hgt_dem;             // height demand sent to control loops (m)
     float _hgt_dem_prev;        // _hgt_dem from previous frame (m)
@@ -402,7 +405,7 @@ private:
     // variables used for precision landing pitch control
     float _hgt_at_start_of_flare;
     float _hgt_rate_at_flare_entry;
-    float _hgt_afe;
+    float _hgt_atp; // height above touchdown point
     float _pitch_min_at_flare_entry;
 
     // used to scale max climb and sink limits to match vehicle ability

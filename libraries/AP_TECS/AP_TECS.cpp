@@ -314,7 +314,7 @@ void AP_TECS::update_50hz(void)
 {
     // Implement third order complementary filter for height and height rate
     // estimated height rate = _climb_rate
-    // estimated height above field elevation  = _height
+    // estimated height above home  = _hgt_above_home
     // Reference Paper :
     // Optimizing the Gains of the Baro-Inertial Vertical Channel
     // Widnall W.S, Sinha P.K,
@@ -324,8 +324,8 @@ void AP_TECS::update_50hz(void)
       if we have a vertical position estimate from the EKF then use
       it, otherwise use barometric altitude
      */
-    _ahrs.get_relative_position_D_home(_height);
-    _height *= -1.0f;
+    _ahrs.get_relative_position_D_home(_hgt_above_home);
+    _hgt_above_home *= -1.0f;
 
     // Calculate time in seconds since last update
     uint64_t now = AP_HAL::micros64();
@@ -368,7 +368,7 @@ void AP_TECS::update_50hz(void)
         // If more than 1 second has elapsed since last update then reset the integrator state
         // to the measured height
         if (_flags.reset) {
-            _height_filter.height = _height;
+            _height_filter.height = _hgt_above_home;
         } else {
             _height_filter.height += integ3_input*DT;
         }
@@ -606,20 +606,22 @@ void AP_TECS::_update_height_demand(void)
             }
         }
         _hgt_dem_prev = _hgt_dem;
+        // up and away flight controls to height above home
+        _height = _hgt_above_home;
     } else {
         // when flaring force height rate demand to the
         // configured sink rate and adjust the demanded height to
         // be kinematically consistent with the height rate.
 
         // set all height filter states to current height to prevent large pitch transients if flare is aborted
-        _hgt_dem_lpf      = _height;
-        _hgt_dem_rate_ltd = _height;
-        _hgt_dem_in_prev  = _height;
+        _hgt_dem_lpf      = _hgt_above_home;
+        _hgt_dem_rate_ltd = _hgt_above_home;
+        _hgt_dem_in_prev  = _hgt_above_home;
 
         if (!_flare_initialised) {
             _flare_hgt_dem_adj = _hgt_dem;
-            _flare_hgt_dem_ideal = _hgt_afe;
-            _hgt_at_start_of_flare = _hgt_afe;
+            _flare_hgt_dem_ideal = _hgt_atp;
+            _hgt_at_start_of_flare = _hgt_atp;
             _hgt_rate_at_flare_entry = _climb_rate;
             _flare_initialised = true;
         }
@@ -630,7 +632,7 @@ void AP_TECS::_update_height_demand(void)
         // bring it in linearly with height
         float p;
         if (_hgt_at_start_of_flare > _flare_holdoff_hgt) {
-            p = constrain_float((_hgt_at_start_of_flare - _hgt_afe) / (_hgt_at_start_of_flare - _flare_holdoff_hgt), 0.0f, 1.0f);
+            p = constrain_float((_hgt_at_start_of_flare - _hgt_atp) / (_hgt_at_start_of_flare - _flare_holdoff_hgt), 0.0f, 1.0f);
         } else {
             p = 1.0f;
         }
@@ -641,9 +643,7 @@ void AP_TECS::_update_height_demand(void)
 
         // fade across to the ideal height profile
         _hgt_dem = _flare_hgt_dem_adj * (1.0f - p) + _flare_hgt_dem_ideal * p;
-
-        // correct for offset between height above ground and height above datum used by control loops
-        _hgt_dem += (_hgt_afe - _height);
+        _height = _hgt_above_home * (1.0f - p) + _hgt_atp * p;
     }
 }
 
@@ -1174,6 +1174,7 @@ void AP_TECS::_initialise_states(float hgt_afe)
         _integKE              = 0.0f;
         _last_throttle_dem    = aparm.throttle_cruise * 0.01f;
         _last_pitch_dem       = _ahrs.get_pitch_rad();
+        _hgt_atp              = hgt_afe;
         _hgt_dem_in_prev      = hgt_afe;
         _hgt_dem_lpf          = hgt_afe;
         _hgt_dem_rate_ltd     = hgt_afe;
@@ -1193,7 +1194,6 @@ void AP_TECS::_initialise_states(float hgt_afe)
         // misc variables used for alternative precision landing pitch control
         _hgt_at_start_of_flare    = 0.0f;
         _hgt_rate_at_flare_entry  = 0.0f;
-        _hgt_afe                  = 0.0f;
         _pitch_min_at_flare_entry = 0.0f;
 
         _max_climb_scaler = 1.0f;
@@ -1216,7 +1216,7 @@ void AP_TECS::_initialise_states(float hgt_afe)
             _post_TO_hgt_offset = 0;
         }
 
-        _hgt_afe              = hgt_afe;
+        _hgt_atp              = hgt_afe;
         _hgt_dem_lpf          = hgt_afe;
         _hgt_dem_rate_ltd     = hgt_afe;
         _hgt_dem_prev         = hgt_afe;
@@ -1290,7 +1290,7 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
     // Convert inputs
     _hgt_dem_in_raw = hgt_dem_cm * 0.01f;
     _EAS_dem = EAS_dem_cm * 0.01f;
-    _hgt_afe = hgt_afe;
+    _hgt_atp = hgt_afe;
     _load_factor = load_factor;
 
     // Don't allow height deamnd to continue changing in a direction that saturates vehicle manoeuvre limits
@@ -1502,7 +1502,7 @@ void AP_TECS::_update_pitch_limits(const int32_t ptchMinCO_cd) {
         if (!_flare_initialised) {
             p = 0.0f;
         } else if (_hgt_at_start_of_flare > _flare_holdoff_hgt) {
-            p = constrain_float((_hgt_at_start_of_flare - _hgt_afe) / _hgt_at_start_of_flare, 0.0f, 1.0f);
+            p = constrain_float((_hgt_at_start_of_flare - _hgt_atp) / _hgt_at_start_of_flare, 0.0f, 1.0f);
         } else {
             p = 1.0f;
         }
