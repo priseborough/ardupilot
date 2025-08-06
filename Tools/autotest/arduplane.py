@@ -4588,6 +4588,34 @@ class AutoTestPlane(vehicle_test_suite.TestSuite):
 
         self.wait_disarmed(timeout=180)
 
+    def LandingHeightOffset(self):
+        '''Circuit with baro drift'''
+        self.customise_SITL_commandline([], wipe=True)
+
+        self.set_analog_rangefinder_parameters()
+
+        self.set_parameters({
+            "SIM_BARO_DRIFT": 0.02,
+            "RNGFND_LANDING": 1,
+        })
+
+        self.reboot_sitl()
+
+        self.wait_ready_to_arm()
+        self.arm_vehicle()
+
+        # Load and start mission
+        self.load_mission("ap-circuit.txt", strict=True)
+        self.set_current_waypoint(1, check_afterwards=True)
+        self.change_mode('AUTO')
+        self.wait_current_waypoint(1, timeout=5)
+        self.wait_groundspeed(0, 10, timeout=5)
+
+        # Wait for landing waypoint
+        self.wait_current_waypoint(9, timeout=1200)
+
+        self.wait_disarmed(timeout=180)
+
     def TakeoffAuto1(self):
         '''Test the behaviour of an AUTO takeoff, pt1.'''
         '''
@@ -7504,6 +7532,7 @@ class AutoTestPlane(vehicle_test_suite.TestSuite):
             self.AHRS_ORIENTATION,
             self.AHRSTrim,
             self.LandingDrift,
+            self.LandingHeightOffset,
             self.TakeoffAuto1,
             self.TakeoffAuto2,
             self.TakeoffAuto3,
@@ -7517,6 +7546,7 @@ class AutoTestPlane(vehicle_test_suite.TestSuite):
             self.TakeoffIdleThrottle,
             self.TakeoffBadLevelOff,
             self.TakeoffLevelOffWind,
+            self.LandingHeightOffset,
             self.ForcedDCM,
             self.DCMFallback,
             self.MAVFTP,
