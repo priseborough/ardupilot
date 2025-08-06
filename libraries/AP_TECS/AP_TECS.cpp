@@ -649,6 +649,19 @@ void AP_TECS::_update_height_demand(void)
         // fade across to the ideal height profile
         _hgt_dem = _flare_hgt_dem_adj * (1.0f - p) + _flare_hgt_dem_ideal * p;
         _height = _hgt_above_home * (1.0f - p) + _hgt_atp * p;
+
+        AP::logger().WriteStreaming("TECF", "TimeUS,HAHdem,HATPdem,Hdem,HAH,HATP,H,P",
+                                    "s-------",
+                                    "F-------",
+                                    "Qfffffff",
+                                    AP_HAL::micros64(),
+                                    (double)_flare_hgt_dem_adj,
+                                    (double)_flare_hgt_dem_ideal,
+                                    (double)_hgt_dem,
+                                    (double)_hgt_above_home,
+                                    (double)_hgt_atp,
+                                    (double)_height,
+                                    (double)p);
     }
 }
 
