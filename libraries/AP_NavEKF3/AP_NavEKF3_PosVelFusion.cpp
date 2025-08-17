@@ -199,7 +199,7 @@ bool NavEKF3_core::setLatLng(const Location &loc, float posAccuracy, uint32_t ti
     // Correct the position for time delay relative to fusion time horizon assuming a constant velocity
     // Don't use data more than 5 seconds old
     if (imuSampleTime_ms - timestamp_ms > 5000) {
-        return;
+        return false;
     }
     // Don't allow data to time travel into the future
     const uint32_t timeStampConstrained_ms = MIN(timestamp_ms, imuSampleTime_ms);
