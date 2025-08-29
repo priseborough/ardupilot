@@ -207,12 +207,21 @@ bool NavEKF3_core::setLatLng(const Location &loc, float posAccuracy, uint32_t ti
     const ftype delaySec = 1E-3F * ftype(delta_ms);
     const Vector2F newPosNE = EKF_origin.get_distance_NE_ftype(loc) + stateStruct.velocity.xy() * delaySec;
 
+
     // handle unknown accuracy
     if (isnan(posAccuracy)) {
         setLatLngPosAcc = frontend->_gpsHorizPosNoise;
     } else {
         setLatLngPosAcc = MAX(posAccuracy, frontend->_gpsHorizPosNoise);
     }
+
+    // without air data aiding, the position time offset creates a circular data dependency
+    // that can destabilise the state estimates if the observation noise variance set is too
+    // low and the vehicle abruptly manoeuvres. Raise the observation noise to take this into
+    //  account when maneouvring assuming a 1/2 g horizontal acceleration used to manoeuvre.
+    const float manoeuvre_accel = GRAVITY_MSS * 0.5f;
+    const ftype posPredictError = 0.5f * manoeuvre_accel * sq(delaySec);
+    setLatLngPosAcc = sqrtf(sq(setLatLngPosAcc) + sq(posPredictError));
 
     if (frontend->option_is_enabled(NavEKF3::Option::SetLatLngFusion)) {
         // treat as an alternative position source
