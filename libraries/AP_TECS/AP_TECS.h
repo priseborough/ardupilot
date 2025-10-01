@@ -392,6 +392,7 @@ private:
     // Specific energy quantities
     float _SPE_dem;
     float _SKE_dem;
+    float _SKE_dem_ul;
     float _SPEdot_dem;
     float _SKEdot_dem;
     float _SPE_est;

@@ -476,11 +476,6 @@ void AP_TECS::_update_speed(float DT)
 
 void AP_TECS::_update_speed_demand(void)
 {
-    if (option_is_set(Option::DESCENT_SPEEDUP)) {
-        // Allow demanded speed to  go to maximum when descending at maximum descent rate
-        _TAS_dem = _TAS_dem + (_TASmax - _TAS_dem) * _sink_fraction;
-    }
-
     // Set the airspeed demand to the minimum value if an underspeed condition exists
     // or a bad descent condition exists
     // This will minimise the rate of descent resulting from an engine failure,
@@ -680,6 +675,12 @@ void AP_TECS::_update_energies(void)
     // Calculate specific energy demands
     _SPE_dem = _hgt_dem * GRAVITY_MSS;
     _SKE_dem = 0.5f * _TAS_dem_adj * _TAS_dem_adj;
+    if (option_is_set(Option::DESCENT_SPEEDUP)) {
+        const float TAS_dem_ul = _TAS_dem_adj + (_TASmax - _TAS_dem_adj) * _sink_fraction;
+        _SKE_dem_ul = 0.5f * TAS_dem_ul * TAS_dem_ul;
+    } else {
+        _SKE_dem_ul = _SKE_dem;
+    }
 
     // Calculate specific energy rate demands and high pass filter demanded airspeed
     // rate of change to match the filtering applied to the measurement
@@ -735,7 +736,16 @@ void AP_TECS::_update_throttle_with_airspeed(void)
     _SPEdot_dem = (_SPE_dem - _SPE_est) / timeConstant();
 
     // Calculate total energy error
-    _STE_error = constrain_float((_SPE_dem - _SPE_est), SPE_err_min, SPE_err_max) + _SKE_dem - _SKE_est;
+    _STE_error = constrain_float((_SPE_dem - _SPE_est), SPE_err_min, SPE_err_max);
+    // Allow a dead band on kinetic energy which is used to allow the vehicle to speedup
+    // during high rate descents
+    if (_SKE_dem_ul - _SKE_est < 0) {
+        // kinetic energy is high
+        _STE_error += _SKE_dem_ul - _SKE_est;
+    } else if (_SKE_dem - _SKE_est > 0) {
+        // kinetic energy is low
+        _STE_error += _SKE_dem - _SKE_est;
+    }
     float STEdot_dem = constrain_float((_SPEdot_dem + _SKEdot_dem), _STEdot_min, _STEdot_max);
     float STEdot_error = STEdot_dem - _SPEdot - _SKEdot;
 
