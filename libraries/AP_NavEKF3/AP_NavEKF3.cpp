@@ -1442,7 +1442,8 @@ bool NavEKF3::setOriginLLH(const Location &loc)
 bool NavEKF3::setLatLng(const Location &loc, float posAccuracy, uint32_t timestamp_ms)
 {
 #if EK3_FEATURE_POSITION_RESET
-    dal.log_SetLatLng(loc, posAccuracy, timestamp_ms);
+    const uint32_t received_ms = (uint32_t)(imuSampleTime_us / (uint64_t)1000);
+    dal.log_SetLatLng(loc, posAccuracy, timestamp_ms, received_ms);
 
     if (!core) {
         return false;
