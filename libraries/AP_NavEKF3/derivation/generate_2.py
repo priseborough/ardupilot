@@ -207,6 +207,29 @@ def body_frame_velocity_observation(P,state,R_to_body,vx,vy,vz):
     write_equations_to_file(equations,vel_bf_code_generator_alt,3)
     vel_bf_code_generator_alt.close()
 
+# Derive equations for fusion of a single doppler velocity observation taken from a body fixed sensor
+def body_frame_doppler_observation(P,state,R_to_body,vx,vy,vz):
+    obs_var = symbols("R_OBS", real=True) # observation noise variance
+
+    # Calculate earth relative velocity in a non-rotating sensor frame
+    vel_bf = R_to_body * Matrix([vx,vy,vz])
+
+    # get velocity along a vector at an arbitrary yaw and pitch
+    yaw = symbols("sensor_yaw", real=True) # azimuth angle of sensor axis in body frame (rad)
+    pitch = symbols("sensor_pitch", real=True) # Angle between sensor axis and body frame Z axis (rad)
+
+    # unit vector in body frame aligned with sensor axis
+    sensor_vec_bf = Matrix([sin(pitch)*cos(yaw), sin(pitch)*sin(yaw), cos(pitch)])
+
+    # sensor doppler velocity
+    doppler_vel = vel_bf[0] * sensor_vec_bf[0] + vel_bf[1] * sensor_vec_bf[1] + vel_bf[2] * sensor_vec_bf[2]
+
+    equations = generate_observation_equations(P,state,doppler_vel,obs_var)
+
+    doppler_vel_code_generator = CodeGenerator("./generated/doppler_vel_generated.cpp")
+    write_equations_to_file(equations,doppler_vel_code_generator,1)
+    doppler_vel_code_generator.close()
+
 # derive equations for fusion of dual antenna yaw measurement
 def gps_yaw_observation(P,state,R_to_body):
     obs_var = symbols("R_YAW", real=True) # measurement noise variance
@@ -684,8 +707,10 @@ def generate_code():
     # beta_observation(P,state,R_to_body,vx,vy,vz,wx,wy)
     # print('Generating optical flow observation code ...')
     # optical_flow_observation(P,state,R_to_body,vx,vy,vz)
-    # print('Generating body frame velocity observation code ...')
-    # body_frame_velocity_observation(P,state,R_to_body,vx,vy,vz)
+    print('Generating body frame doppler observation code ...')
+    body_frame_doppler_observation(P,state,R_to_body,vx,vy,vz)
+    print('Generating body frame velocity observation code ...')
+    body_frame_velocity_observation(P,state,R_to_body,vx,vy,vz)
     print('Generating body frame acceleration observation code ...')
     body_frame_accel_observation(P,state,R_to_body,vx,vy,vz,wx,wy)
     # print('Generating yaw estimator code ...')
