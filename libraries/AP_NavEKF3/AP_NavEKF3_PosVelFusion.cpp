@@ -2049,3 +2049,205 @@ void NavEKF3_core::SelectBodyOdomFusion()
     }
 }
 #endif // EK3_FEATURE_BODY_ODOM
+
+void NavEKF3_core::FuseDopplerVelocity(float dopplerVel, float dopplerVelObsVar, float sensorYaw, float sensorPitch)
+{
+    // copy required states to local variable names
+    const ftype q0 = stateStruct.quat[0];
+    const ftype q1 = stateStruct.quat[1];
+    const ftype q2 = stateStruct.quat[2];
+    const ftype q3 = stateStruct.quat[3];
+    const ftype vn = stateStruct.velocity.x;
+    const ftype ve = stateStruct.velocity.y;
+    const ftype vd = stateStruct.velocity.z;
+
+    // Sub Expressions
+    const ftype HK0 = cosf(sensorPitch);
+    const ftype HK1 = q0*vd - q1*ve + q2*vn;
+    const ftype HK2 = q0*ve + q1*vd - q3*vn;
+    const ftype HK3 = sinf(sensorPitch);
+    const ftype HK4 = HK3*sinf(sensorYaw);
+    const ftype HK5 = q0*vn - q2*vd + q3*ve;
+    const ftype HK6 = HK3*cosf(sensorYaw);
+    const ftype HK7 = HK0*HK1 + HK2*HK4 + HK5*HK6;
+    const ftype HK8 = q1*vn + q2*ve + q3*vd;
+    const ftype HK9 = -HK0*HK2 + HK1*HK4 + HK6*HK8;
+    const ftype HK10 = HK0*HK5 - HK1*HK6 + HK4*HK8;
+    const ftype HK11 = HK0*HK8 + HK2*HK6 - HK4*HK5;
+    const ftype HK12 = q0*q2;
+    const ftype HK13 = q1*q3;
+    const ftype HK14 = 2*HK0;
+    const ftype HK15 = q0*q3;
+    const ftype HK16 = q1*q2;
+    const ftype HK17 = 2*HK4;
+    const ftype HK18 = sq(q1);
+    const ftype HK19 = sq(q2);
+    const ftype HK20 = -HK19;
+    const ftype HK21 = sq(q0);
+    const ftype HK22 = sq(q3);
+    const ftype HK23 = HK21 - HK22;
+    const ftype HK24 = HK14*(HK12 + HK13) - HK17*(HK15 - HK16) + HK6*(HK18 + HK20 + HK23);
+    const ftype HK25 = q0*q1;
+    const ftype HK26 = q2*q3;
+    const ftype HK27 = 2*HK6;
+    const ftype HK28 = -HK18;
+    const ftype HK29 = -HK14*(HK25 - HK26) + HK27*(HK15 + HK16) + HK4*(HK19 + HK23 + HK28);
+    const ftype HK30 = HK0*(HK20 + HK21 + HK22 + HK28) + HK17*(HK25 + HK26) - HK27*(HK12 - HK13);
+    const ftype HK31 = 2*HK7;
+    const ftype HK32 = 2*HK9;
+    const ftype HK33 = 2*HK10;
+    const ftype HK34 = 2*HK11;
+    const ftype HK35 = HK24*P[0][4] + HK29*P[0][5] + HK30*P[0][6] + HK31*P[0][0] + HK32*P[0][1] + HK33*P[0][2] + HK34*P[0][3];
+    const ftype HK36 = HK24*P[4][5] + HK29*P[5][5] + HK30*P[5][6] + HK31*P[0][5] + HK32*P[1][5] + HK33*P[2][5] + HK34*P[3][5];
+    const ftype HK37 = HK24*P[4][4] + HK29*P[4][5] + HK30*P[4][6] + HK31*P[0][4] + HK32*P[1][4] + HK33*P[2][4] + HK34*P[3][4];
+    const ftype HK38 = HK24*P[4][6] + HK29*P[5][6] + HK30*P[6][6] + HK31*P[0][6] + HK32*P[1][6] + HK33*P[2][6] + HK34*P[3][6];
+    const ftype HK39 = HK24*P[1][4] + HK29*P[1][5] + HK30*P[1][6] + HK31*P[0][1] + HK32*P[1][1] + HK33*P[1][2] + HK34*P[1][3];
+    const ftype HK40 = HK24*P[2][4] + HK29*P[2][5] + HK30*P[2][6] + HK31*P[0][2] + HK32*P[1][2] + HK33*P[2][2] + HK34*P[2][3];
+    const ftype HK41 = HK24*P[3][4] + HK29*P[3][5] + HK30*P[3][6] + HK31*P[0][3] + HK32*P[1][3] + HK33*P[2][3] + HK34*P[3][3];
+    varInnovDopplerVel = HK24*HK37 + HK29*HK36 + HK30*HK38 + HK31*HK35 + HK32*HK39 + HK33*HK40 + HK34*HK41 + MAX(dopplerVelObsVar, sq(frontend->_visOdmVelErrMin));
+    ftype HK42;
+    if (varInnovDopplerVel >= dopplerVelObsVar) {
+        HK42 = 1.0F / varInnovDopplerVel;
+    } else {
+        return;
+    }
+
+    // calculate vehicle velocity in body frame
+    Matrix3F Tnb;
+    stateStruct.quat.inverse().rotation_matrix(Tnb);
+    const Vector3F velBF = Tnb * stateStruct.velocity;
+
+    // calculate vector in body frame aligned with doppler measurement axis
+    const Vector3F sensorVecBF = Vector3F(sin(sensorPitch)*cos(sensorYaw), sin(sensorPitch)*sin(sensorYaw), cos(sensorPitch));
+
+    // calculate predicted doppler velocity measurement 
+    // * operator is overloaded as a dot product
+    const ftype dopplerVelPred = velBF * sensorVecBF;
+
+    innovDopplerVel = dopplerVelPred - dopplerVel;
+
+    // calculate the innovation consistency test ratio
+    dopplerVelTestRatio = sq(innovDopplerVel) / (sq(5.0f) * varInnovVtas);
+
+    if (dopplerVelTestRatio < 1.0f) {
+        // Observation Jacobians
+        Vector24 Hfusion = {};
+        Hfusion[0] = 2*HK7;
+        Hfusion[1] = 2*HK9;
+        Hfusion[2] = 2*HK10;
+        Hfusion[3] = 2*HK11;
+        Hfusion[4] = HK24;
+        Hfusion[5] = HK29;
+        Hfusion[6] = HK30;
+
+        // calculate Kalman gains
+        Kfusion[0] = HK35*HK42;
+        Kfusion[1] = HK39*HK42;
+        Kfusion[2] = HK40*HK42;
+        Kfusion[3] = HK41*HK42;
+        Kfusion[4] = HK37*HK42;
+        Kfusion[5] = HK36*HK42;
+        Kfusion[6] = HK38*HK42;
+        Kfusion[7] = HK42*(HK24*P[4][7] + HK29*P[5][7] + HK30*P[6][7] + HK31*P[0][7] + HK32*P[1][7] + HK33*P[2][7] + HK34*P[3][7]);
+        Kfusion[8] = HK42*(HK24*P[4][8] + HK29*P[5][8] + HK30*P[6][8] + HK31*P[0][8] + HK32*P[1][8] + HK33*P[2][8] + HK34*P[3][8]);
+        Kfusion[9] = HK42*(HK24*P[4][9] + HK29*P[5][9] + HK30*P[6][9] + HK31*P[0][9] + HK32*P[1][9] + HK33*P[2][9] + HK34*P[3][9]);
+
+        if (!inhibitDelAngBiasStates) {
+            Kfusion[10] = HK42*(HK24*P[4][10] + HK29*P[5][10] + HK30*P[6][10] + HK31*P[0][10] + HK32*P[1][10] + HK33*P[2][10] + HK34*P[3][10]);
+            Kfusion[11] = HK42*(HK24*P[4][11] + HK29*P[5][11] + HK30*P[6][11] + HK31*P[0][11] + HK32*P[1][11] + HK33*P[2][11] + HK34*P[3][11]);
+            Kfusion[12] = HK42*(HK24*P[4][12] + HK29*P[5][12] + HK30*P[6][12] + HK31*P[0][12] + HK32*P[1][12] + HK33*P[2][12] + HK34*P[3][12]);
+        } else {
+            // zero indexes 10 to 12
+            zero_range(&Kfusion[0], 10, 12);
+        }
+
+        if (!inhibitDelVelBiasStates && !badIMUdata) {
+            for (uint8_t index = 0; index < 3; index++) {
+                const uint8_t stateIndex = index + 13;
+                if (!dvelBiasAxisInhibit[index]) {
+                    Kfusion[stateIndex] = HK42*(HK24*P[4][stateIndex] + HK29*P[5][stateIndex] + HK30*P[6][stateIndex] + HK31*P[0][stateIndex] + HK32*P[1][stateIndex] + HK33*P[2][stateIndex] + HK34*P[3][stateIndex]);
+                } else {
+                    Kfusion[stateIndex] = 0.0f;
+                }
+            }
+        } else {
+            // zero indexes 13 to 15
+            zero_range(&Kfusion[0], 13, 15);
+        }
+
+        if (!inhibitMagStates) {
+            Kfusion[16] = HK42*(HK24*P[4][16] + HK29*P[5][16] + HK30*P[6][16] + HK31*P[0][16] + HK32*P[1][16] + HK33*P[2][16] + HK34*P[3][16]);
+            Kfusion[17] = HK42*(HK24*P[4][17] + HK29*P[5][17] + HK30*P[6][17] + HK31*P[0][17] + HK32*P[1][17] + HK33*P[2][17] + HK34*P[3][17]);
+            Kfusion[18] = HK42*(HK24*P[4][18] + HK29*P[5][18] + HK30*P[6][18] + HK31*P[0][18] + HK32*P[1][18] + HK33*P[2][18] + HK34*P[3][18]);
+            Kfusion[19] = HK42*(HK24*P[4][19] + HK29*P[5][19] + HK30*P[6][19] + HK31*P[0][19] + HK32*P[1][19] + HK33*P[2][19] + HK34*P[3][19]);
+            Kfusion[20] = HK42*(HK24*P[4][20] + HK29*P[5][20] + HK30*P[6][20] + HK31*P[0][20] + HK32*P[1][20] + HK33*P[2][20] + HK34*P[3][20]);
+            Kfusion[21] = HK42*(HK24*P[4][21] + HK29*P[5][21] + HK30*P[6][21] + HK31*P[0][21] + HK32*P[1][21] + HK33*P[2][21] + HK34*P[3][21]);
+        } else {
+            // zero indexes 16 to 21
+            zero_range(&Kfusion[0], 16, 21);
+        }
+
+        if (!inhibitWindStates) {
+            Kfusion[22] = HK42*(HK24*P[4][22] + HK29*P[5][22] + HK30*P[6][22] + HK31*P[0][22] + HK32*P[1][22] + HK33*P[2][22] + HK34*P[3][22]);
+            Kfusion[23] = HK42*(HK24*P[4][23] + HK29*P[5][23] + HK30*P[6][23] + HK31*P[0][23] + HK32*P[1][23] + HK33*P[2][23] + HK34*P[3][23]);
+        } else {
+            // zero indexes 22 to 23
+            zero_range(&Kfusion[0], 22, 23);
+        }
+
+        // record the last time observations were accepted for fusion
+        lastDopplerVelPassTime_ms = imuSampleTime_ms;
+
+        // correct the covariance P = (I - K*H)*P
+        // take advantage of the empty columns in KH to reduce the
+        // number of operations
+        for (unsigned i = 0; i<=stateIndexLim; i++) {
+            for (unsigned j = 0; j<=6; j++) {
+                KH[i][j] = Kfusion[i] * Hfusion[j];
+            }
+            for (unsigned j = 7; j<=stateIndexLim; j++) {
+                KH[i][j] = 0.0f;
+            }
+        }
+        for (unsigned j = 0; j<=stateIndexLim; j++) {
+            for (unsigned i = 0; i<=stateIndexLim; i++) {
+                ftype res = 0;
+                res += KH[i][0] * P[0][j];
+                res += KH[i][1] * P[1][j];
+                res += KH[i][2] * P[2][j];
+                res += KH[i][3] * P[3][j];
+                res += KH[i][4] * P[4][j];
+                res += KH[i][5] * P[5][j];
+                res += KH[i][6] * P[6][j];
+                KHP[i][j] = res;
+            }
+        }
+
+        // Check that we are not going to drive any variances negative and skip the update if so
+        bool healthyFusion = true;
+        for (uint8_t i= 0; i<=stateIndexLim; i++) {
+            if (KHP[i][i] > P[i][i]) {
+                healthyFusion = false;
+            }
+        }
+
+        if (healthyFusion) {
+            // update the covariance matrix
+            for (uint8_t i= 0; i<=stateIndexLim; i++) {
+                for (uint8_t j= 0; j<=stateIndexLim; j++) {
+                    P[i][j] = P[i][j] - KHP[i][j];
+                }
+            }
+
+            // force the covariance matrix to be symmetrical and limit the variances to prevent ill-conditioning.
+            ForceSymmetry();
+            ConstrainVariances();
+
+            // correct the state vector
+            for (uint8_t j= 0; j<=stateIndexLim; j++) {
+                statesArray[j] = statesArray[j] - Kfusion[j] * innovDopplerVel;
+            }
+            stateStruct.quat.normalize();
+        }
+    }
+}

@@ -713,6 +713,9 @@ private:
     // fuse body frame velocity measurements
     void FuseBodyVel();
 
+    // fuse a doppler velocity observation from a single axis sensor
+    void FuseDopplerVelocity(float dopplerVel, float dopplerVelObsVar, float sensorYaw, float sensorPitch);
+
 #if EK3_FEATURE_BEACON_FUSION
     // fuse range beacon measurements
     void FuseRngBcn();
@@ -1311,6 +1314,12 @@ private:
     EKF_obs_buffer_t<wheel_odm_elements> storedWheelOdm;    // body velocity data buffer
     wheel_odm_elements wheelOdmDataDelayed;   // Body  frame odometry data at the fusion time horizon
 #endif
+
+    // Doppler velocity fusion
+    uint32_t lastDopplerVelPassTime_ms; // time stamp when the doppler velocity measurement last passed innovation consistency checks (msec)
+    ftype dopplerVelTestRatio;          // Innovation test ratio for doppler velocity measurement
+    ftype varInnovDopplerVel;           // Doppler velocity innovation variance (m/sec)^2
+    ftype innovDopplerVel;              // Doppler velocity innovation (m/sec)
 
     // GPS yaw sensor fusion
     uint32_t yawMeasTime_ms;            // system time GPS yaw angle was last input to the data buffer
