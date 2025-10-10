@@ -2351,6 +2351,14 @@ void  AP_AHRS::writeBodyFrameOdom(float quality, const Vector3f &delPos, const V
 #endif
 }
 
+// write body frame doppler velocity measurements to the EKF
+void  AP_AHRS::writeDopplerVel(float dopperVel, float dopplerVelErr, float sensorYaw, float sensorPitch, uint32_t timeStamp_ms)
+{
+#if HAL_NAVEKF3_AVAILABLE
+    EKF3.writeDopplerVel(dopperVel, dopplerVelErr, sensorYaw, sensorPitch, timeStamp_ms);
+#endif
+}
+
 // Write position and quaternion data from an external navigation system
 void AP_AHRS::writeExtNavData(const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint16_t delay_ms, uint32_t resetTime_ms)
 {
