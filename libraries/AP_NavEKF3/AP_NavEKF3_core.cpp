@@ -707,6 +707,8 @@ void NavEKF3_core::UpdateFilter(bool predict)
         SelectBodyOdomFusion();
 #endif
 
+        SelectDopplerVelFusion();
+
         // Update states using airspeed data
         SelectTasFusion();
 

@@ -896,6 +896,9 @@ private:
     // determine when to perform fusion of body frame odometry measurements
     void SelectBodyOdomFusion();
 
+    // select fusion of doppler velocity measurements
+    void SelectDopplerVelFusion();
+
     // Estimate terrain offset using a single state EKF
     void EstimateTerrainOffset(const of_elements &ofDataDelayed);
 
