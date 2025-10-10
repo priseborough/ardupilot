@@ -214,6 +214,17 @@ public:
     void writeBodyFrameOdom(float quality, const Vector3f &delPos, const Vector3f &delAng, float delTime, uint32_t timeStamp_ms, uint16_t delay_ms, const Vector3f &posOffset);
 
     /*
+     * Write body frame doppler velocity measurements
+     *
+     * vel is the velocity in the direction fo the sensor axis (m/s)
+     * velErr is the 1-std deviation accuracy of the vel measurement (m/s)
+     * yaw is the yaw angle of sensor axis in the body frame measured CW from the X/forward axis (rad)
+     * pitch is the pitch angle of the sensor axis in the body frame measured up from the Z/down axis (rad)
+     * timeStamp_ms is the time the measurement was taken (msec)
+    */
+    void writeDopplerVel(float vel, float velErr, float yaw, float pitch, uint32_t timeStamp_ms);
+
+    /*
      * Write odometry data from a wheel encoder. The axis of rotation is assumed to be parallel to the vehicle body axis
      *
      * delAng is the measured change in angular position from the previous measurement where a positive rotation is produced by forward motion of the vehicle (rad)

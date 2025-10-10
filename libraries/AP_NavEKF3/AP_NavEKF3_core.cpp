@@ -128,6 +128,9 @@ bool NavEKF3_core::setup_core(uint8_t _imu_index, uint8_t _core_index)
         return false;
     }
 #endif // EK3_FEATURE_BODY_ODOM
+    if(!storedDopplerVel.init(obs_buffer_length)) {
+        return false;
+    }
     if(frontend->sources.gps_yaw_enabled() && !storedYawAng.init(obs_buffer_length)) {
         return false;
     }
@@ -409,6 +412,7 @@ void NavEKF3_core::InitialiseVariables()
     storedBodyOdm.reset();
     storedWheelOdm.reset();
 #endif
+    storedDopplerVel.reset();
 #if EK3_FEATURE_EXTERNAL_NAV
     storedExtNav.reset();
     storedExtNavVel.reset();

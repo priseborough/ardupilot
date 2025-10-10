@@ -141,6 +141,28 @@ void NavEKF3_core::writeBodyFrameOdom(float quality, const Vector3f &delPos, con
 #endif // EK3_FEATURE_BODY_ODOM
 }
 
+void NavEKF3_core::writeDopplerVel(float vel, float velErr, float yaw, float pitch, uint32_t timeStamp_ms)
+{
+    if (isnan(vel) || isnan(velErr) || isnan(yaw) || isnan(pitch)) {
+        return;
+    }
+
+    // limit update rate to maximum allowed by sensor buffers and fusion process
+    // don't try to write to buffer until the filter has been initialised
+    if (((timeStamp_ms - dopplerVelMeasTime_ms) < frontend->sensorIntervalMin_ms) || !statesInitialised) {
+        return;
+    }
+    dopplerVelMeasTime_ms = timeStamp_ms;
+
+    dopplerVelDataNew.vel = vel;
+    dopplerVelDataNew.velErr = velErr;
+    dopplerVelDataNew.time_ms = timeStamp_ms;
+    dopplerVelDataNew.yaw = yaw;
+    dopplerVelDataNew.pitch = pitch;
+
+    storedDopplerVel.push(dopplerVelDataNew);
+}
+
 void NavEKF3_core::writeWheelOdom(float delAng, float delTime, uint32_t timeStamp_ms, const Vector3f &posOffset, float radius)
 {
 #if EK3_FEATURE_BODY_ODOM

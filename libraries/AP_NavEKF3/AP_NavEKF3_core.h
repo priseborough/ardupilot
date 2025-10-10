@@ -295,6 +295,17 @@ public:
     void writeBodyFrameOdom(float quality, const Vector3f &delPos, const Vector3f &delAng, float delTime, uint32_t timeStamp_ms, uint16_t delay_ms, const Vector3f &posOffset);
 
     /*
+     * Write body frame doppler velocity measurements
+     *
+     * vel is the velocity in the direction fo the sensor axis (m/s)
+     * velErr is the 1-std deviation accuracy of the vel measurement (m/s)
+     * yaw is the yaw angle of sensor axis in the body frame measured CW from the X/forward axis (rad)
+     * pitch is the pitch angle of the sensor axis in the body frame measured up from the Z/down axis (rad)
+     * timeStamp_ms is the time the measurement was taken (msec)
+    */
+    void writeDopplerVel(float vel, float velErr, float yaw, float pitch, uint32_t timeStamp_ms);
+
+    /*
      * Write odometry data from a wheel encoder. The axis of rotation is assumed to be parallel to the vehicle body axis
      *
      * delAng is the measured change in angular position from the previous measurement where a positive rotation is produced by forward motion of the vehicle (rad)
@@ -642,6 +653,12 @@ private:
         Vector3F        angRate;    // angular rate estimated from odometry (rad/sec)
     };
 
+    struct doppler_vel_elements : EKF_obs_element_t {
+        ftype           vel;        // doppler velocity shift in direction of sensor axis (m/s)
+        ftype           velErr;     // doppler velocity measurement error 1-std (m/s)
+        ftype           yaw;        // yaw angle of doppler sensor axis in body frame (rad)
+        ftype           pitch;      // pitch angle of doppler sensor axis in body frame (rad)
+    };
     struct wheel_odm_elements : EKF_obs_element_t {
         ftype           delAng;     // wheel rotation angle measured in body frame - positive is forward movement of vehicle (rad/s)
         ftype           radius;     // wheel radius (m)
@@ -1374,10 +1391,14 @@ private:
 #endif
 
     // Doppler velocity fusion
-    uint32_t lastDopplerVelPassTime_ms; // time stamp when the doppler velocity measurement last passed innovation consistency checks (msec)
-    ftype dopplerVelTestRatio;          // Innovation test ratio for doppler velocity measurement
-    ftype varInnovDopplerVel;           // Doppler velocity innovation variance (m/sec)^2
-    ftype innovDopplerVel;              // Doppler velocity innovation (m/sec)
+    EKF_obs_buffer_t<doppler_vel_elements> storedDopplerVel;    // doppler velocity data buffer
+    doppler_vel_elements dopplerVelDataNew;       // Doppler velocity data at the current time horizon
+    doppler_vel_elements dopplerVelDataDelayed;  // Doppler velocity data at the fusion time horizon
+    uint32_t dopplerVelMeasTime_ms;         // time body doppler velocity measurements were accepted for input to the data buffer (msec)
+    uint32_t lastDopplerVelPassTime_ms;     // time stamp when the doppler velocity measurement last passed innovation consistency checks (msec)
+    ftype dopplerVelTestRatio;              // Innovation test ratio for doppler velocity measurement
+    ftype varInnovDopplerVel;               // Doppler velocity innovation variance (m/sec)^2
+    ftype innovDopplerVel;                  // Doppler velocity innovation (m/sec)
 
     // GPS yaw sensor fusion
     uint32_t yawMeasTime_ms;            // system time GPS yaw angle was last input to the data buffer
