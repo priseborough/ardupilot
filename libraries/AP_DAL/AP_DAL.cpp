@@ -396,6 +396,20 @@ void AP_DAL::writeExtNavVelData(const Vector3f &vel, float err, uint32_t timeSta
 
 }
 
+void AP_DAL::writeDopplerVel(float vel, float velErr, float yaw, float pitch, uint32_t timeStamp_ms)
+{
+    end_frame();
+
+    const log_REDV old = _REDV;
+    _REDV.vel = vel;
+    _REDV.err = velErr;
+    _REDV.yaw = yaw;
+    _REDV.pitch = pitch;
+    _REDV.timeStamp_ms = timeStamp_ms;
+    WRITE_REPLAY_BLOCK_IFCHANGED(REDV, _REDV, old);
+
+}
+
 // log wheel odometry data
 void AP_DAL::writeWheelOdom(float delAng, float delTime, uint32_t timeStamp_ms, const Vector3f &posOffset, float radius)
 {
@@ -508,6 +522,16 @@ void AP_DAL::handle_message(const log_REVH &msg, NavEKF2 &ekf2, NavEKF3 &ekf3)
     _REVH = msg;
     ekf2.writeExtNavVelData(msg.vel, msg.err, msg.timeStamp_ms, msg.delay_ms);
     ekf3.writeExtNavVelData(msg.vel, msg.err, msg.timeStamp_ms, msg.delay_ms);
+}
+
+/*
+  handle doppler velocity data
+ */
+void AP_DAL::handle_message(const log_REDV &msg, NavEKF2 &ekf2, NavEKF3 &ekf3)
+{
+    _REDV = msg;
+    // note that EKF2 does not support doppler velocity
+    ekf3.writeDopplerVel(msg.vel, msg.err, msg.yaw, msg.pitch, msg.timeStamp_ms);
 }
 
 /*

@@ -37,6 +37,7 @@
     LOG_REPH_MSG, \
     LOG_RSLL_MSG, \
     LOG_REVH_MSG, \
+    LOG_REDV_MSG, \
     LOG_RWOH_MSG, \
     LOG_RBOH_MSG, \
     LOG_RTER_MSG
@@ -537,6 +538,22 @@ struct log_REVH {
     uint8_t _end;
 };
 
+// @LoggerMessage: REDV
+// @Description: Replay doppler velocity data
+// @Field: V: doppler velocity along sensor axis
+// @Field: Er: error in doppler velocity
+// @Field: Yaw: sensor axis yaw
+// @Field: Pitch: sensor axis pitch
+// @Field: TS: timestamp of doppler velocity measurement
+struct log_REDV {
+    float vel;
+    float err;
+    float yaw;
+    float pitch;
+    uint32_t timeStamp_ms;
+    uint8_t _end;
+};
+
 // @LoggerMessage: RWOH
 // @Description: Replay wheel odometry data
 // @Field: DA: delta-angle
@@ -652,6 +669,8 @@ struct log_RTER {
       "RSLL", "IIfI", "Lat,Lng,PosAccSD,TS", "DU--", "GG--" }, \
     { LOG_REVH_MSG, RLOG_SIZE(REVH),                                   \
       "REVH", "ffffIH", "VX,VY,VZ,Er,TS,D", "------", "------" }, \
+    { LOG_REDV_MSG, RLOG_SIZE(REDV),                                   \
+      "REDV", "ffffI", "V,Er,Yaw,Pitch,TS", "-----", "-----" },   \
     { LOG_RWOH_MSG, RLOG_SIZE(RWOH),                                   \
       "RWOH", "ffIffff", "DA,DT,TS,PX,PY,PZ,R", "-------", "-------" }, \
     { LOG_RBOH_MSG, RLOG_SIZE(RBOH),                                   \
