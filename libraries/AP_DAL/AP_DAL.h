@@ -215,6 +215,8 @@ public:
     void writeExtNavData(const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint16_t delay_ms, uint32_t resetTime_ms);
     void writeExtNavVelData(const Vector3f &vel, float err, uint32_t timeStamp_ms, uint16_t delay_ms);
 
+    void writeDopplerVel(float vel, float velErr, float yaw, float pitch, uint32_t timeStamp_ms);
+
     // log wheel odometry data
     void writeWheelOdom(float delAng, float delTime, uint32_t timeStamp_ms, const Vector3f &posOffset, float radius);
     void writeBodyFrameOdom(float quality, const Vector3f &delPos, const Vector3f &delAng, float delTime, uint32_t timeStamp_ms, uint16_t delay_ms, const Vector3f &posOffset);
@@ -317,6 +319,7 @@ public:
     void handle_message(const log_ROFH &msg, NavEKF2 &ekf2, NavEKF3 &ekf3);
     void handle_message(const log_REPH &msg, NavEKF2 &ekf2, NavEKF3 &ekf3);
     void handle_message(const log_REVH &msg, NavEKF2 &ekf2, NavEKF3 &ekf3);
+    void handle_message(const log_REDV &msg, NavEKF2 &ekf2, NavEKF3 &ekf3);
     void handle_message(const log_RWOH &msg, NavEKF2 &ekf2, NavEKF3 &ekf3);
     void handle_message(const log_RBOH &msg, NavEKF2 &ekf2, NavEKF3 &ekf3);
     void handle_message(const log_RSLL &msg, NavEKF2 &ekf2, NavEKF3 &ekf3);
@@ -343,6 +346,7 @@ private:
     struct log_ROFH _ROFH;
     struct log_REPH _REPH;
     struct log_REVH _REVH;
+    struct log_REDV _REDV;
     struct log_RWOH _RWOH;
     struct log_RBOH _RBOH;
     struct log_RSLL _RSLL;
