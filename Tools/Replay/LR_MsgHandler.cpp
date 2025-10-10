@@ -301,6 +301,13 @@ void LR_MsgHandler_REVH::process_message(uint8_t *msgbytes)
     AP::dal().handle_message(msg, ekf2, ekf3);
 }
 
+void LR_MsgHandler_REDV::process_message(uint8_t *msgbytes)
+{
+    MSG_CREATE(REDV, msgbytes);
+    AP::dal().handle_message(msg, ekf2, ekf3);
+}
+
+
 #include <AP_AHRS/AP_AHRS.h>
 #include "VehicleType.h"
 
