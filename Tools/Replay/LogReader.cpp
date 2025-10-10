@@ -122,6 +122,8 @@ bool LogReader::handle_log_format_msg(const struct log_Format &f)
         msgparser[f.type] = NEW_NOTHROW LR_MsgHandler_RSLL(formats[f.type], ekf2, ekf3);
     } else if (streq(name, "REVH")) {
         msgparser[f.type] = NEW_NOTHROW LR_MsgHandler_REVH(formats[f.type], ekf2, ekf3);
+    } else if (streq(name, "REDV")) {
+        msgparser[f.type] = NEW_NOTHROW LR_MsgHandler_REDV(formats[f.type], ekf2, ekf3);
     } else if (streq(name, "RWOH")) {
         msgparser[f.type] = NEW_NOTHROW LR_MsgHandler_RWOH(formats[f.type], ekf2, ekf3);
     } else if (streq(name, "RBOH")) {
