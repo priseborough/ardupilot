@@ -4,6 +4,7 @@
 #include "AP_NavEKF3_core.h"
 #include <GCS_MAVLink/GCS.h>
 #include <AP_DAL/AP_DAL.h>
+#include <AP_Logger/AP_Logger.h>
 
 /********************************************************
 *                   RESET FUNCTIONS                     *
@@ -2124,10 +2125,35 @@ void NavEKF3_core::SelectBodyOdomFusion()
 // select fusion of doppler velocity measurements
 void NavEKF3_core::SelectDopplerVelFusion()
 {
+    bool logFusion=false;
+    float innovations[4];
+    float innovationVariances[4];
     for (uint8_t index=0; index<4; index++) {
         if (storedDopplerVel.recall(dopplerVelDataDelayed, imuDataDelayed.time_ms)) {
             FuseDopplerVelocity(dopplerVelDataDelayed.vel, dopplerVelDataDelayed.velErr, dopplerVelDataDelayed.yaw, dopplerVelDataDelayed.pitch);
+            innovations[index] = innovDopplerVel;
+            innovationVariances[index] = varInnovDopplerVel;
+            logFusion = true;
+        } else {
+            innovations[index] = NaNf;
+            innovationVariances[index] = NaNf;
         }
+    }
+    if (logFusion) {
+        const struct log_XKDV pkt11{
+            LOG_PACKET_HEADER_INIT(LOG_XKDV_MSG),
+            time_us : AP::dal().micros64(),
+            core    : DAL_CORE(core_index),
+            innov_0 : innovations[0],
+            innov_1 : innovations[1],
+            innov_2 : innovations[2],
+            innov_3 : innovations[3],
+            innovVar_0 : innovationVariances[0],
+            innovVar_1 : innovationVariances[1],
+            innovVar_2 : innovationVariances[2],
+            innovVar_3 : innovationVariances[3]
+         };
+        AP::logger().WriteBlock(&pkt11, sizeof(pkt11));
     }
 }
 

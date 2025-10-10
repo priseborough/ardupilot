@@ -19,7 +19,8 @@
     LOG_XKV1_MSG, \
     LOG_XKV2_MSG, \
     LOG_XKY0_MSG, \
-    LOG_XKY1_MSG
+    LOG_XKY1_MSG, \
+    LOG_XKDV_MSG
 
 // @LoggerMessage: XKF0
 // @Description: EKF3 beacon sensor diagnostics
@@ -268,6 +269,32 @@ struct PACKED log_XKFD {
     float velInnovVarZ;
 };
 
+// @LoggerMessage: XKDV
+// @Description: EKF3 Body Frame Doppler Velocity Fusion
+// @Field: TimeUS: Time since system startup
+// @Field: C: EKF3 core this data is for
+// @Field: I0: Innovation in doppler velocity - sensor 0
+// @Field: I1: Innovation in doppler velocity - sensor 1
+// @Field: I2: Innovation in doppler velocity - sensor 2
+// @Field: I3: Innovation in doppler velocity - sensor 3
+// @Field: IV0: Innovation Variance in doppler velocity - sensor 0
+// @Field: IV1: Innovation Variance in doppler velocity - sensor 1
+// @Field: IV2: Innovation Variance in doppler velocity - sensor 2
+// @Field: IV3: Innovation Variance in doppler velocity - sensor 3
+struct PACKED log_XKDV {
+    LOG_PACKET_HEADER;
+    uint64_t time_us;
+    uint8_t core;
+    float innov_0;
+    float innov_1;
+    float innov_2;
+    float innov_3;
+    float innovVar_0;
+    float innovVar_1;
+    float innovVar_2;
+    float innovVar_3;
+};
+
 // @LoggerMessage: XKT
 // @Description: EKF3 timing information
 // @Field: TimeUS: Time since system startup
@@ -456,7 +483,9 @@ struct PACKED log_XKV {
     { LOG_XKV1_MSG, sizeof(log_XKV), \
       "XKV1","QBffffffffffff","TimeUS,C,V00,V01,V02,V03,V04,V05,V06,V07,V08,V09,V10,V11", "s#------------", "F-------------" , true }, \
     { LOG_XKV2_MSG, sizeof(log_XKV), \
-      "XKV2","QBffffffffffff","TimeUS,C,V12,V13,V14,V15,V16,V17,V18,V19,V20,V21,V22,V23", "s#------------", "F-------------" , true },
-#else
+      "XKV2","QBffffffffffff","TimeUS,C,V12,V13,V14,V15,V16,V17,V18,V19,V20,V21,V22,V23", "s#------------", "F-------------" , true }, \
+    { LOG_XKDV_MSG, sizeof(log_XKDV), \
+      "XKDV","QBffffffff","TimeUS,C,I0,I1,I2,I3,IV0,IV1,IV2,IV3", "s#--------", "F---------" , true },
+      #else
   #define LOG_STRUCTURE_FROM_NAVEKF3
 #endif
