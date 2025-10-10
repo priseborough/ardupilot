@@ -315,6 +315,9 @@ public:
     // write body odometry measurements to the EKF
     void writeBodyFrameOdom(float quality, const Vector3f &delPos, const Vector3f &delAng, float delTime, uint32_t timeStamp_ms, uint16_t delay_ms, const Vector3f &posOffset);
 
+    // write body frame doppler velocity measurements to the EKF
+    void writeDopplerVel(float dopperVel, float dopplerVelErr, float sensorYaw, float sensorPitch, uint32_t timeStamp_ms);
+
     // Writes the default equivalent airspeed and its 1-sigma uncertainty in m/s to be used in forward flight if a measured airspeed is required and not available.
     void writeDefaultAirSpeed(float airspeed, float uncertainty);
 
