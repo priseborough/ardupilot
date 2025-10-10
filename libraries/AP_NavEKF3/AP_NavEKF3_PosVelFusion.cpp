@@ -2121,6 +2121,16 @@ void NavEKF3_core::SelectBodyOdomFusion()
 }
 #endif // EK3_FEATURE_BODY_ODOM
 
+// select fusion of doppler velocity measurements
+void NavEKF3_core::SelectDopplerVelFusion()
+{
+    for (uint8_t index=0; index<4; index++) {
+        if (storedDopplerVel.recall(dopplerVelDataDelayed, imuDataDelayed.time_ms)) {
+            FuseDopplerVelocity(dopplerVelDataDelayed.vel, dopplerVelDataDelayed.velErr, dopplerVelDataDelayed.yaw, dopplerVelDataDelayed.pitch);
+        }
+    }
+}
+
 void NavEKF3_core::FuseDopplerVelocity(float dopplerVel, float dopplerVelObsVar, float sensorYaw, float sensorPitch)
 {
     // copy required states to local variable names
