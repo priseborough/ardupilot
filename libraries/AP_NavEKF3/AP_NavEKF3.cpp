@@ -1642,6 +1642,17 @@ void NavEKF3::writeBodyFrameOdom(float quality, const Vector3f &delPos, const Ve
     }
 }
 
+void NavEKF3::writeDopplerVel(float vel, float velErr, float yaw, float pitch, uint32_t timeStamp_ms)
+{
+    AP::dal().writeDopplerVel(vel, velErr, yaw, pitch, timeStamp_ms);
+
+    if (core) {
+        for (uint8_t i=0; i<num_cores; i++) {
+            core[i].writeDopplerVel(vel, velErr, yaw, pitch, timeStamp_ms);
+        }
+    }
+}
+
 /*
  * Write odometry data from a wheel encoder. The axis of rotation is assumed to be parallel to the vehicle body axis
  *
