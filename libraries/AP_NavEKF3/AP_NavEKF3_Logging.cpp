@@ -300,6 +300,31 @@ void NavEKF3_core::Log_Write_BodyOdom(uint64_t time_us)
 }
 #endif
 
+// void NavEKF3_core::Log_Write_DopplerVel(uint64_t time_us)
+// {
+//     if (core_index != frontend->primary) {
+//         // log only primary instance for now
+//         return;
+//     }
+
+//     const uint32_t updateTime_ms = dopplerVelDataDelayed.time_ms;
+//     if (updateTime_ms > lastUpdateTime_ms) {
+//         const struct log_XKFD pkt11{
+//             LOG_PACKET_HEADER_INIT(LOG_XKFD_MSG),
+//             time_us : time_us,
+//             core    : DAL_CORE(core_index),
+//             innov_0 : innovBodyVel[0],
+//             velInnovY : innovBodyVel[1],
+//             velInnovZ : innovBodyVel[2],
+//             velInnovVarX : varInnovBodyVel[0],
+//             velInnovVarY : varInnovBodyVel[1],
+//             velInnovVarZ : varInnovBodyVel[2]
+//          };
+//         AP::logger().WriteBlock(&pkt11, sizeof(pkt11));
+//         lastUpdateTime_ms = updateTime_ms;
+//     }
+// }
+
 void NavEKF3_core::Log_Write_State_Variances(uint64_t time_us)
 {
     if (core_index != frontend->primary) {
