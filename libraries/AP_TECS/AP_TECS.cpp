@@ -264,8 +264,6 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("PTCH_FF_K", 30, AP_TECS, _pitch_ff_k, 0.0),
 
-    // 31 previously used by AP_Int8 TECS_LAND_PTRIM which was removed in November 2022
-
     // @Param: THR_ERATE
     // @DisplayName: Forward throttle external limit slew rate
     // @Description: The externally set forward throttle lower limit applied within TECS will be reduced by this many percentage points per second after being set. Set to a non positive value to hold the lower limit for one frame only.
@@ -290,6 +288,13 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
     // @Increment: 0.2
     // @User: Advanced
     AP_GROUPINFO("HDEM_TCONST", 33, AP_TECS, _hgt_dem_tconst, 3.0f),
+
+    // @Param: AOA_FF_K
+    // @DisplayName: Gain for AoA feed-forward.
+    // @Description: This parameter sets the gain from the second derivative of height rate demand in g to demanded pitch angle in degrees and is used to compensate for the change in angle of attack with normal load facto. Start at half the stall angle of attack and adjust from there to reduce undershoot when levelling out from steep descents. The default (0.0) disables this feed-forward.
+    // @Range: 0.0 15.0
+    // @User: Advanced
+    AP_GROUPINFO("AOA_FF_K", 34, AP_TECS, _aoa_ff_k, 0.0),
 
     AP_GROUPEND
 };
@@ -1103,6 +1108,19 @@ void AP_TECS::_update_pitch(void)
         _pitch_dem_unc += (_TAS_dem_adj - _pitch_ff_v0) * _pitch_ff_k;
     }
 
+    // Add compensation for additional AoA required
+    float pitch_dem_aoa_ff;
+    if (is_positive(_aoa_ff_k)) {
+        const float hgt_accel = (1.0f / GRAVITY_MSS) * (_hgt_rate_dem - _hgt_rate_dem_prev) / _DT;
+        const float stall_TAS_1g = (is_positive(aparm.airspeed_stall) ? aparm.airspeed_stall : 0.7f * aparm.airspeed_min) * _ahrs.get_EAS2TAS();
+        const float gain_scaler = sq(_TAS_state / stall_TAS_1g);
+        pitch_dem_aoa_ff = hgt_accel * radians(_aoa_ff_k) * gain_scaler;
+        _pitch_dem_unc += pitch_dem_aoa_ff;
+    } else {
+        pitch_dem_aoa_ff = 0.0f;
+    }
+    _hgt_rate_dem_prev = _hgt_rate_dem;
+
     // Constrain pitch demand
     _pitch_dem = constrain_float(_pitch_dem_unc, _PITCHminf, _PITCHmaxf);
 
@@ -1139,8 +1157,9 @@ void AP_TECS::_update_pitch(void)
         // @Field: KI: Pitch demand kinetic energy integral
         // @Field: tmin: Throttle min
         // @Field: tmax: Throttle max
-        AP::logger().WriteStreaming("TEC2","TimeUS,PEW,KEW,EBD,EBE,EBDD,EBDE,EBDDT,Imin,Imax,I,KI,tmin,tmax",
-                                    "Qfffffffffffff",
+        // @Field: FF: AoA compensation pitch demand component
+        AP::logger().WriteStreaming("TEC2","TimeUS,PEW,KEW,EBD,EBE,EBDD,EBDE,EBDDT,Imin,Imax,I,KI,Tmn,Tmx,FF",
+                                    "Qffffffffffffff",
                                     AP_HAL::micros64(),
                                     (double)SPE_weighting,
                                     (double)_SKE_weighting,
@@ -1154,7 +1173,8 @@ void AP_TECS::_update_pitch(void)
                                     (double)_integSEBdot,
                                     (double)_integKE,
                                     (double)_THRminf,
-                                    (double)_THRmaxf);
+                                    (double)_THRmaxf,
+                                    (double)pitch_dem_aoa_ff);
     }
 #endif
 }

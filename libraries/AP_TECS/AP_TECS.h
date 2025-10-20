@@ -222,6 +222,7 @@ private:
 
     AP_Float _pitch_ff_v0;
     AP_Float _pitch_ff_k;
+    AP_Float _aoa_ff_k;
     AP_Float _accel_gf;
     AP_Int8 _thr_min_pct_ext_rate_lim;
 
@@ -300,6 +301,7 @@ private:
     // height rate demands
     float _hgt_dem_rate_ltd;    // height demand after application of the rate limiter (m)
     float _hgt_rate_dem;        // height rate demand sent to control loops
+    float _hgt_rate_dem_prev;   // previous value of height rate demand sent to control loops
 
     // offset applied to height demand post takeoff to compensate for height demand filter lag
     float _post_TO_hgt_offset;
