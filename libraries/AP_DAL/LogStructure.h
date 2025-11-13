@@ -353,12 +353,15 @@ struct log_REVH {
 // @Field: Yaw: sensor axis yaw
 // @Field: Pitch: sensor axis pitch
 // @Field: TS: timestamp of doppler velocity measurement
+// @Field: Id: sensor Id
 struct log_REDV {
     float vel;
     float err;
     float yaw;
     float pitch;
     uint32_t timeStamp_ms;
+    uint8_t Id;
+    uint8_t Nsensors;
     uint8_t _end;
 };
 
