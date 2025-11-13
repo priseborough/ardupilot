@@ -442,7 +442,7 @@ void AP_AHRS::update(bool skip_ins_update)
 #if AP_AHRS_SIM_ENABLED
     // test code for doppler interface
     static uint32_t last_ms = 0;
-    if (AP_HAL::millis() - last_ms > 200) {
+    if (AP_HAL::millis() - last_ms > 1000) {
         last_ms = AP_HAL::millis();
         Vector3f vel;
         Quaternion quat;
@@ -453,10 +453,10 @@ void AP_AHRS::update(bool skip_ins_update)
             for (uint8_t i=0; i<4; i++) {
                 const float sensorYaw = radians(float(90 * i));;
                 const float sensorPitch = radians(30.0f);
-                const float dopperVel = (velBF.x * cosf(sensorYaw) + velBF.y * sinf(sensorYaw)) * sinf(sensorPitch) + velBF.z * cosf(sensorPitch);
+                const float dopplerVel = (velBF.x * cosf(sensorYaw) + velBF.y * sinf(sensorYaw)) * sinf(sensorPitch) + velBF.z * cosf(sensorPitch);
                 const float dopplerVelErr = 0.3f;
-                uint32_t timeStamp_ms = AP_HAL::millis() - 50 + i*15;
-                writeDopplerVel(dopperVel, dopplerVelErr, sensorYaw, sensorPitch, timeStamp_ms);
+                uint32_t timeStamp_ms = AP_HAL::millis();
+                writeDopplerVel(dopplerVel, dopplerVelErr, sensorYaw, sensorPitch, timeStamp_ms, i, 4);
             }
         }
     }
@@ -2375,10 +2375,10 @@ void  AP_AHRS::writeBodyFrameOdom(float quality, const Vector3f &delPos, const V
 }
 
 // write body frame doppler velocity measurements to the EKF
-void  AP_AHRS::writeDopplerVel(float dopperVel, float dopplerVelErr, float sensorYaw, float sensorPitch, uint32_t timeStamp_ms)
+void  AP_AHRS::writeDopplerVel(float dopperVel, float dopplerVelErr, float sensorYaw, float sensorPitch, uint32_t timeStamp_ms, uint8_t Id, uint8_t N_sensors)
 {
 #if HAL_NAVEKF3_AVAILABLE
-    EKF3.writeDopplerVel(dopperVel, dopplerVelErr, sensorYaw, sensorPitch, timeStamp_ms);
+    EKF3.writeDopplerVel(dopperVel, dopplerVelErr, sensorYaw, sensorPitch, timeStamp_ms, Id, N_sensors);
 #endif
 }
 

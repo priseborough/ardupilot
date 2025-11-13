@@ -301,7 +301,7 @@ public:
      * sensorPitch is the pitch angle of the sensor axis in the body frame measured up from the Z/down axis (rad)
      * timeStamp_ms is the time from boot the measurement was taken (msec)
     */
-    void writeDopplerVel(float dopperVel, float dopplerVelErr, float sensorYaw, float sensorPitch, uint32_t timeStamp_ms);
+    void writeDopplerVel(float dopperVel, float dopplerVelErr, float sensorYaw, float sensorPitch, uint32_t timeStamp_ms, uint8_t Id, uint8_t N_sensors);
 
     // Writes the default equivalent airspeed and its 1-sigma uncertainty in m/s to be used in forward flight if a measured airspeed is required and not available.
     void writeDefaultAirSpeed(float airspeed, float uncertainty);
