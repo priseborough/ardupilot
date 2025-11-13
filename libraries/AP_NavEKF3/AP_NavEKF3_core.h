@@ -300,7 +300,7 @@ public:
      * pitch is the pitch angle of the sensor axis in the body frame measured up from the Z/down axis (rad)
      * timeStamp_ms is the time the measurement was taken (msec)
     */
-    void writeDopplerVel(float vel, float velErr, float yaw, float pitch, uint32_t timeStamp_ms);
+    void writeDopplerVel(float vel, float velErr, float yaw, float pitch, uint32_t timeStamp_ms, uint8_t Id, uint8_t N_sensors);
 
     /*
      * Write odometry data from a wheel encoder. The axis of rotation is assumed to be parallel to the vehicle body axis
@@ -630,11 +630,13 @@ private:
     };
 
     struct doppler_vel_elements : EKF_obs_element_t {
-        ftype           vel;        // doppler velocity shift in direction of sensor axis (m/s)
-        ftype           velErr;     // doppler velocity measurement error 1-std (m/s)
-        ftype           yaw;        // yaw angle of doppler sensor axis in body frame (rad)
-        ftype           pitch;      // pitch angle of doppler sensor axis in body frame (rad)
+        ftype           vel[4];        // doppler velocity shift in direction of sensor axis (m/s)
+        ftype           velErr[4];     // doppler velocity measurement error 1-std (m/s)
+        ftype           yaw[4];        // yaw angle of doppler sensor axis in body frame (rad)
+        ftype           pitch[4];      // pitch angle of doppler sensor axis in body frame (rad)
+        uint8_t         Nsensors;      // number of sensors used in this group of measurements
     };
+
     struct wheel_odm_elements : EKF_obs_element_t {
         ftype           delAng;     // wheel rotation angle measured in body frame - positive is forward movement of vehicle (rad/s)
         ftype           radius;     // wheel radius (m)

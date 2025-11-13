@@ -137,26 +137,28 @@ void NavEKF3_core::writeBodyFrameOdom(float quality, const Vector3f &delPos, con
 #endif // EK3_FEATURE_BODY_ODOM
 }
 
-void NavEKF3_core::writeDopplerVel(float vel, float velErr, float yaw, float pitch, uint32_t timeStamp_ms)
+void NavEKF3_core::writeDopplerVel(float vel, float velErr, float yaw, float pitch, uint32_t timeStamp_ms, uint8_t Id, uint8_t N_sensors)
 {
-    if (isnan(vel) || isnan(velErr) || isnan(yaw) || isnan(pitch)) {
+    if (isnan(vel) || isnan(velErr) || isnan(yaw) || isnan(pitch) || Id > N_sensors-1 || N_sensors > 4 || N_sensors < 1) {
         return;
     }
 
-    // limit update rate to maximum allowed by sensor buffers and fusion process
     // don't try to write to buffer until the filter has been initialised
     if (!statesInitialised) {
         return;
     }
+
     dopplerVelMeasTime_ms = timeStamp_ms;
-
-    dopplerVelDataNew.vel = vel;
-    dopplerVelDataNew.velErr = velErr;
     dopplerVelDataNew.time_ms = timeStamp_ms;
-    dopplerVelDataNew.yaw = yaw;
-    dopplerVelDataNew.pitch = pitch;
+    dopplerVelDataNew.vel[Id] = vel;
+    dopplerVelDataNew.velErr[Id] = velErr;
+    dopplerVelDataNew.yaw[Id] = yaw;
+    dopplerVelDataNew.pitch[Id] = pitch;
 
-    storedDopplerVel.push(dopplerVelDataNew);
+    if (Id == N_sensors-1) {
+        dopplerVelDataNew.Nsensors = N_sensors;
+        storedDopplerVel.push(dopplerVelDataNew);
+    }
 }
 
 void NavEKF3_core::writeWheelOdom(float delAng, float delTime, uint32_t timeStamp_ms, const Vector3f &posOffset, float radius)
