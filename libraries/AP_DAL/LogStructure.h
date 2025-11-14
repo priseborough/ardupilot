@@ -453,7 +453,7 @@ struct log_RBOH {
     { LOG_REVH_MSG, RLOG_SIZE(REVH),                                   \
       "REVH", "ffffIH", "VX,VY,VZ,Er,TS,D", "------", "------" }, \
     { LOG_REDV_MSG, RLOG_SIZE(REDV),                                   \
-      "REDV", "ffffI", "V,Er,Yaw,Pitch,TS", "-----", "-----" },   \
+      "REDV", "ffffIBB", "V,Er,Yaw,Pitch,TS,Id,NS", "-------", "-------" },   \
     { LOG_RWOH_MSG, RLOG_SIZE(RWOH),                                   \
       "RWOH", "ffIffff", "DA,DT,TS,PX,PY,PZ,R", "-------", "-------" }, \
     { LOG_RBOH_MSG, RLOG_SIZE(RBOH),                                   \
