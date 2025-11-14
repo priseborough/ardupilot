@@ -148,7 +148,7 @@ void NavEKF3_core::writeDopplerVel(float vel, float velErr, float yaw, float pit
         return;
     }
 
-    dopplerVelMeasTime_ms = timeStamp_ms;
+    dopplerVelMeasTime_ms = imuSampleTime_ms;
     dopplerVelDataNew.time_ms = timeStamp_ms;
     dopplerVelDataNew.vel[Id] = vel;
     dopplerVelDataNew.velErr[Id] = velErr;
