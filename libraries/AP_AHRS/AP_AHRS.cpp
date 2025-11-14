@@ -450,12 +450,12 @@ void AP_AHRS::update(bool skip_ins_update)
             Matrix3f Tnb;
             quat.inverse().rotation_matrix(Tnb);
             const Vector3f velBF = Tnb * vel;
+            uint32_t timeStamp_ms = AP_HAL::millis();
             for (uint8_t i=0; i<4; i++) {
                 const float sensorYaw = radians(float(90 * i));;
                 const float sensorPitch = radians(30.0f);
                 const float dopplerVel = (velBF.x * cosf(sensorYaw) + velBF.y * sinf(sensorYaw)) * sinf(sensorPitch) + velBF.z * cosf(sensorPitch);
                 const float dopplerVelErr = 0.3f;
-                uint32_t timeStamp_ms = AP_HAL::millis();
                 writeDopplerVel(dopplerVel, dopplerVelErr, sensorYaw, sensorPitch, timeStamp_ms, i, 4);
             }
         }
