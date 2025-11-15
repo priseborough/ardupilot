@@ -2375,10 +2375,10 @@ void  AP_AHRS::writeBodyFrameOdom(float quality, const Vector3f &delPos, const V
 }
 
 // write body frame doppler velocity measurements to the EKF
-void  AP_AHRS::writeDopplerVel(float dopperVel, float dopplerVelErr, float sensorYaw, float sensorPitch, uint32_t timeStamp_ms, uint8_t Id, uint8_t N_sensors)
+void  AP_AHRS::writeDopplerVel(float dopplerVel, float dopplerVelErr, float sensorYaw, float sensorPitch, uint32_t timeStamp_ms, uint8_t Id, uint8_t N_sensors)
 {
 #if HAL_NAVEKF3_AVAILABLE
-    EKF3.writeDopplerVel(dopperVel, dopplerVelErr, sensorYaw, sensorPitch, timeStamp_ms, Id, N_sensors);
+    EKF3.writeDopplerVel(dopplerVel, dopplerVelErr, sensorYaw, sensorPitch, timeStamp_ms, Id, N_sensors);
 #endif
 }
 

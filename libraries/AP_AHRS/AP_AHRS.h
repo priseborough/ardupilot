@@ -293,15 +293,20 @@ public:
     void writeBodyFrameOdom(float quality, const Vector3f &delPos, const Vector3f &delAng, float delTime, uint32_t timeStamp_ms, uint16_t delay_ms, const Vector3f &posOffset);
 
     /*
-     * Send individual doppler velocity measurements from a body fixed sensor to the EKF
+     * Send individual doppler velocity measurements from a body fixed sensor to the EKF.
      *
-     * dopperVel is the velocity in the direction fo the sensor axis (m/s)
+     * dopplerVel is the velocity in the direction of the sensor axis, ie when return distance to ground is decreasing, the doppler velocity will be positive (m/s)
      * dopplerVelErr is the 1-std deviation accuracy of the vel measurement (m/s)
      * sensorYaw is the yaw angle of sensor axis in the body frame measured CW from the X/forward axis (rad)
      * sensorPitch is the pitch angle of the sensor axis in the body frame measured up from the Z/down axis (rad)
      * timeStamp_ms is the time from boot the measurement was taken (msec)
+     * Id is a unique 0 base sensor identifier. The first sensor in a group is 0, the second 1, through to a maximum of 4 sensors
+     * N_sensors is the total number of sensors in the group up to a maximum of 4
+     * 
+     * When there is a group of more than 1 sensor, this function should be called sequentially, once for each sensor, starting at Id 0 and finishing at Id = N_sensors-1
+     * The timestamp used by the EKF will be the timestamp sent with the last function call for the group.
     */
-    void writeDopplerVel(float dopperVel, float dopplerVelErr, float sensorYaw, float sensorPitch, uint32_t timeStamp_ms, uint8_t Id, uint8_t N_sensors);
+    void writeDopplerVel(float dopplerVel, float dopplerVelErr, float sensorYaw, float sensorPitch, uint32_t timeStamp_ms, uint8_t Id, uint8_t N_sensors);
 
     // Writes the default equivalent airspeed and its 1-sigma uncertainty in m/s to be used in forward flight if a measured airspeed is required and not available.
     void writeDefaultAirSpeed(float airspeed, float uncertainty);
