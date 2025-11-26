@@ -280,25 +280,6 @@ bool Copter::ekf_has_relative_position() const
         return false;
     }
 
-    // return immediately if neither optflow nor visual odometry is enabled and dead reckoning is inactive
-    bool enabled = false;
-#if AP_OPTICALFLOW_ENABLED
-    if (optflow.enabled()) {
-        enabled = true;
-    }
-#endif
-#if HAL_VISUALODOM_ENABLED
-    if (visual_odom.enabled()) {
-        enabled = true;
-    }
-#endif
-    if (dead_reckoning.active && !dead_reckoning.timeout) {
-        enabled = true;
-    }
-    if (!enabled) {
-        return false;
-    }
-
     // get filter status from EKF
     nav_filter_status filt_status = inertial_nav.get_filter_status();
 
