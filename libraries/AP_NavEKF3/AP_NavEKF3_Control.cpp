@@ -522,9 +522,15 @@ bool NavEKF3_core::readyToUseOptFlow(void) const
 }
 
 // return true if the filter is ready to start using optical flow measurements
-bool NavEKF3_core::readyToUseDopplerVelocity(void) const
+bool NavEKF3_core::readyToUseDopplerVelocity(void)
 {
-    return dopplerVelDataNew.Nsensors >=2 && (imuSampleTime_ms - dopplerVelMeasTime_ms < 200) && tiltAlignComplete && delAngBiasLearned;
+    const bool ret = dopplerVelDataNew.Nsensors >=2 && (imuSampleTime_ms - dopplerVelMeasTime_ms < 200) && tiltAlignComplete && delAngBiasLearned;
+    if (ret && PV_AidingMode == AID_NONE) {
+        // set the last valid fusion time stamp for this data to now so we don't time out
+        // into AID_NONE after switching to AID_RELATIVE
+        lastDopplerVelPassTime_ms = imuSampleTime_ms;
+    }
+    return ret;
 }
 
 
