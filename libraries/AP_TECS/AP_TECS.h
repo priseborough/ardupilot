@@ -67,6 +67,12 @@ public:
         return int32_t(_pitch_dem * 5729.5781f);
     }
 
+    // demanded height acceleration in m/s/s
+    bool get_height_accel_demand(float &accln) {
+        accln = _hgt_accel_dem;
+        return (bool)(_options & OPTION_HGT_ACCLN_CTRL);
+    }
+
     // Rate of change of velocity along X body axis in m/s^2
     float get_VXdot(void) {
         return _vel_dot;
@@ -157,6 +163,12 @@ public:
     // Apply an altitude offset, to compensate for changes in home alt.
     void offset_altitude(const float alt_offset);
 
+    // upper pitch limit in degrees currently used by TECS
+    float get_pitch_max() { return degrees(_PITCHmaxf); }
+
+    // lower pitch limit in degrees currently used by TECS
+    float get_pitch_min() { return degrees(_PITCHminf); }
+
     // this supports the TECS_* user settable parameters
     static const struct AP_Param::GroupInfo var_info[];
 
@@ -209,10 +221,17 @@ private:
     AP_Int32 _options;
     AP_Float _flare_holdoff_hgt;
     AP_Float _hgt_dem_tconst;
+    AP_Float _hgt_accln_gain;
+    AP_Float _hgt_accln_damping_ratio;
+    AP_Float _thr_pid_p_gain;
+    AP_Float _thr_pid_i_gain;
+    AP_Float _thr_pid_d;
 
     enum {
         OPTION_GLIDER_ONLY=(1<<0),
-        OPTION_DESCENT_SPEEDUP=(1<<1)
+        OPTION_DESCENT_SPEEDUP=(1<<1),
+        OPTION_HGT_ACCLN_CTRL=(1<<2),
+        OPTION_INHIBIT_CLIPSTATUS=(1<<3),
     };
 
     AP_Float _pitch_ff_v0;
@@ -230,6 +249,9 @@ private:
 
     // pitch angle demand in radians
     float _pitch_dem;
+
+    // up acceleration demand m/s/s
+    float _hgt_accel_dem;
 
     // estimated climb rate (m/s)
     float _climb_rate;
@@ -388,6 +410,7 @@ private:
         MAX  =  1,
     };
     clipStatus _thr_clip_status;
+    clipStatus _alt_thr_clip_status; // used by throttle PID control used when TECS_OPTIONS but 2 is set
 
     // Specific energy quantities
     float _SPE_dem;
@@ -458,6 +481,9 @@ private:
     // aerodynamic load factor
     float _load_factor;
 
+    // Integral term from throttle PID controller used when bit 2 in TECS_OPTIONS is set
+    float _thr_PID_I_term;
+
     // Update the airspeed internal state using a second order complementary filter
     void _update_speed(float DT);
 
@@ -508,4 +534,6 @@ private:
 
     // Update the allowable pitch range.
     void _update_pitch_limits(const int32_t ptchMinCO_cd);
+
+    void _calc_vert_accel_demand(void);
 };
