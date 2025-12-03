@@ -15,6 +15,7 @@ public:
 
     float get_rate_out(float desired_rate, float scaler);
     float get_servo_out(int32_t angle_err, float scaler, bool disable_integrator, bool ground_mode);
+    float get_servo_out_accln(float up_accln, float scaler, float pitch_angle_min, float pitch_angle_max);
 
     // setup a one loop FF scale multiplier. This replaces any previous scale applied
     // so should only be used when only one source of scaling is needed
@@ -69,4 +70,11 @@ private:
 
     float _get_rate_out(float desired_rate, float scaler, bool disable_integrator, float aspeed, bool ground_mode);
     float _get_coordination_rate_offset(float &aspeed, bool &inverted) const;
+
+    // used for accln control
+    uint32_t _last_t;
+    float accln_err_integral; // pitch rate demand from acceleration error integral (rad/s)
+    int8_t clip_direction; // 0 when not clipped, >0 when clipping in the up direction, <0 when clipping in teh down direction
+    AP_Float acro_normal_g_lim;
+    AP_Float accln_tconst;
 };
