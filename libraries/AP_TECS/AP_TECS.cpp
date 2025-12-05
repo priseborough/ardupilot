@@ -245,7 +245,7 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
 
     // @Param: OPTIONS
     // @DisplayName: Extra TECS options
-    // @Description: This allows the enabling of special features in the speed/height controller.
+    // @Description: This allows the enabling of special features in the speed/height controller. Do not set bit 1 AllowDescentSpeedup if TECS_K_SINK2SPD is non zero.
     // @Bitmask: 0:GliderOnly,1:AllowDescentSpeedup
     // @User: Advanced
     AP_GROUPINFO("OPTIONS", 28, AP_TECS, _options, 0),
@@ -290,6 +290,14 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
     // @Increment: 0.2
     // @User: Advanced
     AP_GROUPINFO("HDEM_TCONST", 33, AP_TECS, _hgt_dem_tconst, 3.0f),
+
+    // @Param: K_SINK2SPD
+    // @DisplayName: Gain from excess sink to speed demand
+    // @Description: This sets the gain from sink rate demand in excess of TECS_SINK_MIN to airspeed demand in excess of AIRSPEED_CRUISE. Use this to allow the vehicle to speed up during high rate descents. Do not use together with TECS_OPTIONS bit 1 (DESCENT_SPEEDUP) which is different algorithm.
+    // @Range: 0.0 5.0
+    // @Increment: 0.1
+    // @User: Advanced
+    AP_GROUPINFO("K_SINK2SPD", 34, AP_TECS, _gain_sink2spd, 0.0f),
 
     AP_GROUPEND
 };
@@ -494,7 +502,15 @@ void AP_TECS::_update_speed_demand(void)
     _TAS_dem = constrain_float(_TAS_dem, _TASmin, _TASmax);
 
     // Determine the true cruising airspeed (m/s)
-    const float TAScruise = aparm.airspeed_cruise * _ahrs.get_EAS2TAS();
+    const float EAS2TAS = _ahrs.get_EAS2TAS();
+    const float TAScruise = aparm.airspeed_cruise * EAS2TAS;
+
+    // calculate an additional component to allow the aircraft to follow steep descent profiles
+    if (-_hgt_rate_dem > _minSinkRate) {
+        const float TAS_descent_incr = (- _hgt_rate_dem - _minSinkRate) * _gain_sink2spd * EAS2TAS;
+        const float TAS_descent_min = MIN(TAScruise + TAS_descent_incr, _TASmax);
+        _TAS_dem = MAX(_TAS_dem, TAS_descent_min);
+    }
 
     // calculate velocity rate limits based on physical performance limits
     // provision to use a different rate limit if bad descent or underspeed condition exists
