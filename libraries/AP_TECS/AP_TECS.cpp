@@ -1447,6 +1447,16 @@ void AP_TECS::_update_throttle_limits() {
 
     // Configure max throttle; constrain to the external safety limits.
     _THRmaxf = MIN(1.0f, _THRmaxf_ext);
+
+    // Reduce maximum allowed throttle during steep descent profiles
+    // When sink <=_minSinkRate there is no reduction in _THRmaxf
+    // When sink >=  _maxSinkRate _THRmaxf = _THRminf + 0.01f
+    // In between these two conditions _THRmaxf is interpolated
+    if (-_hgt_rate_dem > _minSinkRate && _maxSinkRate > _minSinkRate) {
+        const float fraction = MIN((- _hgt_rate_dem - _minSinkRate) / (_maxSinkRate - _minSinkRate), 1.0f);
+        _THRmaxf -= (_THRmaxf - _THRminf - 0.01f) * fraction;
+    }
+
     // Configure min throttle; constrain to the external safety limits.
     _THRminf = MAX(-1.0f, _THRminf_ext);
 
