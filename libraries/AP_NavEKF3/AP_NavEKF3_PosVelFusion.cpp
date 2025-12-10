@@ -2059,6 +2059,7 @@ void NavEKF3_core::SelectDopplerVelFusion()
     float innovationVariances[4];
     const float nanf = AP::logger().quiet_nanf();
     if (PV_AidingMode != AID_NONE && storedDopplerVel.recall(dopplerVelDataDelayed, imuDataDelayed.time_ms)) {
+        bool log_angle_estimates = false;
         for (uint8_t index=0; index<4; index++) {
             if (!dopplerAngleEst[index].initialised) {
                 dopplerAngleEst[index].P[0][0] = dopplerAngleEst[index].P[1][1] = sq(radians(5.0f));
@@ -2066,8 +2067,10 @@ void NavEKF3_core::SelectDopplerVelFusion()
                 dopplerAngleEst[index].yaw = dopplerVelDataDelayed.yaw[index];
                 dopplerAngleEst[index].pitch = dopplerVelDataDelayed.pitch[index];
                 dopplerAngleEst[index].initialised = true;
+                log_angle_estimates = true;
             } else if (imuSampleTime_ms - lastVelPassTime_ms <= 1000) {
                 UpdateDopplerAngles(index);
+                log_angle_estimates = true;
             }
             FuseDopplerVelocity(dopplerVelDataDelayed.vel[index], sq(dopplerVelDataDelayed.velErr[index]), dopplerVelDataDelayed.yaw[index], dopplerVelDataDelayed.pitch[index]);
             innovations[index] = innovDopplerVel;
@@ -2078,6 +2081,22 @@ void NavEKF3_core::SelectDopplerVelFusion()
                 innovationVariances[index] = nanf;
             }
         }
+        if (log_angle_estimates) {
+            const struct log_XKDA pkt1{
+                LOG_PACKET_HEADER_INIT(LOG_XKDV_MSG),
+                time_us : AP::dal().micros64(),
+                core    : DAL_CORE(core_index),
+                yaw_0 : (float)dopplerAngleEst[0].yaw,
+                yaw_1 : (float)dopplerAngleEst[1].yaw,
+                yaw_2 : (float)dopplerAngleEst[2].yaw,
+                yaw_3 : (float)dopplerAngleEst[3].yaw,
+                pitch_0 : (float)dopplerAngleEst[0].pitch,
+                pitch_1 : (float)dopplerAngleEst[1].pitch,
+                pitch_2 : (float)dopplerAngleEst[2].pitch,
+                pitch_3 : (float)dopplerAngleEst[3].pitch
+            };
+            AP::logger().WriteBlock(&pkt1, sizeof(pkt1));
+        }
     } else {
         for (uint8_t index=0; index<4; index++) {
             innovations[index] = nanf;
@@ -2085,7 +2104,7 @@ void NavEKF3_core::SelectDopplerVelFusion()
         }
     }
     if (logFusion) {
-        const struct log_XKDV pkt11{
+        const struct log_XKDV pkt2{
             LOG_PACKET_HEADER_INIT(LOG_XKDV_MSG),
             time_us : AP::dal().micros64(),
             core    : DAL_CORE(core_index),
@@ -2098,7 +2117,7 @@ void NavEKF3_core::SelectDopplerVelFusion()
             innovVar_2 : innovationVariances[2],
             innovVar_3 : innovationVariances[3]
          };
-        AP::logger().WriteBlock(&pkt11, sizeof(pkt11));
+        AP::logger().WriteBlock(&pkt2, sizeof(pkt2));
     }
 }
 
