@@ -58,6 +58,11 @@ def create_Tbs_matrix(i, j):
     # legacy array format
     return Symbol("Tbs[" + str(i) + "][" + str(j) + "]", real=True)
 
+def create_RotMat_matrix(i, j):
+    # return Symbol("RotMat(" + str(i) + "," + str(j) + ")", real=True)
+    # legacy array format
+    return Symbol("RotMat[" + str(i) + "][" + str(j) + "]", real=True)
+
 def quat_mult(p,q):
     r = Matrix([p[0] * q[0] - p[1] * q[1] - p[2] * q[2] - p[3] * q[3],
                 p[0] * q[1] + p[1] * q[0] + p[2] * q[3] - p[3] * q[2],
@@ -419,6 +424,63 @@ def beta_observation(P,state,R_to_body,vx,vy,vz,wx,wy):
 
     return
 
+# doppler beam alignment observation
+# calculate equations for Kalman gain and covariance update
+def doppler_angle_alignment():
+    yaw = symbols("yaw", real=True)  # yaw angle of sensor frame wrt body frame
+    pitch = symbols("pitch", real=True)  # pitch angle of sensor frame wrt body frame up from nadir
+    vn, ve, vd = symbols("vn ve vd", real=True)  # velocity in world frame (north/east) - m/sec
+
+    stateVector = Matrix([yaw,pitch])
+
+    # static process model
+    newStateVector = stateVector
+
+    # define a symbolic covariance matrix
+    P = Matrix(2,2,create_cov_matrix)
+
+    for index in range(2):
+        for j in range(2):
+            if index > j:
+                P[index,j] = P[j,index]
+
+    # Define rotation matrix from nav to body frame
+    RotMat = Matrix(3,3,create_RotMat_matrix)
+
+    # Calculate earth relative velocity in a non-rotating sensor frame
+    vel_bf = RotMat * Matrix([vn,ve,vd])
+
+    # unit vector in body frame aligned with sensor axis
+    sensor_vec_bf = Matrix([sin(pitch)*cos(yaw), sin(pitch)*sin(yaw), cos(pitch)])
+
+    # sensor doppler velocity
+    doppler_vel = vel_bf[0] * sensor_vec_bf[0] + vel_bf[1] * sensor_vec_bf[1] + vel_bf[2] * sensor_vec_bf[2]
+
+    H = Matrix([doppler_vel]).jacobian(stateVector)
+
+    # derive the covariance update equation for a NE velocity observation
+    velObsVar = symbols("velObsVar", real=True) # velocity observation variance (m/s)^2
+
+    R = Matrix([velObsVar])
+
+    S = H * P * H.T + R
+    S_det_inv = 1 / S.det()
+    S_inv = S.inv()
+    K = (P * H.T) * S_inv
+    P_new = P - K * S * K.T
+
+    # optimize code
+    t, [K_s, P_new_s] = cse([K, P_new], symbols("t0:1000"), optimizations='basic')
+
+    yaw_estimator_observation_generator = CodeGenerator("./generated/doppler_angle_generated.cpp")
+    yaw_estimator_observation_generator.print_string("Intermediate variables")
+    yaw_estimator_observation_generator.write_subexpressions(t)
+    yaw_estimator_observation_generator.print_string("Equations for Kalman gain")
+    yaw_estimator_observation_generator.write_matrix(Matrix(K_s), "K", False)
+    yaw_estimator_observation_generator.print_string("Equations for covariance matrix update")
+    yaw_estimator_observation_generator.write_matrix(Matrix(P_new_s), "P", True)
+    yaw_estimator_observation_generator.close()
+
 # yaw estimator prediction and observation code
 def yaw_estimator():
     dt = symbols("dt", real=True)  # dt (sec)
@@ -720,6 +782,8 @@ def generate_code():
     yaw_estimator()
     print('Generating body frame doppler observation code ...')
     body_frame_doppler_observation(P,state,R_to_body,vx,vy,vz)
+    print('Generating doppler sensor angle alignment code ...')
+    doppler_angle_alignment()
     print('Code generation finished!')
 
 
