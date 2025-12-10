@@ -2054,12 +2054,13 @@ void NavEKF3_core::SelectBodyOdomFusion()
 // select fusion of doppler velocity measurements
 void NavEKF3_core::SelectDopplerVelFusion()
 {
-    bool logFusion=false;
     float innovations[4];
     float innovationVariances[4];
     const float nanf = AP::logger().quiet_nanf();
     if (PV_AidingMode != AID_NONE && storedDopplerVel.recall(dopplerVelDataDelayed, imuDataDelayed.time_ms)) {
         bool log_angle_estimates = false;
+        bool running_angle_cal = false;
+        bool running_doppler_fusion =false;
         for (uint8_t index=0; index<4; index++) {
             if (!dopplerAngleEst[index].initialised) {
                 dopplerAngleEst[index].P[0][0] = dopplerAngleEst[index].P[1][1] = sq(radians(5.0f));
@@ -2068,14 +2069,17 @@ void NavEKF3_core::SelectDopplerVelFusion()
                 dopplerAngleEst[index].pitch = dopplerVelDataDelayed.pitch[index];
                 dopplerAngleEst[index].initialised = true;
                 log_angle_estimates = true;
-            } else if (imuSampleTime_ms - lastVelPassTime_ms <= 1000) {
+            } else if (frontend->option_is_enabled(NavEKF3::Option::CalDopplerSensorAngles) && imuSampleTime_ms - lastVelPassTime_ms <= 1000) {
                 UpdateDopplerAngles(index);
+                running_angle_cal = true;
                 log_angle_estimates = true;
             }
-            FuseDopplerVelocity(dopplerVelDataDelayed.vel[index], sq(dopplerVelDataDelayed.velErr[index]), dopplerVelDataDelayed.yaw[index], dopplerVelDataDelayed.pitch[index]);
-            innovations[index] = innovDopplerVel;
-            innovationVariances[index] = varInnovDopplerVel;
-            logFusion = true;
+            if (!running_angle_cal) {
+                // Don't use dopper sensor to correct EKF states if calibrating sensors
+                FuseDopplerVelocity(dopplerVelDataDelayed.vel[index], sq(dopplerVelDataDelayed.velErr[index]), dopplerVelDataDelayed.yaw[index], dopplerVelDataDelayed.pitch[index]);
+                innovations[index] = innovDopplerVel;
+                innovationVariances[index] = varInnovDopplerVel;
+            }
             if (index > dopplerVelDataDelayed.Nsensors -1) {
                 innovations[index] = nanf;
                 innovationVariances[index] = nanf;
@@ -2096,28 +2100,44 @@ void NavEKF3_core::SelectDopplerVelFusion()
                 pitch_3 : (float)dopplerAngleEst[3].pitch
             };
             AP::logger().WriteBlock(&pkt1, sizeof(pkt1));
+            if (running_angle_cal) {
+                const struct log_XKDV pkt2{
+                    LOG_PACKET_HEADER_INIT(LOG_XKDV_MSG),
+                    time_us : AP::dal().micros64(),
+                    core    : DAL_CORE(core_index),
+                    innov_0 : (float)dopplerAngleEst[0].innov,
+                    innov_1 : (float)dopplerAngleEst[1].innov,
+                    innov_2 : (float)dopplerAngleEst[2].innov,
+                    innov_3 : (float)dopplerAngleEst[3].innov,
+                    innovVar_0 : (float)dopplerAngleEst[0].innovVar,
+                    innovVar_1 : (float)dopplerAngleEst[1].innovVar,
+                    innovVar_2 : (float)dopplerAngleEst[2].innovVar,
+                    innovVar_3 : (float)dopplerAngleEst[3].innovVar
+                };
+                AP::logger().WriteBlock(&pkt2, sizeof(pkt2));
+            }
+        }
+        if (running_doppler_fusion) {
+            const struct log_XKDV pkt2{
+                LOG_PACKET_HEADER_INIT(LOG_XKDV_MSG),
+                time_us : AP::dal().micros64(),
+                core    : DAL_CORE(core_index),
+                innov_0 : innovations[0],
+                innov_1 : innovations[1],
+                innov_2 : innovations[2],
+                innov_3 : innovations[3],
+                innovVar_0 : innovationVariances[0],
+                innovVar_1 : innovationVariances[1],
+                innovVar_2 : innovationVariances[2],
+                innovVar_3 : innovationVariances[3]
+            };
+            AP::logger().WriteBlock(&pkt2, sizeof(pkt2));
         }
     } else {
         for (uint8_t index=0; index<4; index++) {
             innovations[index] = nanf;
             innovationVariances[index] = nanf;
         }
-    }
-    if (logFusion) {
-        const struct log_XKDV pkt2{
-            LOG_PACKET_HEADER_INIT(LOG_XKDV_MSG),
-            time_us : AP::dal().micros64(),
-            core    : DAL_CORE(core_index),
-            innov_0 : innovations[0],
-            innov_1 : innovations[1],
-            innov_2 : innovations[2],
-            innov_3 : innovations[3],
-            innovVar_0 : innovationVariances[0],
-            innovVar_1 : innovationVariances[1],
-            innovVar_2 : innovationVariances[2],
-            innovVar_3 : innovationVariances[3]
-         };
-        AP::logger().WriteBlock(&pkt2, sizeof(pkt2));
     }
 }
 
@@ -2144,10 +2164,7 @@ void NavEKF3_core::UpdateDopplerAngles(uint8_t index)
     // * operator is overloaded as a dot product
     const ftype dopplerVelPred = velBF * sensorVecBF;
 
-    innovDopplerVel = dopplerVelPred - dopplerVel;
-
-    // limit the innovation to slow adaptation
-    innovDopplerVel = constrain_ftype(innovDopplerVel, -dopplerVelDataDelayed.velErr[index], dopplerVelDataDelayed.velErr[index]);
+    dopplerAngleEst[index].innov = dopplerVelPred - dopplerVel;
 
     // Intermediate variables
     const ftype t0 = sinf(pitch);
@@ -2273,10 +2290,12 @@ void NavEKF3_core::UpdateDopplerAngles(uint8_t index)
     } else {
         // increase the innovation variance for large innovations to protect from spikes
         // and slow initial learning
-        if (sq(innovDopplerVel) > t113) {
-            t113 = sq(innovDopplerVel);
+        if (sq(dopplerAngleEst[index].innov) > t113) {
+            t113 = sq(dopplerAngleEst[index].innov);
         }
     }
+
+    dopplerAngleEst[index].innovVar = t113;
 
     const ftype t114 = 1.0F/t113;
     const ftype t115 = dopplerAngleEst[index].P[0][1]*t11 - dopplerAngleEst[index].P[1][1]*t18;
@@ -2289,8 +2308,8 @@ void NavEKF3_core::UpdateDopplerAngles(uint8_t index)
     K[1] = -t114*t115;
 
     // correct the state vector
-    dopplerAngleEst[index].yaw -= K[0] * innovDopplerVel;
-    dopplerAngleEst[index].pitch -= K[1] * innovDopplerVel;
+    dopplerAngleEst[index].yaw -= K[0] * dopplerAngleEst[index].innov;
+    dopplerAngleEst[index].pitch -= K[1] * dopplerAngleEst[index].innov;
 
     // Equations for covariance matrix update
     dopplerAngleEst[index].P[0][0] = dopplerAngleEst[index].P[0][0] - t116*powf(t19, 2);

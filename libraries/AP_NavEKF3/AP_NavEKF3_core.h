@@ -1356,6 +1356,8 @@ private:
     ftype dopplerVelTestRatio;              // Innovation test ratio for doppler velocity measurement
     ftype varInnovDopplerVel;               // Doppler velocity innovation variance (m/sec)^2
     ftype innovDopplerVel;                  // Doppler velocity innovation (m/sec)
+
+    // Doppler sensor angle calibration
     struct dopplerAngEstStruct {
         bool initialised;
         ftype innov; // doppler velocity innovation (m/s)

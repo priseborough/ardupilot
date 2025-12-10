@@ -734,6 +734,13 @@ const AP_Param::GroupInfo NavEKF3::var_info2[] = {
     // @Units: m
     AP_GROUPINFO("GPS_VACC_MAX", 10, NavEKF3, _gpsVAccThreshold, 0.0f),
 
+    // @Param: OPTIONS
+    // @DisplayName: Optional EKF behaviour
+    // @Description: EKF optional behaviour. Bit 3 (Calibrate Doppler Sensor Angles): Setting will cause the doppler sensor angle to be calibrated when GPS velocity data is available.
+    // @Bitmask: 0:Reserved, 1:Reserved, 2:Reserved, 3:Calibrate Doppler Sensor Angles
+    // @User: Advanced
+    AP_GROUPINFO("OPTIONS",  11, NavEKF3, _options, 0),
+
     AP_GROUPEND
 };
 
