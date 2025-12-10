@@ -2060,6 +2060,15 @@ void NavEKF3_core::SelectDopplerVelFusion()
     const float nanf = AP::logger().quiet_nanf();
     if (PV_AidingMode != AID_NONE && storedDopplerVel.recall(dopplerVelDataDelayed, imuDataDelayed.time_ms)) {
         for (uint8_t index=0; index<4; index++) {
+            if (!dopplerAngleEst[index].initialised) {
+                dopplerAngleEst[index].P[0][0] = dopplerAngleEst[index].P[1][1] = sq(radians(5.0f));
+                dopplerAngleEst[index].P[0][1] = dopplerAngleEst[index].P[1][0] = 0.0f;
+                dopplerAngleEst[index].yaw = dopplerVelDataDelayed.yaw[index];
+                dopplerAngleEst[index].pitch = dopplerVelDataDelayed.pitch[index];
+                dopplerAngleEst[index].initialised = true;
+            } else if (imuSampleTime_ms - lastVelPassTime_ms <= 1000) {
+                UpdateDopplerAngles(index);
+            }
             FuseDopplerVelocity(dopplerVelDataDelayed.vel[index], sq(dopplerVelDataDelayed.velErr[index]), dopplerVelDataDelayed.yaw[index], dopplerVelDataDelayed.pitch[index]);
             innovations[index] = innovDopplerVel;
             innovationVariances[index] = varInnovDopplerVel;
@@ -2092,6 +2101,185 @@ void NavEKF3_core::SelectDopplerVelFusion()
         AP::logger().WriteBlock(&pkt11, sizeof(pkt11));
     }
 }
+
+void NavEKF3_core::UpdateDopplerAngles(uint8_t index)
+{
+    // copy required states to local variable names
+    const ftype vn = stateStruct.velocity.x;
+    const ftype ve = stateStruct.velocity.y;
+    const ftype vd = stateStruct.velocity.z;
+    const ftype yaw = dopplerAngleEst[index].yaw;
+    const ftype pitch = dopplerAngleEst[index].pitch;
+    const ftype dopplerVel = dopplerVelDataDelayed.vel[index];
+    const ftype dopplerVelObsVar = sq(dopplerVelDataDelayed.velErr[index]);
+
+    // calculate vehicle velocity in body frame
+    Matrix3F RotMat;
+    stateStruct.quat.inverse().rotation_matrix(RotMat);
+    const Vector3F velBF = RotMat * stateStruct.velocity;
+
+    // calculate vector in body frame aligned with doppler measurement axis
+    const Vector3F sensorVecBF = Vector3F(sinf(pitch)*cosf(yaw), sinf(pitch)*sinf(yaw), cosf(pitch));
+
+    // calculate predicted doppler velocity measurement 
+    // * operator is overloaded as a dot product
+    const ftype dopplerVelPred = velBF * sensorVecBF;
+
+    innovDopplerVel = dopplerVelPred - dopplerVel;
+
+    // limit the innovation to slow adaptation
+    innovDopplerVel = constrain_ftype(innovDopplerVel, -dopplerVelDataDelayed.velErr[index], dopplerVelDataDelayed.velErr[index]);
+
+    // Intermediate variables
+    const ftype t0 = sinf(pitch);
+    const ftype t1 = sinf(yaw);
+    const ftype t2 = RotMat[0][0]*vn;
+    const ftype t3 = RotMat[0][1]*ve;
+    const ftype t4 = RotMat[0][2]*vd;
+    const ftype t5 = t2 + t3 + t4;
+    const ftype t6 = cosf(yaw);
+    const ftype t7 = RotMat[1][0]*vn;
+    const ftype t8 = RotMat[1][1]*ve;
+    const ftype t9 = RotMat[1][2]*vd;
+    const ftype t10 = t7 + t8 + t9;
+    const ftype t11 = t0*(t1*t5 - t10*t6);
+    const ftype t12 = RotMat[2][0]*vn;
+    const ftype t13 = RotMat[2][1]*ve;
+    const ftype t14 = RotMat[2][2]*vd;
+    const ftype t15 = cosf(pitch);
+    const ftype t16 = t15*t6;
+    const ftype t17 = t1*t15;
+    const ftype t18 = -t0*(t12 + t13 + t14) + t10*t17 + t16*t5;
+    const ftype t19 = dopplerAngleEst[index].P[0][0]*t11 - dopplerAngleEst[index].P[0][1]*t18;
+    const ftype t20 = 2*t13;
+    const ftype t21 = powf(t0, 2);
+    const ftype t22 = dopplerAngleEst[index].P[1][1]*t21;
+    const ftype t23 = t12*t22;
+    const ftype t24 = 2*t14;
+    const ftype t25 = powf(vn, 2);
+    const ftype t26 = powf(ve, 2);
+    const ftype t27 = powf(vd, 2);
+    const ftype t28 = dopplerAngleEst[index].P[0][1]*t21;
+    const ftype t29 = 2*t28;
+    const ftype t30 = t1*t29;
+    const ftype t31 = t2*t30;
+    const ftype t32 = t3*t30;
+    const ftype t33 = t30*t4;
+    const ftype t34 = 2*t6;
+    const ftype t35 = t28*t34;
+    const ftype t36 = t35*t7;
+    const ftype t37 = t35*t8;
+    const ftype t38 = t35*t9;
+    const ftype t39 = dopplerAngleEst[index].P[1][1]*t0;
+    const ftype t40 = t16*t39;
+    const ftype t41 = t2*t40;
+    const ftype t42 = 2*t0;
+    const ftype t43 = dopplerAngleEst[index].P[1][1]*t42;
+    const ftype t44 = t16*t43;
+    const ftype t45 = t12*t44;
+    const ftype t46 = t17*t39;
+    const ftype t47 = t46*t7;
+    const ftype t48 = t17*t43;
+    const ftype t49 = t12*t48;
+    const ftype t50 = RotMat[2][0]*t25;
+    const ftype t51 = RotMat[0][0]*t1;
+    const ftype t52 = RotMat[2][1]*t26;
+    const ftype t53 = RotMat[0][1]*t52;
+    const ftype t54 = RotMat[2][2]*t27;
+    const ftype t55 = RotMat[0][2]*t54;
+    const ftype t56 = RotMat[1][0]*t50;
+    const ftype t57 = RotMat[1][1]*t52;
+    const ftype t58 = RotMat[1][2]*t54;
+    const ftype t59 = powf(t1, 2);
+    const ftype t60 = dopplerAngleEst[index].P[0][0]*t21;
+    const ftype t61 = t59*t60;
+    const ftype t62 = 2*t2;
+    const ftype t63 = t61*t62;
+    const ftype t64 = t3*t4;
+    const ftype t65 = 2*t64;
+    const ftype t66 = powf(t6, 2);
+    const ftype t67 = t60*t66;
+    const ftype t68 = 2*t7;
+    const ftype t69 = t67*t68;
+    const ftype t70 = t8*t9;
+    const ftype t71 = 2*t70;
+    const ftype t72 = dopplerAngleEst[index].P[1][1]*powf(t15, 2);
+    const ftype t73 = t66*t72;
+    const ftype t74 = t62*t73;
+    const ftype t75 = t59*t72;
+    const ftype t76 = t68*t75;
+    const ftype t77 = t34*t60;
+    const ftype t78 = t1*t77;
+    const ftype t79 = t2*t78;
+    const ftype t80 = t3*t78;
+    const ftype t81 = t4*t78;
+    const ftype t82 = dopplerAngleEst[index].P[0][1]*t42;
+    const ftype t83 = t15*t82;
+    const ftype t84 = t59*t83;
+    const ftype t85 = t2*t84;
+    const ftype t86 = t66*t83;
+    const ftype t87 = t2*t86;
+    const ftype t88 = t3*t84;
+    const ftype t89 = t3*t86;
+    const ftype t90 = t4*t84;
+    const ftype t91 = t4*t86;
+    const ftype t92 = t34*t72;
+    const ftype t93 = t1*t92;
+    const ftype t94 = t2*t93;
+    const ftype t95 = t3*t93;
+    const ftype t96 = t4*t93;
+    const ftype t97 = t1*t16;
+    const ftype t98 = 4*dopplerAngleEst[index].P[0][1]*t0*t97;
+    const ftype t99 = t2*t98;
+    const ftype t100 = t7*t98;
+    const ftype t101 = powf(RotMat[0][0], 2)*t25;
+    const ftype t102 = powf(RotMat[0][1], 2)*t26;
+    const ftype t103 = powf(RotMat[0][2], 2)*t27;
+    const ftype t104 = powf(RotMat[1][0], 2)*t25;
+    const ftype t105 = powf(RotMat[1][1], 2)*t26;
+    const ftype t106 = powf(RotMat[1][2], 2)*t27;
+    const ftype t107 = RotMat[1][0]*t25;
+    const ftype t108 = t107*t51;
+    const ftype t109 = RotMat[0][1]*RotMat[1][1]*t26;
+    const ftype t110 = RotMat[0][2]*RotMat[1][2]*t27;
+    const ftype t111 = RotMat[0][0]*t107;
+    const ftype t112 = t82*t97;
+
+    // this term is the innovation variance
+    ftype t113 = -RotMat[0][0]*t44*t50 + powf(RotMat[2][0], 2)*t22*t25 + powf(RotMat[2][1], 2)*t22*t26 + powf(RotMat[2][2], 2)*t22*t27 + t100*t8 + t100*t9 - t101*t112 + t101*t61 + t101*t73 - t102*t112 + t102*t61 + t102*t73 - t103*t112 + t103*t61 + t103*t73 + t104*t112 + t104*t67 + t104*t75 + t105*t112 + t105*t67 + t105*t75 + t106*t112 + t106*t67 + t106*t75 - t108*t77 + t108*t92 - t109*t78 - t109*t84 + t109*t86 + t109*t93 - t110*t78 - t110*t84 + t110*t86 + t110*t93 - t111*t84 + t111*t86 + t12*t32 + t12*t33 - t12*t37 - t12*t38 + t13*t31 + t13*t33 - t13*t36 - t13*t38 + t14*t20*t22 + t14*t31 + t14*t32 - t14*t36 - t14*t37 + t20*t23 - t20*t4*t40 - t20*t41 - t20*t46*t9 - t20*t47 + t23*t24 - t24*t3*t40 - t24*t41 - t24*t46*t8 - t24*t47 + t29*t50*t51 - t3*t45 + t3*t63 + t3*t74 - t3*t99 + t30*t53 + t30*t55 - t35*t56 - t35*t57 - t35*t58 - t4*t45 + t4*t63 + t4*t74 - t4*t99 - t44*t53 - t44*t55 - t48*t56 - t48*t57 - t48*t58 - t49*t8 - t49*t9 + t61*t65 - t64*t98 + t65*t73 + t67*t71 + t69*t8 + t69*t9 - t7*t80 - t7*t81 - t7*t88 + t7*t89 - t7*t90 + t7*t91 + t7*t95 + t7*t96 + t70*t98 + t71*t75 + t76*t8 + t76*t9 - t79*t8 - t79*t9 - t8*t81 - t8*t85 + t8*t87 - t8*t90 + t8*t91 + t8*t94 + t8*t96 - t80*t9 - t85*t9 + t87*t9 - t88*t9 + t89*t9 + t9*t94 + t9*t95 + dopplerVelObsVar;
+
+    if (t113 < dopplerVelObsVar) {
+        // badly conditioned so exit
+        return;
+    } else {
+        // increase the innovation variance for large innovations to protect from spikes
+        // and slow initial learning
+        if (sq(innovDopplerVel) > t113) {
+            t113 = sq(innovDopplerVel);
+        }
+    }
+
+    const ftype t114 = 1.0F/t113;
+    const ftype t115 = dopplerAngleEst[index].P[0][1]*t11 - dopplerAngleEst[index].P[1][1]*t18;
+    const ftype t116 = (t11*t19 - t115*t18 + dopplerVelObsVar)/powf(t113, 2);
+    const ftype t117 = dopplerAngleEst[index].P[0][1] - t115*t116*t19;
+
+    // Equations for Kalman gains
+    ftype K[2];
+    K[0] = -t114*t19;
+    K[1] = -t114*t115;
+
+    // correct the state vector
+    dopplerAngleEst[index].yaw -= K[0] * innovDopplerVel;
+    dopplerAngleEst[index].pitch -= K[1] * innovDopplerVel;
+
+    // Equations for covariance matrix update
+    dopplerAngleEst[index].P[0][0] = dopplerAngleEst[index].P[0][0] - t116*powf(t19, 2);
+    dopplerAngleEst[index].P[1][0] = dopplerAngleEst[index].P[0][1] = t117;
+    dopplerAngleEst[index].P[1][1] = dopplerAngleEst[index].P[1][1] - powf(t115, 2)*t116;
+
+}
+
 
 void NavEKF3_core::FuseDopplerVelocity(float dopplerVel, float dopplerVelObsVar, float sensorYaw, float sensorPitch)
 {

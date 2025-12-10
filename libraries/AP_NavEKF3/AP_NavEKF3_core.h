@@ -737,6 +737,8 @@ private:
     // fuse body frame velocity measurements
     void FuseBodyVel();
 
+    void UpdateDopplerAngles(uint8_t index);
+
     // fuse a doppler velocity observation from a single axis sensor
     void FuseDopplerVelocity(float dopplerVel, float dopplerVelObsVar, float sensorYaw, float sensorPitch);
 
@@ -1354,6 +1356,15 @@ private:
     ftype dopplerVelTestRatio;              // Innovation test ratio for doppler velocity measurement
     ftype varInnovDopplerVel;               // Doppler velocity innovation variance (m/sec)^2
     ftype innovDopplerVel;                  // Doppler velocity innovation (m/sec)
+    struct dopplerAngEstStruct {
+        bool initialised;
+        ftype innov; // doppler velocity innovation (m/s)
+        ftype innovVar; // doppler velocity observation innvovation variance (m/s)^2
+        ftype yaw; // sensor yaw angle estimate (rad)
+        ftype pitch; // sensor pitch angle estimate (rad)
+        ftype P[2][2]; // covariance matrix
+    };
+    dopplerAngEstStruct dopplerAngleEst[4];
 
     // GPS yaw sensor fusion
     uint32_t yawMeasTime_ms;            // system time GPS yaw angle was last input to the data buffer
