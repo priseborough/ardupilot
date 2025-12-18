@@ -1362,8 +1362,8 @@ private:
         bool initialised;
         ftype innov; // doppler velocity innovation (m/s)
         ftype innovVar; // doppler velocity observation innvovation variance (m/s)^2
-        ftype yaw; // sensor yaw angle estimate (rad)
-        ftype pitch; // sensor pitch angle estimate (rad)
+        ftype yawOffset; // sensor yaw angle offset estimate (rad)
+        ftype pitchOffset; // sensor pitch angle offset estimate (rad)
         ftype P[2][2]; // covariance matrix
     };
     dopplerAngEstStruct dopplerAngleEst[4];

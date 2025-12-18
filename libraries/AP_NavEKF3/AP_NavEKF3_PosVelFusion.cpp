@@ -2065,8 +2065,8 @@ void NavEKF3_core::SelectDopplerVelFusion()
             if (!dopplerAngleEst[index].initialised) {
                 dopplerAngleEst[index].P[0][0] = dopplerAngleEst[index].P[1][1] = sq(radians(5.0f));
                 dopplerAngleEst[index].P[0][1] = dopplerAngleEst[index].P[1][0] = 0.0f;
-                dopplerAngleEst[index].yaw = dopplerVelDataDelayed.yaw[index];
-                dopplerAngleEst[index].pitch = dopplerVelDataDelayed.pitch[index];
+                dopplerAngleEst[index].yawOffset = frontend->_dopplerYawOffset[index]; // start with previously saved value
+                dopplerAngleEst[index].pitchOffset = frontend->_dopplerPitchOffset[index]; // start with previously saved value
                 dopplerAngleEst[index].initialised = true;
                 log_angle_estimates = true;
             } else if (frontend->option_is_enabled(NavEKF3::Option::CalDopplerSensorAngles) && imuSampleTime_ms - lastVelPassTime_ms <= 1000) {
@@ -2076,13 +2076,11 @@ void NavEKF3_core::SelectDopplerVelFusion()
             }
             // Don't use dopper sensor to correct EKF states if calibrating sensors
             if (!running_angle_cal) {
-                ftype yaw,pitch;
+                ftype yaw = dopplerVelDataDelayed.yaw[index];
+                ftype pitch = dopplerVelDataDelayed.pitch[index];
                 if (dopplerAngleEst[index].initialised) {
-                    yaw = dopplerAngleEst[index].yaw;
-                    pitch = dopplerAngleEst[index].pitch;
-                } else {
-                    yaw = dopplerVelDataDelayed.yaw[index];
-                    pitch = dopplerVelDataDelayed.pitch[index];
+                    yaw += dopplerAngleEst[index].yawOffset; // apply learned offset
+                    pitch += dopplerAngleEst[index].pitchOffset; // apply learned offset
                 }
                 FuseDopplerVelocity(dopplerVelDataDelayed.vel[index], sq(dopplerVelDataDelayed.velErr[index]), yaw, pitch);
                 innovations[index] = innovDopplerVel;
@@ -2099,10 +2097,10 @@ void NavEKF3_core::SelectDopplerVelFusion()
                 LOG_PACKET_HEADER_INIT(LOG_XKDY_MSG),
                 time_us : AP::dal().micros64(),
                 core    : DAL_CORE(core_index),
-                yaw_0 : (float)dopplerAngleEst[0].yaw,
-                yaw_1 : (float)dopplerAngleEst[1].yaw,
-                yaw_2 : (float)dopplerAngleEst[2].yaw,
-                yaw_3 : (float)dopplerAngleEst[3].yaw,
+                yaw_0 : (float)dopplerAngleEst[0].yawOffset,
+                yaw_1 : (float)dopplerAngleEst[1].yawOffset,
+                yaw_2 : (float)dopplerAngleEst[2].yawOffset,
+                yaw_3 : (float)dopplerAngleEst[3].yawOffset,
                 yawVariance_0 : (float)dopplerAngleEst[0].P[0][0],
                 yawVariance_1 : (float)dopplerAngleEst[1].P[0][0],
                 yawVariance_2 : (float)dopplerAngleEst[2].P[0][0],
@@ -2114,10 +2112,10 @@ void NavEKF3_core::SelectDopplerVelFusion()
                 LOG_PACKET_HEADER_INIT(LOG_XKDP_MSG),
                 time_us : AP::dal().micros64(),
                 core    : DAL_CORE(core_index),
-                pitch_0 : (float)dopplerAngleEst[0].pitch,
-                pitch_1 : (float)dopplerAngleEst[1].pitch,
-                pitch_2 : (float)dopplerAngleEst[2].pitch,
-                pitch_3 : (float)dopplerAngleEst[3].pitch,
+                pitch_0 : (float)dopplerAngleEst[0].pitchOffset,
+                pitch_1 : (float)dopplerAngleEst[1].pitchOffset,
+                pitch_2 : (float)dopplerAngleEst[2].pitchOffset,
+                pitch_3 : (float)dopplerAngleEst[3].pitchOffset,
                 pitchVariance_0 : (float)dopplerAngleEst[0].P[1][1],
                 pitchVariance_1 : (float)dopplerAngleEst[1].P[1][1],
                 pitchVariance_2 : (float)dopplerAngleEst[2].P[1][1],
@@ -2173,8 +2171,8 @@ void NavEKF3_core::UpdateDopplerAngles(uint8_t index)
     const ftype vn = stateStruct.velocity.x;
     const ftype ve = stateStruct.velocity.y;
     const ftype vd = stateStruct.velocity.z;
-    const ftype yaw = dopplerAngleEst[index].yaw;
-    const ftype pitch = dopplerAngleEst[index].pitch;
+    const ftype yaw = dopplerVelDataDelayed.yaw[index] + dopplerAngleEst[index].yawOffset; // nominal value + offset
+    const ftype pitch = dopplerVelDataDelayed.pitch[index] + dopplerAngleEst[index].pitchOffset; // nominal value + offset
     const ftype dopplerVel = dopplerVelDataDelayed.vel[index];
     const ftype dopplerVelObsVar = sq(dopplerVelDataDelayed.velErr[index]);
 
@@ -2334,8 +2332,8 @@ void NavEKF3_core::UpdateDopplerAngles(uint8_t index)
     K[1] = -t114*t115;
 
     // correct the state vector
-    dopplerAngleEst[index].yaw -= K[0] * dopplerAngleEst[index].innov;
-    dopplerAngleEst[index].pitch -= K[1] * dopplerAngleEst[index].innov;
+    dopplerAngleEst[index].yawOffset -= K[0] * dopplerAngleEst[index].innov;
+    dopplerAngleEst[index].pitchOffset -= K[1] * dopplerAngleEst[index].innov;
 
     // Equations for covariance matrix update
     dopplerAngleEst[index].P[0][0] = dopplerAngleEst[index].P[0][0] - t116*powf(t19, 2);

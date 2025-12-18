@@ -745,49 +745,49 @@ const AP_Param::GroupInfo NavEKF3::var_info2[] = {
     // @DisplayName: Learned doppler velocity sensor 0 yaw
     // @User: Advanced
     // @Units: deg
-    AP_GROUPINFO("DV_YAW_0", 12, NavEKF3, _dopplerYaw0, 0.0f),
+    AP_GROUPINFO("DV_YAW_0", 12, NavEKF3, _dopplerYawOffset[0], 0.0f),
 
     // @Param: DV_YAW_1
     // @DisplayName: Learned doppler velocity sensor 1 yaw
     // @User: Advanced
     // @Units: deg
-    AP_GROUPINFO("DV_YAW_1", 13, NavEKF3, _dopplerYaw1, 0.0f),
+    AP_GROUPINFO("DV_YAW_1", 13, NavEKF3, _dopplerYawOffset[1], 0.0f),
 
     // @Param: DV_YAW_2
     // @DisplayName: Learned doppler velocity sensor 2 yaw
     // @User: Advanced
     // @Units: deg
-    AP_GROUPINFO("DV_YAW_2", 14, NavEKF3, _dopplerYaw2, 0.0f),
+    AP_GROUPINFO("DV_YAW_2", 14, NavEKF3, _dopplerYawOffset[2], 0.0f),
 
     // @Param: DV_YAW_3
     // @DisplayName: Learned doppler velocity sensor 3 yaw
     // @User: Advanced
     // @Units: deg
-    AP_GROUPINFO("DV_YAW_3", 15, NavEKF3, _dopplerYaw3, 0.0f),
+    AP_GROUPINFO("DV_YAW_3", 15, NavEKF3, _dopplerYawOffset[3], 0.0f),
 
     // @Param: DV_PIT_0
     // @DisplayName: Learned doppler velocity sensor 0 pitch
     // @User: Advanced
     // @Units: deg
-    AP_GROUPINFO("DV_PIT_0", 16, NavEKF3, _dopplerPitch0, 0.0f),
+    AP_GROUPINFO("DV_PIT_0", 16, NavEKF3, _dopplerPitchOffset[0], 0.0f),
 
     // @Param: DV_PIT_1
     // @DisplayName: Learned doppler velocity sensor 1 pitch
     // @User: Advanced
     // @Units: deg
-    AP_GROUPINFO("DV_PIT_1", 17, NavEKF3, _dopplerPitch1, 0.0f),
+    AP_GROUPINFO("DV_PIT_1", 17, NavEKF3, _dopplerPitchOffset[1], 0.0f),
 
     // @Param: DV_PIT_2
     // @DisplayName: Learned doppler velocity sensor 2 pitch
     // @User: Advanced
     // @Units: deg
-    AP_GROUPINFO("DV_PIT_2", 18, NavEKF3, _dopplerPitch2, 0.0f),
+    AP_GROUPINFO("DV_PIT_2", 18, NavEKF3, _dopplerPitchOffset[2], 0.0f),
 
     // @Param: DV_PIT_3
     // @DisplayName: Learned doppler velocity sensor 3 pitch
     // @User: Advanced
     // @Units: deg
-    AP_GROUPINFO("DV_PIT_3", 19, NavEKF3, _dopplerPitch3, 0.0f),
+    AP_GROUPINFO("DV_PIT_3", 19, NavEKF3, _dopplerPitchOffset[3], 0.0f),
 
     AP_GROUPEND
 };

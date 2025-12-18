@@ -465,14 +465,8 @@ private:
     AP_Enum<LogLevel> _log_level;   // log verbosity level
     AP_Float _gpsVAccThreshold;     // vertical accuracy threshold to use GPS as an altitude source
     AP_Int32 _options;              // bitmask of EKF options
-    AP_Float _dopplerYaw0;          // learned doppler yaw angle for sensor 0
-    AP_Float _dopplerYaw1;          // learned doppler yaw angle for sensor 1
-    AP_Float _dopplerYaw2;          // learned doppler yaw angle for sensor 2
-    AP_Float _dopplerYaw3;          // learned doppler yaw angle for sensor 3
-    AP_Float _dopplerPitch0;        // learned doppler pitch angle for sensor 0
-    AP_Float _dopplerPitch1;        // learned doppler pitch angle for sensor 1
-    AP_Float _dopplerPitch2;        // learned doppler pitch angle for sensor 2
-    AP_Float _dopplerPitch3;        // learned doppler pitch angle for sensor 3
+    AP_Float _dopplerYawOffset[4];        // learned doppler yaw angle offset for sensors 0 ... 3
+    AP_Float _dopplerPitchOffset[4];      // learned doppler pitch angle offset for sensors 0 ... 3
 
     // enum for processing options
     enum class Option {
