@@ -2167,6 +2167,9 @@ void NavEKF3_core::SelectDopplerVelFusion()
 
 void NavEKF3_core::UpdateDopplerAngles(uint8_t index)
 {
+    if (stateStruct.velocity.xy().length() < 5.0f) {
+        return;
+    }
     // copy required states to local variable names
     const ftype vn = stateStruct.velocity.x;
     const ftype ve = stateStruct.velocity.y;
