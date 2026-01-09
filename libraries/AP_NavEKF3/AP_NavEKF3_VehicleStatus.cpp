@@ -430,15 +430,12 @@ void NavEKF3_core::detectFlight()
     }
 
     // save sensor angle calibration data at end of flight
-    if (frontend->option_is_enabled(NavEKF3::Option::CalDopplerSensorAngles) && !prevOnGround && onGround) {
+    if (frontend->option_is_enabled(NavEKF3::Option::CalDopplerSensorAngles) && !frontend->dopplerAngleOffsetsSaved && !prevOnGround && onGround) {
         for (uint8_t index=0; index<4; index++) {
-            if (dopplerAngleEst[index].initialised) {
-                if (dopplerAngleEst[index].P[0][0] < DOPPLER_ANGLE_SAVE_VARIANCE) {
-                    frontend->_dopplerYawOffset[index].set_and_save_ifchanged(degrees((float)dopplerAngleEst[index].yawOffset));
-                }
-                if (dopplerAngleEst[index].P[1][1] < DOPPLER_ANGLE_SAVE_VARIANCE) {
-                    frontend->_dopplerPitchOffset[index].set_and_save_ifchanged(degrees((float)dopplerAngleEst[index].pitchOffset));
-                }
+            if (dopplerAngleEst[index].converged) {
+                frontend->_dopplerYawOffset[index].set_and_save_ifchanged(degrees((float)dopplerAngleEst[index].yawOffset));
+                frontend->_dopplerPitchOffset[index].set_and_save_ifchanged(degrees((float)dopplerAngleEst[index].pitchOffset));
+                frontend->dopplerAngleOffsetsSaved = true;
             }
         }
     }

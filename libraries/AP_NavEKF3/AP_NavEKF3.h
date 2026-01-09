@@ -524,6 +524,9 @@ private:
     // last time of Log_Write
     uint64_t lastLogWrite_us;
 
+    // true when doppler sensor angle estimates have converged and have been saved
+    bool dopplerAngleOffsetsSaved;
+
     struct {
         uint32_t last_function_call;  // last time getLastYawResetAngle was called
         bool core_changed;            // true when a core change happened and hasn't been consumed, false otherwise
