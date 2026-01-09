@@ -1360,6 +1360,7 @@ private:
     ftype varInnovDopplerVel;               // Doppler velocity innovation variance (m/sec)^2
     ftype innovDopplerVel;                  // Doppler velocity innovation (m/sec)
 
+
     // Doppler sensor angle calibration
     struct dopplerAngEstStruct {
         bool initialised;
@@ -1368,6 +1369,7 @@ private:
         ftype yawOffset; // sensor yaw angle offset estimate (rad)
         ftype pitchOffset; // sensor pitch angle offset estimate (rad)
         ftype P[2][2]; // covariance matrix
+        bool converged;
     };
     dopplerAngEstStruct dopplerAngleEst[4];
 

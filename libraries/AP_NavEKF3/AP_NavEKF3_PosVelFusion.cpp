@@ -2343,6 +2343,10 @@ void NavEKF3_core::UpdateDopplerAngles(uint8_t index)
     dopplerAngleEst[index].P[1][0] = dopplerAngleEst[index].P[0][1] = t117;
     dopplerAngleEst[index].P[1][1] = dopplerAngleEst[index].P[1][1] - powf(t115, 2)*t116;
 
+    if (!dopplerAngleEst[index].converged) {
+        dopplerAngleEst[index].converged = dopplerAngleEst[index].P[0][0] < DOPPLER_ANGLE_SAVE_VARIANCE &&
+                                           dopplerAngleEst[index].P[1][1] < DOPPLER_ANGLE_SAVE_VARIANCE;
+    }
 }
 
 
