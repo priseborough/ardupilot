@@ -124,6 +124,9 @@
 // maximum GPs ground course uncertainty allowed for yaw alignment (deg)
 #define GPS_VEL_YAW_ALIGN_MAX_ANG_ERR 15.0F
 
+// variance upper limit of doppler sensor angle estimate that will allow save to parameter
+#define DOPPLER_ANGLE_SAVE_VARIANCE sq(radians(1.0f))
+
 class NavEKF3_core : public NavEKF_core_common
 {
 public:
