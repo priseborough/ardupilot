@@ -2065,7 +2065,7 @@ void NavEKF3_core::SelectDopplerVelFusion()
             if (!dopplerAngleEst[index].initialised) {
                 dopplerAngleEst[index].P[0][0] = dopplerAngleEst[index].P[1][1] = sq(radians(5.0f));
                 dopplerAngleEst[index].P[0][1] = dopplerAngleEst[index].P[1][0] = 0.0f;
-                dopplerAngleEst[index].yawOffset = frontend->_dopplerYawOffset[index]; // start with previously saved value
+                dopplerAngleEst[index].yawOffset = radians(frontend->_dopplerYawOffset[index]); // start with previously saved value
                 dopplerAngleEst[index].pitchOffset = radians(frontend->_dopplerPitchOffset[index]); // start with previously saved value
                 dopplerAngleEst[index].initialised = true;
                 log_angle_estimates = true;
