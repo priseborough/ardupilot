@@ -2061,6 +2061,7 @@ void NavEKF3_core::SelectDopplerVelFusion()
         bool log_angle_estimates = false;
         bool running_angle_cal = false;
         bool running_doppler_fusion =false;
+        bool all_angle_cals_converged = true;
         for (uint8_t index=0; index<4; index++) {
             if (!dopplerAngleEst[index].initialised) {
                 dopplerAngleEst[index].P[0][0] = dopplerAngleEst[index].P[1][1] = sq(radians(5.0f));
@@ -2069,10 +2070,12 @@ void NavEKF3_core::SelectDopplerVelFusion()
                 dopplerAngleEst[index].pitchOffset = radians(frontend->_dopplerPitchOffset[index]); // start with previously saved value
                 dopplerAngleEst[index].initialised = true;
                 log_angle_estimates = true;
+                all_angle_cals_converged = false;
             } else if (frontend->option_is_enabled(NavEKF3::Option::CalDopplerSensorAngles) && imuSampleTime_ms - lastVelPassTime_ms <= 1000) {
                 UpdateDopplerAngles(index);
                 running_angle_cal = true;
                 log_angle_estimates = true;
+                all_angle_cals_converged = all_angle_cals_converged && dopplerAngleEst[index].converged;
             }
             // Don't use dopper sensor to correct EKF states if calibrating sensors
             if (!running_angle_cal) {
@@ -2091,6 +2094,11 @@ void NavEKF3_core::SelectDopplerVelFusion()
                 innovations[index] = nanf;
                 innovationVariances[index] = nanf;
             }
+        }
+        // notify when angle cal converged
+        if (running_angle_cal && all_angle_cals_converged && !angleCalConvergenceReported) {
+            angleCalConvergenceReported = true;
+            GCS_SEND_TEXT(MAV_SEVERITY_INFO, "EKF3 IMU%u doppler sensor cal complete",(unsigned)imu_index);
         }
         if (log_angle_estimates) {
             const struct log_XKDY pkt1{

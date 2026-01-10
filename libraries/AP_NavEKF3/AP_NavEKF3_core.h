@@ -1372,6 +1372,7 @@ private:
         bool converged;
     };
     dopplerAngEstStruct dopplerAngleEst[4];
+    bool angleCalConvergenceReported; // true when the EKF has reported the convergence of the dopper sensor angle offset calibration
 
     // GPS yaw sensor fusion
     uint32_t yawMeasTime_ms;            // system time GPS yaw angle was last input to the data buffer
