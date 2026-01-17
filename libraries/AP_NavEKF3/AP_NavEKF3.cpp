@@ -743,6 +743,7 @@ const AP_Param::GroupInfo NavEKF3::var_info2[] = {
 
     // @Param: DV_YAW_0
     // @DisplayName: Learned doppler velocity sensor 0 yaw offset
+    // @Description: Learned doppler velocity sensor 0 yaw offset
     // @User: Advanced
     // @Units: deg
     AP_GROUPINFO("DV_YAW_0", 12, NavEKF3, _dopplerYawOffset[0], 0.0f),
@@ -777,7 +778,7 @@ const AP_Param::GroupInfo NavEKF3::var_info2[] = {
 
     // @Param: DV_PIT_1
     // @DisplayName: Learned doppler velocity sensor 1 pitch offset
-    // @v: Learned doppler velocity sensor 1 pitch offset
+    // @Description: Learned doppler velocity sensor 1 pitch offset
     // @User: Advanced
     // @Units: deg
     AP_GROUPINFO("DV_PIT_1", 17, NavEKF3, _dopplerPitchOffset[1], 0.0f),
@@ -791,7 +792,7 @@ const AP_Param::GroupInfo NavEKF3::var_info2[] = {
 
     // @Param: DV_PIT_3
     // @DisplayName: Learned doppler velocity sensor 3 pitch offset
-    // @DisplayName: Learned doppler velocity sensor 3 pitch offset
+    // @Description: Learned doppler velocity sensor 3 pitch offset
     // @User: Advanced
     // @Units: deg
     AP_GROUPINFO("DV_PIT_3", 19, NavEKF3, _dopplerPitchOffset[3], 0.0f),
