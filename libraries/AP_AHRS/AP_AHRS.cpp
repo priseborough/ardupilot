@@ -439,28 +439,28 @@ void AP_AHRS::update(bool skip_ins_update)
         _view->update();
     }
 
-#if AP_AHRS_SIM_ENABLED
-    // test code for doppler interface
-    static uint32_t last_ms = 0;
-    if (AP_HAL::millis() - last_ms > 1000) {
-        last_ms = AP_HAL::millis();
-        Vector3f vel;
-        Quaternion quat;
-        if (sim.get_velocity_NED(vel) && sim.get_quaternion(quat)) {
-            Matrix3f Tnb;
-            quat.inverse().rotation_matrix(Tnb);
-            const Vector3f velBF = Tnb * vel;
-            uint32_t timeStamp_ms = AP_HAL::millis();
-            for (uint8_t i=0; i<4; i++) {
-                const float sensorYaw = radians(float(90 * i));;
-                const float sensorPitch = radians(30.0f);
-                const float dopplerVel = (velBF.x * cosf(sensorYaw) + velBF.y * sinf(sensorYaw)) * sinf(sensorPitch) + velBF.z * cosf(sensorPitch);
-                const float dopplerVelErr = 0.3f;
-                writeDopplerVel(dopplerVel, dopplerVelErr, sensorYaw, sensorPitch, timeStamp_ms, i, 4);
-            }
-        }
-    }
-#endif
+// #if AP_AHRS_SIM_ENABLED
+//     // test code for doppler interface
+//     static uint32_t last_ms = 0;
+//     if (AP_HAL::millis() - last_ms > 1000) {
+//         last_ms = AP_HAL::millis();
+//         Vector3f vel;
+//         Quaternion quat;
+//         if (sim.get_velocity_NED(vel) && sim.get_quaternion(quat)) {
+//             Matrix3f Tnb;
+//             quat.inverse().rotation_matrix(Tnb);
+//             const Vector3f velBF = Tnb * vel;
+//             uint32_t timeStamp_ms = AP_HAL::millis();
+//             for (uint8_t i=0; i<4; i++) {
+//                 const float sensorYaw = radians(float(90 * i));;
+//                 const float sensorPitch = radians(30.0f);
+//                 const float dopplerVel = (velBF.x * cosf(sensorYaw) + velBF.y * sinf(sensorYaw)) * sinf(sensorPitch) + velBF.z * cosf(sensorPitch);
+//                 const float dopplerVelErr = 0.3f;
+//                 writeDopplerVel(dopplerVel, dopplerVelErr, sensorYaw, sensorPitch, timeStamp_ms, i, 4);
+//             }
+//         }
+//     }
+// #endif
 
     // update AOA and SSA
     update_AOA_SSA();
