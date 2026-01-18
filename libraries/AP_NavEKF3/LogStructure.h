@@ -325,14 +325,14 @@ struct PACKED log_XKDY {
 // @Description: EKF3 Body Frame Doppler Velocity Pitch Angles
 // @Field: TimeUS: Time since system startup
 // @Field: C: EKF3 core this data is for
-// @Field: Y0: Body frame pitch angle - sensor 0
-// @Field: Y1: Body frame pitch angle - sensor 1
-// @Field: Y2: Body frame pitch angle - sensor 2
-// @Field: Y3: Body frame pitch angle - sensor 3
-// @Field: YV0: Body frame pitch angle variance - sensor 0
-// @Field: YV1: Body frame pitch angle variance - sensor 1
-// @Field: YV2: Body frame pitch angle variance - sensor 2
-// @Field: YV3: Body frame pitch angle variance - sensor 3
+// @Field: P0: Body frame pitch angle - sensor 0
+// @Field: P1: Body frame pitch angle - sensor 1
+// @Field: P2: Body frame pitch angle - sensor 2
+// @Field: P3: Body frame pitch angle - sensor 3
+// @Field: PV0: Body frame pitch angle variance - sensor 0
+// @Field: PV1: Body frame pitch angle variance - sensor 1
+// @Field: PV2: Body frame pitch angle variance - sensor 2
+// @Field: PV3: Body frame pitch angle variance - sensor 3
 struct PACKED log_XKDP {
     LOG_PACKET_HEADER;
     uint64_t time_us;
