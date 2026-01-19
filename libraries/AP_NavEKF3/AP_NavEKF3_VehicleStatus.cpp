@@ -108,6 +108,34 @@ void NavEKF3_core::calcGpsGoodToAlign(void)
         }
     }
 
+
+    // check for consistency with EKF velocity states if velocity observable by other methods
+    bool gpsVelAgreeFail = false;
+    if (frontend->_gpsCheck & MASK_GPS_VEL_DIFF && PV_AidingMode != AID_NONE) {
+        bool optFlowUsed = (imuSampleTime_ms - prevFlowFuseTime_ms < 1000);
+        bool bodyOdmUsed = (imuSampleTime_ms - prevBodyVelFuseTime_ms < 1000);
+#if EK3_FEATURE_BEACON_FUSION
+        const bool rngBcnUsed = (imuSampleTime_ms - rngBcn.lastPassTime_ms < 1000);
+#else
+        const bool rngBcnUsed = false;
+#endif
+        bool dopplerAiding = (imuSampleTime_ms - lastDopplerVelPassTime_ms < 1000);
+        bool velAiding = rngBcnUsed || optFlowUsed || bodyOdmUsed || dopplerAiding;
+        if (velAiding) {
+            const float vel_diff_sq = (gpsDataDelayed.vel.xy() - stateStruct.velocity.xy()).length_squared();
+            const float vel_diff_lim_sq = sq(frontend->_gpsVelDiffLimit) + sq(gpsSpdAccuracy);
+            gpsVelAgreeFail = vel_diff_sq > vel_diff_lim_sq;
+            if (gpsVelAgreeFail) {
+                dal.snprintf(prearm_fail_string,
+                                sizeof(prearm_fail_string),
+                                "GPS velocity inconsistent by %.1fm/s (needs %.1f)", (double)sqrtf(vel_diff_sq), (double)sqrtf(vel_diff_lim_sq));
+                gpsCheckStatus.bad_gps_vel = true;
+            } else {
+                gpsCheckStatus.bad_gps_vel = false;
+            }
+        }
+    }
+
     // Check that the vertical GPS vertical velocity is reasonable after noise filtering
     bool gpsVertVelFail;
     if (gpsDataNew.have_vz && onGround) {
@@ -251,7 +279,7 @@ void NavEKF3_core::calcGpsGoodToAlign(void)
     }
 
     // record time of pass or fail
-    if (gpsSpdAccFail || numSatsFail || hdopFail || hAccFail || vAccFail || yawFail || gpsDriftFail || gpsVertVelFail || gpsHorizVelFail || gpsBaroAgreeFail) {
+    if (gpsSpdAccFail || numSatsFail || hdopFail || hAccFail || vAccFail || yawFail || gpsDriftFail || gpsVertVelFail || gpsHorizVelFail || gpsBaroAgreeFail || gpsVelAgreeFail) {
         lastGpsVelFail_ms = imuSampleTime_ms;
     } else {
         lastGpsVelPass_ms = imuSampleTime_ms;

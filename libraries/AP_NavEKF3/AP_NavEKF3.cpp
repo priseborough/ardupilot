@@ -395,7 +395,7 @@ const AP_Param::GroupInfo NavEKF3::var_info[] = {
     // @Param: GPS_CHECK
     // @DisplayName: GPS preflight check
     // @Description: This is a 1 byte bitmap controlling which GPS preflight checks are performed. Set to 0 to bypass all checks. Set to 255 perform all checks. Set to 3 to check just the number of satellites and HDoP. Set to 31 for the most rigorous checks that will still allow checks to pass when the copter is moving, eg launch from a boat.
-    // @Bitmask: 0:NSats,1:HDoP,2:speed error,3:position error,4:yaw error,5:pos drift,6:vert speed,7:horiz speed,8:baro hgt consistency
+    // @Bitmask: 0:NSats,1:HDoP,2:speed error,3:position error,4:yaw error,5:pos drift,6:vert speed,7:horiz speed,8:baro hgt consistency,9:horiz vel consistency
     // @User: Advanced
     AP_GROUPINFO("GPS_CHECK",    32, NavEKF3, _gpsCheck, 31),
 
@@ -799,11 +799,19 @@ const AP_Param::GroupInfo NavEKF3::var_info2[] = {
 
     // @Param: GPS_HGT_DIFF
     // @DisplayName: GPS height discrepancy limit
-    // @Description: Sets the maximum allowed discrepancy with baro height before GPS use can re-commence after losing lock. This check only runs if EK3_GPS_CHECK bit 8 is set.
+    // @Description: Sets the maximum allowed discrepancy with baro height before GPS use can commence after gaining lock. This check only runs if EK3_GPS_CHECK bit 8 is set.
     // @Range: 5 128
     // @User: Advanced
     // @Units: m
     AP_GROUPINFO("GPS_HGT_DIFF", 20, NavEKF3, _gpsAltDiffLimit, 20),
+
+    // @Param: GPS_VEL_DIFF
+    // @DisplayName: GPS velocity discrepancy limit
+    // @Description: Sets the maximum allowed discrepancy with EKF velocity before GPS use can commence after gaining lock. This check only runs if EK3_GPS_CHECK bit 9 is set.
+    // @Range: 5 128
+    // @User: Advanced
+    // @Units: m
+    AP_GROUPINFO("GPS_VEL_DIFF", 21, NavEKF3, _gpsVelDiffLimit, 2.0f),
 
     AP_GROUPEND
 };

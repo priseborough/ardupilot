@@ -467,7 +467,8 @@ private:
     AP_Int32 _options;              // bitmask of EKF options
     AP_Float _dopplerYawOffset[4];        // learned doppler yaw angle offset for sensors 0 ... 3
     AP_Float _dopplerPitchOffset[4];      // learned doppler pitch angle offset for sensors 0 ... 3
-    AP_Int8 _gpsAltDiffLimit;       // maximum allowed discrepancy with baro height before GPS use can re-commence after losing lock
+    AP_Int8 _gpsAltDiffLimit;       // maximum allowed discrepancy with baro height before GPS use can commence after gaining lock
+    AP_Float _gpsVelDiffLimit;      // maximum allowed discrepancy with EKF velocity before GPS use can commence after gaining lock
 
     // enum for processing options
     enum class Option {
