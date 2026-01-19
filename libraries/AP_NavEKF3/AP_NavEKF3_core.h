@@ -45,6 +45,7 @@
 #define MASK_GPS_POS_DRIFT  (1<<5)
 #define MASK_GPS_VERT_SPD   (1<<6)
 #define MASK_GPS_HORIZ_SPD  (1<<7)
+#define MASK_GPS_BARO_DIFF  (1<<8)
 
 #define earthRate 0.000072921f // earth rotation rate (rad/sec)
 
@@ -1544,6 +1545,7 @@ private:
             bool bad_vert_vel:1;
             bool bad_fix:1;
             bool bad_horiz_vel:1;
+            bool bad_gps_hgt:1;
         };
         uint16_t value;
     } gpsCheckStatus;

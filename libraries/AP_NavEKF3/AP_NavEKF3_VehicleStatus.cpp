@@ -74,6 +74,40 @@ void NavEKF3_core::calcGpsGoodToAlign(void)
         gpsCheckStatus.bad_horiz_drift = false;
     }
 
+    // Check consistency with baro height
+    bool gpsBaroAgreeFail = false;
+    if (frontend->_gpsCheck & MASK_GPS_BARO_DIFF) {
+        uint8_t n_sensors = dal.baro().num_instances();
+        float max_baro_alt = FLT_MIN;
+        float min_baro_alt = FLT_MAX;
+        bool healthy_baro_found = false;
+        for (uint8_t i=0; i<n_sensors; i++) {
+            if (dal.baro().healthy(i)) {
+                healthy_baro_found = true;
+                const float alt = dal.baro().get_altitude(i);
+                max_baro_alt = MAX(max_baro_alt, alt);
+                min_baro_alt = MIN(min_baro_alt, alt);
+            }
+        }
+        if (healthy_baro_found) {
+            const float baro_alt_diff = max_baro_alt - min_baro_alt;
+            const float baro_rel_alt = 0.5f * (max_baro_alt + min_baro_alt);
+            const float gps_rel_alt = 0.01f * (float)(gpsloc.alt - dal.get_home().alt);
+            const float max_allowed_diff = baro_alt_diff + baro_rel_alt * 0.02f + (float)frontend->_gpsAltDiffLimit;
+            const float diff = fabsf(gps_rel_alt - baro_rel_alt);
+            gpsBaroAgreeFail = diff > max_allowed_diff;
+            // Report check result as a text string and bitmask
+            if (gpsBaroAgreeFail) {
+                dal.snprintf(prearm_fail_string,
+                                sizeof(prearm_fail_string),
+                                "GPS height inconsistent with baro by %.1fm (needs %.1f)", (double)diff, (double)max_allowed_diff);
+                gpsCheckStatus.bad_gps_hgt = true;
+            } else {
+                gpsCheckStatus.bad_gps_hgt = false;
+            }
+        }
+    }
+
     // Check that the vertical GPS vertical velocity is reasonable after noise filtering
     bool gpsVertVelFail;
     if (gpsDataNew.have_vz && onGround) {
@@ -217,7 +251,7 @@ void NavEKF3_core::calcGpsGoodToAlign(void)
     }
 
     // record time of pass or fail
-    if (gpsSpdAccFail || numSatsFail || hdopFail || hAccFail || vAccFail || yawFail || gpsDriftFail || gpsVertVelFail || gpsHorizVelFail) {
+    if (gpsSpdAccFail || numSatsFail || hdopFail || hAccFail || vAccFail || yawFail || gpsDriftFail || gpsVertVelFail || gpsHorizVelFail || gpsBaroAgreeFail) {
         lastGpsVelFail_ms = imuSampleTime_ms;
     } else {
         lastGpsVelPass_ms = imuSampleTime_ms;
