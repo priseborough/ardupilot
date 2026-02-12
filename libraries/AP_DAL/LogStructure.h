@@ -349,14 +349,18 @@ struct log_REVH {
 // @LoggerMessage: REDV
 // @Description: Replay doppler velocity data
 // @Field: V: doppler velocity along sensor axis
-// @Field: Er: error in doppler velocity
+// @Field: Verr: doppler velocity 1-sigma accuracy
+// @Field: R: range along sensor axis
+// @Field: Rerr: range 1-sigma accuracy
 // @Field: Yaw: sensor axis yaw
 // @Field: Pitch: sensor axis pitch
 // @Field: TS: timestamp of doppler velocity measurement
 // @Field: Id: sensor Id
 struct log_REDV {
     float vel;
-    float err;
+    float velErr;
+    float rng;
+    float rngErr;
     float yaw;
     float pitch;
     uint32_t timeStamp_ms;
@@ -453,7 +457,7 @@ struct log_RBOH {
     { LOG_REVH_MSG, RLOG_SIZE(REVH),                                   \
       "REVH", "ffffIH", "VX,VY,VZ,Er,TS,D", "------", "------" }, \
     { LOG_REDV_MSG, RLOG_SIZE(REDV),                                   \
-      "REDV", "ffffIBB", "V,Er,Yaw,Pitch,TS,Id,NS", "-------", "-------" },   \
+      "REDV", "ffffffIBB", "V,Verr,R,Rerr,Yaw,Pitch,TS,Id,NS", "---------", "---------" },   \
     { LOG_RWOH_MSG, RLOG_SIZE(RWOH),                                   \
       "RWOH", "ffIffff", "DA,DT,TS,PX,PY,PZ,R", "-------", "-------" }, \
     { LOG_RBOH_MSG, RLOG_SIZE(RBOH),                                   \

@@ -386,13 +386,15 @@ void AP_DAL::writeExtNavVelData(const Vector3f &vel, float err, uint32_t timeSta
 
 }
 
-void AP_DAL::writeDopplerVel(float vel, float velErr, float yaw, float pitch, uint32_t timeStamp_ms, uint8_t Id, uint8_t N_sensors)
+void AP_DAL::writeDopplerVel(float vel, float velErr, float rng, float rngErr, float yaw, float pitch, uint32_t timeStamp_ms, uint8_t Id, uint8_t N_sensors)
 {
     end_frame();
 
     const log_REDV old = _REDV;
     _REDV.vel = vel;
-    _REDV.err = velErr;
+    _REDV.velErr = velErr;
+    _REDV.rng = rng;
+    _REDV.rngErr = rngErr;
     _REDV.yaw = yaw;
     _REDV.pitch = pitch;
     _REDV.timeStamp_ms = timeStamp_ms;
@@ -509,7 +511,7 @@ void AP_DAL::handle_message(const log_REDV &msg, NavEKF2 &ekf2, NavEKF3 &ekf3)
 {
     _REDV = msg;
     // note that EKF2 does not support doppler velocity
-    ekf3.writeDopplerVel(msg.vel, msg.err, msg.yaw, msg.pitch, msg.timeStamp_ms, msg.Id, msg.Nsensors);
+    ekf3.writeDopplerVel(msg.vel, msg.velErr, msg.rng, msg.rngErr, msg.yaw, msg.pitch, msg.timeStamp_ms, msg.Id, msg.Nsensors);
 }
 
 /*
