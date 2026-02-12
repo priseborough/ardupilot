@@ -2088,6 +2088,11 @@ void NavEKF3_core::SelectDopplerVelFusion()
                 FuseDopplerVelocity(dopplerVelDataDelayed.vel[index], sq(dopplerVelDataDelayed.velErr[index]), yaw, pitch);
                 innovations[index] = innovDopplerVel;
                 innovationVariances[index] = varInnovDopplerVel;
+
+                if (is_positive(dopplerVelDataDelayed.rng[index]) && is_positive(dopplerVelDataDelayed.rngErr[index])) {
+                    FuseDopplerRange(dopplerVelDataDelayed.rng[index], sq(dopplerVelDataDelayed.rngErr[index]), yaw, pitch);
+                }
+
                 running_doppler_fusion = true;
             }
             if (index > dopplerVelDataDelayed.Nsensors -1) {
@@ -2357,6 +2362,80 @@ void NavEKF3_core::UpdateDopplerAngles(uint8_t index)
     }
 }
 
+void NavEKF3_core::FuseDopplerRange(float rng, float rngVar, float sensorYaw, float sensorPitch)
+{
+    // propagate ground position state noise each time this is called using the difference in position since the last observations and an RMS gradient assumption
+    // limit distance to prevent intialisation after bad gps causing bad numerical conditioning
+    ftype distanceTravelledSq = sq(stateStruct.position[0] - prevPosN) + sq(stateStruct.position[1] - prevPosE);
+    distanceTravelledSq = MIN(distanceTravelledSq, 100.0f);
+    prevPosN = stateStruct.position[0];
+    prevPosE = stateStruct.position[1];
+
+    // in addition to a terrain gradient error model, we also have the growth in uncertainty due to the copter's vertical velocity
+    ftype timeLapsed = MIN(0.001f * (imuSampleTime_ms - timeAtLastAuxEKF_ms), 1.0f);
+    ftype Pincrement = (distanceTravelledSq * sq(frontend->_terrGradMax)) + sq(timeLapsed)*P[6][6];
+    Popt += Pincrement;
+    timeAtLastAuxEKF_ms = imuSampleTime_ms;
+
+    // reset terrain state if rangefinder data not fused for 5 seconds
+    if (imuSampleTime_ms - gndHgtValidTime_ms > 5000) {
+        terrainState = MAX(rangeDataDelayed.rng * prevTnb.c.z, rngOnGnd) + stateStruct.position.z;
+    }
+
+    // Quaternion defining the rotation of the sensor frame relative to the body frame
+    QuaternionF Qbs;
+    Qbs.from_euler(0, sensorPitch, sensorYaw);
+
+    // Quaternion defining the rotation of the sensor frame relative to the navigation frame
+    QuaternionF Qns;
+    Qns = stateStruct.quat * Qbs;
+
+    // predict range
+    ftype predRngMeas = MAX((terrainState - stateStruct.position[2]),rngOnGnd) / prevTnb.c.z;
+
+    // Copy required states to local variable names
+    ftype q0 = Qns[0];
+    ftype q1 = Qns[1];
+    ftype q2 = Qns[2];
+    ftype q3 = Qns[3];
+
+    // Set range finder measurement noise variance. TODO make this a function of range and tilt to allow for sensor, alignment and AHRS errors
+    ftype R_RNG = rngVar;
+
+    // calculate Kalman gain
+    ftype SK_RNG = sq(q0) - sq(q1) - sq(q2) + sq(q3);
+    ftype K_RNG = Popt/(SK_RNG*(R_RNG + Popt/sq(SK_RNG)));
+
+    // Calculate the innovation variance for data logging
+    varInnovRng = (R_RNG + Popt/sq(SK_RNG));
+
+    // constrain terrain height to be below the vehicle
+    terrainState = MAX(terrainState, stateStruct.position[2] + rngOnGnd);
+
+    // Calculate the measurement innovation
+    innovRng = predRngMeas - rangeDataDelayed.rng;
+
+    // calculate the innovation consistency test ratio
+    auxRngTestRatio = sq(innovRng) / (sq(MAX(0.01f * (ftype)frontend->_rngInnovGate, 1.0f)) * varInnovRng);
+
+    // Check the innovation test ratio and don't fuse if too large
+    if (auxRngTestRatio < 1.0f) {
+        // correct the state
+        terrainState -= K_RNG * innovRng;
+
+        // constrain the state
+        terrainState = MAX(terrainState, stateStruct.position[2] + rngOnGnd);
+
+        // correct the covariance
+        Popt = Popt - sq(Popt)/(SK_RNG*(R_RNG + Popt/sq(SK_RNG))*(sq(q0) - sq(q1) - sq(q2) + sq(q3)));
+
+        // prevent the state variance from becoming negative
+        Popt = MAX(Popt,0.0f);
+
+        // record the time we last updated the terrain offset state
+        gndHgtValidTime_ms = imuSampleTime_ms;
+    }
+}
 
 void NavEKF3_core::FuseDopplerVelocity(float dopplerVel, float dopplerVelObsVar, float sensorYaw, float sensorPitch)
 {

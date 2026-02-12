@@ -137,7 +137,7 @@ void NavEKF3_core::writeBodyFrameOdom(float quality, const Vector3f &delPos, con
 #endif // EK3_FEATURE_BODY_ODOM
 }
 
-void NavEKF3_core::writeDopplerVel(float vel, float velErr, float yaw, float pitch, uint32_t timeStamp_ms, uint8_t Id, uint8_t N_sensors)
+void NavEKF3_core::writeDopplerVel(float vel, float velErr, float rng, float rngErr, float yaw, float pitch, uint32_t timeStamp_ms, uint8_t Id, uint8_t N_sensors)
 {
     if (isnan(vel) || isnan(velErr) || isnan(yaw) || isnan(pitch) || Id > N_sensors-1 || N_sensors > 4 || N_sensors < 1) {
         return;

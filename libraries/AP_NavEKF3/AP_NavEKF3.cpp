@@ -1721,13 +1721,13 @@ void NavEKF3::writeBodyFrameOdom(float quality, const Vector3f &delPos, const Ve
     }
 }
 
-void NavEKF3::writeDopplerVel(float vel, float velErr, float yaw, float pitch, uint32_t timeStamp_ms, uint8_t Id, uint8_t N_sensors)
+void NavEKF3::writeDopplerVel(float vel, float velErr, float rng, float rngErr, float yaw, float pitch, uint32_t timeStamp_ms, uint8_t Id, uint8_t N_sensors)
 {
-    AP::dal().writeDopplerVel(vel, velErr, yaw, pitch, timeStamp_ms, Id, N_sensors);
+    AP::dal().writeDopplerVel(vel, velErr, rng, rngErr, yaw, pitch, timeStamp_ms, Id, N_sensors);
 
     if (core) {
         for (uint8_t i=0; i<num_cores; i++) {
-            core[i].writeDopplerVel(vel, velErr, yaw, pitch, timeStamp_ms, Id, N_sensors);
+            core[i].writeDopplerVel(vel, velErr, rng, rngErr, yaw, pitch, timeStamp_ms, Id, N_sensors);
         }
     }
 }

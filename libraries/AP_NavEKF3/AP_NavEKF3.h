@@ -216,8 +216,10 @@ public:
     /*
      * Send individual doppler velocity measurements from a body fixed sensor to the EKF.
      *
-     * dopplerVel is the velocity in the direction of the sensor axis, ie when return distance to ground is decreasing, the doppler velocity will be positive (m/s)
-     * dopplerVelErr is the 1-std deviation accuracy of the vel measurement (m/s)
+     * vel is the velocity in the direction of the sensor axis, ie when return distance to ground is decreasing, the doppler velocity will be positive (m/s)
+     * velErr is the 1-std deviation accuracy of the vel measurement (m/s)
+     * rng is the range measurement in the direction of the sensor axis (m)
+     * rngErr is the 1-std deviation accuracy of the range measurement (m)
      * sensorYaw is the yaw angle of sensor axis in the body frame measured CW from the X/forward axis (rad)
      * sensorPitch is the pitch angle of the sensor axis in the body frame measured up from the Z/down axis (rad)
      * timeStamp_ms is the time from boot the measurement was taken (msec)
@@ -227,7 +229,7 @@ public:
      * When there is a group of more than 1 sensor, this function should be called sequentially, once for each sensor, starting at Id 0 and finishing at Id = N_sensors-1
      * The timestamp used by the EKF will be the timestamp sent with the last function call for the group.
     */
-    void writeDopplerVel(float vel, float velErr, float yaw, float pitch, uint32_t timeStamp_ms, uint8_t Id, uint8_t N_sensors);
+    void writeDopplerVel(float vel, float velErr, float rng, float rngErr, float yaw, float pitch, uint32_t timeStamp_ms, uint8_t Id, uint8_t N_sensors);
 
     /*
      * Write odometry data from a wheel encoder. The axis of rotation is assumed to be parallel to the vehicle body axis
