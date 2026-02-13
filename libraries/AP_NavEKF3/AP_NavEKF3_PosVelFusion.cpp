@@ -2095,7 +2095,7 @@ void NavEKF3_core::SelectDopplerVelFusion()
                 running_doppler_fusion = true;
 
                 // use range meaurements if available to update terrain height offset
-                if (is_positive(dopplerVelDataDelayed.rng[index]) && is_positive(dopplerVelDataDelayed.rngErr[index])) {
+                if (isfinite(dopplerVelDataDelayed.rng[index]) && is_positive(dopplerVelDataDelayed.rng[index]) && isfinite(dopplerVelDataDelayed.rngErr[index]) &&  is_positive(dopplerVelDataDelayed.rngErr[index])) {
                     FuseDopplerRange(dopplerVelDataDelayed.rng[index], sq(dopplerVelDataDelayed.rngErr[index]), yaw, pitch);
                     running_range_fusion = true;
                     rngInnov[index] = innovDopplerRng;
