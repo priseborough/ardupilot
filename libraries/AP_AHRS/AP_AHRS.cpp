@@ -3292,6 +3292,36 @@ void AP_AHRS::check_lane_switch(void)
     }
 }
 
+void AP_AHRS::permit_gps_use(void)
+{
+    switch (active_EKF_type()) {
+#if AP_AHRS_DCM_ENABLED
+    case EKFType::DCM:
+        break;
+#endif
+#if AP_AHRS_SIM_ENABLED
+    case EKFType::SIM:
+        break;
+#endif
+
+#if AP_AHRS_EXTERNAL_ENABLED
+    case EKFType::EXTERNAL:
+        break;
+#endif
+        
+#if HAL_NAVEKF2_AVAILABLE
+    case EKFType::TWO:
+        break;
+#endif
+
+#if HAL_NAVEKF3_AVAILABLE
+    case EKFType::THREE:
+        EKF3.approveAligntoGPS();
+        break;
+#endif
+    }
+}
+
 // request EKF yaw reset to try and avoid the need for an EKF lane switch or failsafe
 void AP_AHRS::request_yaw_reset(void)
 {
