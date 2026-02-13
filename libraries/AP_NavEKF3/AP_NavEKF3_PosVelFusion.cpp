@@ -2054,13 +2054,16 @@ void NavEKF3_core::SelectBodyOdomFusion()
 // select fusion of doppler velocity measurements
 void NavEKF3_core::SelectDopplerVelFusion()
 {
-    float innovations[4];
-    float innovationVariances[4];
+    float velInnov[4]; // doppler velocity innovations (m/s)
+    float velInnovVar[4]; // doppler velocity innovation variances (m/s)^2
+    float rngInnov[4]; // range innovations (m)
+    float rngInnovVar[4]; // range innovation variances (m^2)
     const float nanf = AP::logger().quiet_nanf();
     if (PV_AidingMode != AID_NONE && storedDopplerVel.recall(dopplerVelDataDelayed, imuDataDelayed.time_ms)) {
         bool log_angle_estimates = false;
         bool running_angle_cal = false;
         bool running_doppler_fusion =false;
+        bool running_range_fusion = false;
         bool all_angle_cals_converged = true;
         for (uint8_t index=0; index<4; index++) {
             if (!dopplerAngleEst[index].initialised) {
@@ -2086,18 +2089,22 @@ void NavEKF3_core::SelectDopplerVelFusion()
                     pitch += dopplerAngleEst[index].pitchOffset; // apply learned offset
                 }
                 FuseDopplerVelocity(dopplerVelDataDelayed.vel[index], sq(dopplerVelDataDelayed.velErr[index]), yaw, pitch);
-                innovations[index] = innovDopplerVel;
-                innovationVariances[index] = varInnovDopplerVel;
-
-                if (is_positive(dopplerVelDataDelayed.rng[index]) && is_positive(dopplerVelDataDelayed.rngErr[index])) {
-                    FuseDopplerRange(dopplerVelDataDelayed.rng[index], sq(dopplerVelDataDelayed.rngErr[index]), yaw, pitch);
-                }
+                velInnov[index] = innovDopplerVel;
+                velInnovVar[index] = varInnovDopplerVel;
 
                 running_doppler_fusion = true;
+
+                // use range meaurements if available to update terrain height offset
+                if (is_positive(dopplerVelDataDelayed.rng[index]) && is_positive(dopplerVelDataDelayed.rngErr[index])) {
+                    FuseDopplerRange(dopplerVelDataDelayed.rng[index], sq(dopplerVelDataDelayed.rngErr[index]), yaw, pitch);
+                    running_range_fusion = true;
+                    rngInnov[index] = innovDopplerRng;
+                    rngInnovVar[index] = varInnovDopplerRng;
+                }
             }
             if (index > dopplerVelDataDelayed.Nsensors -1) {
-                innovations[index] = nanf;
-                innovationVariances[index] = nanf;
+                velInnov[index] = nanf;
+                velInnovVar[index] = nanf;
             }
         }
         // notify when angle cal converged
@@ -2155,25 +2162,42 @@ void NavEKF3_core::SelectDopplerVelFusion()
         }
 
         if (running_doppler_fusion) {
-            const struct log_XKDV pkt2{
+            const struct log_XKDV pkt4{
                 LOG_PACKET_HEADER_INIT(LOG_XKDV_MSG),
                 time_us : AP::dal().micros64(),
                 core    : DAL_CORE(core_index),
-                innov_0 : innovations[0],
-                innov_1 : innovations[1],
-                innov_2 : innovations[2],
-                innov_3 : innovations[3],
-                innovVar_0 : innovationVariances[0],
-                innovVar_1 : innovationVariances[1],
-                innovVar_2 : innovationVariances[2],
-                innovVar_3 : innovationVariances[3]
+                innov_0 : velInnov[0],
+                innov_1 : velInnov[1],
+                innov_2 : velInnov[2],
+                innov_3 : velInnov[3],
+                innovVar_0 : velInnovVar[0],
+                innovVar_1 : velInnovVar[1],
+                innovVar_2 : velInnovVar[2],
+                innovVar_3 : velInnovVar[3]
             };
-            AP::logger().WriteBlock(&pkt2, sizeof(pkt2));
+            AP::logger().WriteBlock(&pkt4, sizeof(pkt4));
+        }
+
+        if (running_range_fusion) {
+            const struct log_XKDR pkt5{
+                LOG_PACKET_HEADER_INIT(LOG_XKDR_MSG),
+                time_us : AP::dal().micros64(),
+                core    : DAL_CORE(core_index),
+                innov_0 : rngInnov[0],
+                innov_1 : rngInnov[1],
+                innov_2 : rngInnov[2],
+                innov_3 : rngInnov[3],
+                innovVar_0 : rngInnovVar[0],
+                innovVar_1 : rngInnovVar[1],
+                innovVar_2 : rngInnovVar[2],
+                innovVar_3 : rngInnovVar[3]
+            };
+            AP::logger().WriteBlock(&pkt5, sizeof(pkt5));
         }
     } else {
         for (uint8_t index=0; index<4; index++) {
-            innovations[index] = nanf;
-            innovationVariances[index] = nanf;
+            velInnov[index] = nanf;
+            velInnovVar[index] = nanf;
         }
     }
 }
@@ -2377,11 +2401,6 @@ void NavEKF3_core::FuseDopplerRange(float rng, float rngVar, float sensorYaw, fl
     Popt += Pincrement;
     timeAtLastAuxEKF_ms = imuSampleTime_ms;
 
-    // reset terrain state if rangefinder data not fused for 5 seconds
-    if (imuSampleTime_ms - gndHgtValidTime_ms > 5000) {
-        terrainState = MAX(rangeDataDelayed.rng * prevTnb.c.z, rngOnGnd) + stateStruct.position.z;
-    }
-
     // Quaternion defining the rotation of the sensor frame relative to the body frame
     QuaternionF Qbs;
     Qbs.from_euler(0, sensorPitch, sensorYaw);
@@ -2390,8 +2409,12 @@ void NavEKF3_core::FuseDopplerRange(float rng, float rngVar, float sensorYaw, fl
     QuaternionF Qns;
     Qns = stateStruct.quat * Qbs;
 
+    // Matrix defining the rotation of the sensor frame relative to the navigation fram
+    Matrix3F Tns;
+    Qns.rotation_matrix(Tns);
+
     // predict range
-    ftype predRngMeas = MAX((terrainState - stateStruct.position[2]),rngOnGnd) / prevTnb.c.z;
+    ftype predRngMeas = MAX((terrainState - stateStruct.position[2]),0.1f) / Tns.c.z;
 
     // Copy required states to local variable names
     ftype q0 = Qns[0];
@@ -2399,35 +2422,37 @@ void NavEKF3_core::FuseDopplerRange(float rng, float rngVar, float sensorYaw, fl
     ftype q2 = Qns[2];
     ftype q3 = Qns[3];
 
-    // Set range finder measurement noise variance. TODO make this a function of range and tilt to allow for sensor, alignment and AHRS errors
-    ftype R_RNG = rngVar;
+    // reset terrain state if rangefinder data not fused for 5 seconds
+    if (imuSampleTime_ms - gndHgtValidTime_ms > 5000) {
+        terrainState = MAX(rng * Tns.c.z, 0.1f) + stateStruct.position.z;
+    }
 
     // calculate Kalman gain
     ftype SK_RNG = sq(q0) - sq(q1) - sq(q2) + sq(q3);
-    ftype K_RNG = Popt/(SK_RNG*(R_RNG + Popt/sq(SK_RNG)));
+    ftype K_RNG = Popt/(SK_RNG*(rngVar + Popt/sq(SK_RNG)));
 
     // Calculate the innovation variance for data logging
-    varInnovRng = (R_RNG + Popt/sq(SK_RNG));
+    varInnovDopplerRng = (rngVar + Popt/sq(SK_RNG));
 
     // constrain terrain height to be below the vehicle
     terrainState = MAX(terrainState, stateStruct.position[2] + rngOnGnd);
 
     // Calculate the measurement innovation
-    innovRng = predRngMeas - rangeDataDelayed.rng;
+    innovDopplerRng = predRngMeas - rng;
 
     // calculate the innovation consistency test ratio
-    auxRngTestRatio = sq(innovRng) / (sq(MAX(0.01f * (ftype)frontend->_rngInnovGate, 1.0f)) * varInnovRng);
+    const ftype testRatio = sq(innovDopplerRng) / (sq(MAX(0.01f * (ftype)frontend->_rngInnovGate, 1.0f)) * varInnovDopplerRng);
 
     // Check the innovation test ratio and don't fuse if too large
-    if (auxRngTestRatio < 1.0f) {
+    if (testRatio < 1.0f) {
         // correct the state
-        terrainState -= K_RNG * innovRng;
+        terrainState -= K_RNG * innovDopplerRng;
 
         // constrain the state
         terrainState = MAX(terrainState, stateStruct.position[2] + rngOnGnd);
 
         // correct the covariance
-        Popt = Popt - sq(Popt)/(SK_RNG*(R_RNG + Popt/sq(SK_RNG))*(sq(q0) - sq(q1) - sq(q2) + sq(q3)));
+        Popt = Popt - sq(Popt)/(SK_RNG*(rngVar + Popt/sq(SK_RNG))*(sq(q0) - sq(q1) - sq(q2) + sq(q3)));
 
         // prevent the state variance from becoming negative
         Popt = MAX(Popt,0.0f);

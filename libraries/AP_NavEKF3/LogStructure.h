@@ -21,7 +21,8 @@
     LOG_XKY1_MSG, \
     LOG_XKDV_MSG, \
     LOG_XKDY_MSG, \
-    LOG_XKDP_MSG
+    LOG_XKDP_MSG, \
+    LOG_XKDR_MSG
 
 // @LoggerMessage: XKF0
 // @Description: EKF3 beacon sensor diagnostics
@@ -347,6 +348,33 @@ struct PACKED log_XKDP {
     float pitchVariance_3;
 };
 
+// @LoggerMessage: XKDR
+// @Description: EKF3 Body Frame Doppler Sensor Range Fusion
+// @Field: TimeUS: Time since system startup
+// @Field: C: EKF3 core this data is for
+// @Field: I0: Innovation in range - sensor 0
+// @Field: I1: Innovation in range - sensor 1
+// @Field: I2: Innovation in range - sensor 2
+// @Field: I3: Innovation in range - sensor 3
+// @Field: IV0: Innovation Variance in range - sensor 0
+// @Field: IV1: Innovation Variance in range - sensor 1
+// @Field: IV2: Innovation Variance in range - sensor 2
+// @Field: IV3: Innovation Variance in range - sensor 3
+struct PACKED log_XKDR {
+    LOG_PACKET_HEADER;
+    uint64_t time_us;
+    uint8_t core;
+    float innov_0;
+    float innov_1;
+    float innov_2;
+    float innov_3;
+    float innovVar_0;
+    float innovVar_1;
+    float innovVar_2;
+    float innovVar_3;
+};
+
+
 // @LoggerMessage: XKT
 // @Description: EKF3 timing information
 // @Field: TimeUS: Time since system startup
@@ -535,7 +563,9 @@ struct PACKED log_XKV {
     { LOG_XKDY_MSG, sizeof(log_XKDY), \
       "XKDY","QBffffffff","TimeUS,C,Y0,Y1,Y2,Y3,YV0,YV1,YV2,YV3", "s#--------", "F---------" , true }, \
     { LOG_XKDP_MSG, sizeof(log_XKDP), \
-      "XKDP","QBffffffff","TimeUS,C,P0,P1,P2,P3,PV0,PV1,PV2,PV3", "s#--------", "F---------" , true },
+      "XKDP","QBffffffff","TimeUS,C,P0,P1,P2,P3,PV0,PV1,PV2,PV3", "s#--------", "F---------" , true }, \
+    { LOG_XKDR_MSG, sizeof(log_XKDR), \
+      "XKDR","QBffffffff","TimeUS,C,I0,I1,I2,I3,IV0,IV1,IV2,IV3", "s#--------", "F---------" , true },
       #else
   #define LOG_STRUCTURE_FROM_NAVEKF3
 #endif
