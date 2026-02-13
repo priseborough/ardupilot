@@ -1067,6 +1067,15 @@ void NavEKF3::requestYawReset(void)
     }
 }
 
+void NavEKF3::approveAligntoGPS(void)
+{
+    dal.log_event3(AP_DAL::Event::requestYawReset);
+
+    for (uint8_t i = 0; i < num_cores; i++) {
+        core[i].approveAligntoGPS();
+    }
+}
+
 /*
   Update this instance error score value for all active cores
 */
