@@ -452,11 +452,29 @@ void AP_AHRS::update(bool skip_ins_update)
 //             const Vector3f velBF = Tnb * vel;
 //             uint32_t timeStamp_ms = AP_HAL::millis();
 //             for (uint8_t i=0; i<4; i++) {
-//                 const float sensorYaw = radians(float(90 * i));;
+//                 const float sensorYaw = radians(float(90 * i));
 //                 const float sensorPitch = radians(30.0f);
 //                 const float dopplerVel = (velBF.x * cosf(sensorYaw) + velBF.y * sinf(sensorYaw)) * sinf(sensorPitch) + velBF.z * cosf(sensorPitch);
 //                 const float dopplerVelErr = 0.3f;
-//                 writeDopplerVel(dopplerVel, dopplerVelErr, sensorYaw, sensorPitch, timeStamp_ms, i, 4);
+//                 // Quaternion defining the rotation of the sensor frame relative to the body frame
+//                 Quaternion Qbs;
+//                 Qbs.from_euler(0, sensorPitch, sensorYaw);
+//                 // Quaternion defining the rotation of the sensor frame relative to the navigation frame
+//                 Quaternion Qns = quat * Qbs;
+//                 // Matrix defining the rotation of the sensor frame relative to the navigation fram
+//                 Matrix3f Tns;
+//                 Qns.rotation_matrix(Tns);
+//                 // predict range
+//                 float hagl, rngMea, rngMeaErr;
+//                 if(sim.get_hagl(hagl) && hagl > 0.1f && Tns.c.z > 0.1f) {
+//                     rngMea = hagl / Tns.c.z;
+//                     rngMeaErr = 0.5f;
+//                 } else {
+//                     const float nanf = AP::logger().quiet_nanf();
+//                     rngMea = nanf;
+//                     rngMeaErr = nanf;
+//                 }
+//                 writeDopplerVel(dopplerVel, dopplerVelErr,rngMea, rngMeaErr,  sensorYaw, sensorPitch, timeStamp_ms, i, 4);
 //             }
 //         }
 //     }
