@@ -152,6 +152,8 @@ void NavEKF3_core::writeDopplerVel(float vel, float velErr, float rng, float rng
     dopplerVelDataNew.time_ms = timeStamp_ms;
     dopplerVelDataNew.vel[Id] = vel;
     dopplerVelDataNew.velErr[Id] = MAX(velErr, 0.1f); // protect against too small values that could destabilise the filter
+    dopplerVelDataNew.rng[Id] = rng;
+    dopplerVelDataNew.rngErr[Id] = MAX(rngErr, 0.1f); // protect against too small values that could destabilise the filter
     dopplerVelDataNew.yaw[Id] = yaw;
     dopplerVelDataNew.pitch[Id] = pitch;
 
