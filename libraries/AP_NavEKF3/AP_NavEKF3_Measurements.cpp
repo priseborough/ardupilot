@@ -655,6 +655,7 @@ void NavEKF3_core::readGpsData()
             lastGpsVelFail_ms = imuSampleTime_ms;
             lastGpsVelPass_ms = 0;
             gpsGoodToAlign = false;
+            alignToGpsPermissionReceived = false;
         } else {
             waitingForGpsChecks = false;
         }

@@ -362,6 +362,8 @@ public:
     // degraded by vibration
     bool isVibrationAffected() const;
 
+    void approveAligntoGPS(void);
+
     // get a yaw estimator instance
     const EKFGSF_yaw *get_yawEstimator(void) const;
 

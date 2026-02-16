@@ -454,6 +454,14 @@ public:
     // get a yaw estimator instance
     const EKFGSF_yaw *get_yawEstimator(void) const { return yawEstimator; }
 
+    // per-core pre-arm checks. returns false if we fail arming
+    // checks, in which case the buffer will be populated with a
+    // failure message
+    // requires_position should be true if horizontal position configuration should be checked
+    bool pre_arm_check(bool requires_position, char *failure_msg, uint8_t failure_msg_len) const;
+
+    void approveAligntoGPS(void) {alignToGpsPermissionReceived = true; }
+
 private:
     EKFGSF_yaw *yawEstimator;
     AP_DAL &dal;
@@ -1583,6 +1591,8 @@ private:
     bool posxy_source_reset;                        // true when the horizontal position source has changed but the position has not yet been reset
     AP_NavEKF_Source::SourceYaw yaw_source_last;    // yaw source on previous iteration (used to detect a change)
     bool yaw_source_reset;                          // true when the yaw source has changed but the yaw has not yet been reset
+
+    bool alignToGpsPermissionReceived;
 
     // logging functions shared by cores:
     void Log_Write_XKF1(uint64_t time_us) const;
