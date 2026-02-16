@@ -226,10 +226,9 @@ void NavEKF3_core::calcGpsGoodToAlign(void)
     // continuous period of 10s without fail required to set healthy
     // continuous period of 5s without pass required to set unhealthy
     if (!gpsGoodToAlign && imuSampleTime_ms - lastGpsVelFail_ms > 10000) {
-        if ((frontend->_options & (int32_t)NavEKF3::Options::JammingExpected) && !alignToGpsPermissionReceived) {
-            break;
+        if (!(frontend->_options & (int32_t)NavEKF3::Options::JammingExpected) || alignToGpsPermissionReceived) {
+            gpsGoodToAlign = true;
         }
-        gpsGoodToAlign = true;
     } else if (gpsGoodToAlign && imuSampleTime_ms - lastGpsVelPass_ms > 5000) {
         gpsGoodToAlign = false;
     }
