@@ -560,6 +560,12 @@ void NavEKF3_core::readGpsData()
         return;
     }
 
+    if ((frontend->_options & (int32_t)NavEKF3::Options::JammingExpected) && !alignToGpsPermissionReceived) {
+        gpsCheckStatus.bad_fix = true;
+        dal.snprintf(prearm_fail_string, sizeof(prearm_fail_string), "GPS use blocked");
+        return;
+    }
+
     // report GPS fix status
     gpsCheckStatus.bad_fix = false;
 
