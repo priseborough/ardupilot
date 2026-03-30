@@ -2088,7 +2088,8 @@ void NavEKF3_core::SelectDopplerVelFusion()
                     yaw += dopplerAngleEst[index].yawOffset; // apply learned offset
                     pitch += dopplerAngleEst[index].pitchOffset; // apply learned offset
                 }
-                FuseDopplerVelocity(dopplerVelDataDelayed.vel[index], sq(dopplerVelDataDelayed.velErr[index]), yaw, pitch);
+                Vector3F sensorPosXYZ = Vector3F(frontend->_dopplerRadius[index]*cosf(yaw), frontend->_dopplerRadius[index]*sinf(yaw), frontend->_dopplerPosZ);
+                FuseDopplerVelocity(dopplerVelDataDelayed.vel[index], sq(dopplerVelDataDelayed.velErr[index]), yaw, pitch, sensorPosXYZ);
                 velInnov[index] = innovDopplerVel;
                 velInnovVar[index] = varInnovDopplerVel;
 
@@ -2462,7 +2463,7 @@ void NavEKF3_core::FuseDopplerRange(float rng, float rngVar, float sensorYaw, fl
     }
 }
 
-void NavEKF3_core::FuseDopplerVelocity(float dopplerVel, float dopplerVelObsVar, float sensorYaw, float sensorPitch)
+void NavEKF3_core::FuseDopplerVelocity(float dopplerVel, float dopplerVelObsVar, float sensorYaw, float sensorPitch, Vector3F sensorPosXYZ)
 {
     // copy required states to local variable names
     const ftype q0 = stateStruct.quat[0];
@@ -2524,10 +2525,15 @@ void NavEKF3_core::FuseDopplerVelocity(float dopplerVel, float dopplerVelObsVar,
         return;
     }
 
+    // Velocity due to position offset and body angle rates
+    Vector3F angRate = imuDataDelayed.delAng * (1.0f/imuDataDelayed.delAngDT);
+    Vector3F velRelBF = angRate % sensorPosXYZ;
+
     // calculate vehicle velocity in body frame
     Matrix3F Tnb;
     stateStruct.quat.inverse().rotation_matrix(Tnb);
-    const Vector3F velBF = Tnb * stateStruct.velocity;
+    const Vector3F velBF = velRelBF + Tnb * stateStruct.velocity;
+
 
     // calculate vector in body frame aligned with doppler measurement axis
     const Vector3F sensorVecBF = Vector3F(sin(sensorPitch)*cos(sensorYaw), sin(sensorPitch)*sin(sensorYaw), cos(sensorPitch));

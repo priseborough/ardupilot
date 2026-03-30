@@ -813,6 +813,41 @@ const AP_Param::GroupInfo NavEKF3::var_info2[] = {
     // @Units: m
     AP_GROUPINFO("GPS_VEL_DIFF", 21, NavEKF3, _gpsVelDiffLimit, 2.0f),
 
+    // @Param: DV_POSZ
+    // @DisplayName: Doppler velocity sensor Z position
+    // @Description: Z position of the doppler sensor antenna phase centroid in the vehicle body frame where positive Z is down.
+    // @User: Advanced
+    // @Units: m
+    AP_GROUPINFO("DV_POSZ", 22, NavEKF3, _dopplerPosZ, 0.0f),
+
+    // @Param: DV_RAD_0
+    // @DisplayName: Doppler velocity sensor 0 radial position
+    // @Description: Horizontal distance of the doppler sensor 0 antenna phase centroid from the vehicle body axis centroid.
+    // @User: Advanced
+    // @Units: m
+    AP_GROUPINFO("DV_RAD_0", 23, NavEKF3, _dopplerRadius[0], 0.0f),
+
+    // @Param: DV_RAD_1
+    // @DisplayName: Doppler velocity sensor 1 radial position
+    // @Description: Horizontal distance of the doppler sensor 1 antenna phase centroid from the vehicle body axis centroid.
+    // @User: Advanced
+    // @Units: m
+    AP_GROUPINFO("DV_RAD_1", 24, NavEKF3, _dopplerRadius[1], 0.0f),
+
+    // @Param: DV_RAD_2
+    // @DisplayName: Doppler velocity sensor 2 radial position
+    // @Description: Horizontal distance of the doppler sensor 2 antenna phase centroid from the vehicle body axis centroid.
+    // @User: Advanced
+    // @Units: m
+    AP_GROUPINFO("DV_RAD_2", 25, NavEKF3, _dopplerRadius[2], 0.0f),
+
+    // @Param: DV_RAD_3
+    // @DisplayName: Doppler velocity sensor 3 radial position
+    // @Description: Horizontal distance of the doppler sensor 3 antenna phase centroid from the vehicle body axis centroid.
+    // @User: Advanced
+    // @Units: m
+    AP_GROUPINFO("DV_RAD_3", 26, NavEKF3, _dopplerRadius[3], 0.0f),
+
     AP_GROUPEND
 };
 

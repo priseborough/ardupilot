@@ -749,7 +749,7 @@ private:
     void UpdateDopplerAngles(uint8_t index);
 
     // fuse a doppler velocity observation from a single axis sensor
-    void FuseDopplerVelocity(float dopplerVel, float dopplerVelObsVar, float sensorYaw, float sensorPitch);
+    void FuseDopplerVelocity(float dopplerVel, float dopplerVelObsVar, float sensorYaw, float sensorPitch, Vector3F sensorPosXYZ);
 
     // fuse a doppler range observation from a single axis sensor
     void FuseDopplerRange(float rng, float rngVar, float sensorYaw, float sensorPitch);

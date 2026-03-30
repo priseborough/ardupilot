@@ -471,6 +471,8 @@ private:
     AP_Float _dopplerPitchOffset[4];      // learned doppler pitch angle offset for sensors 0 ... 3
     AP_Int8 _gpsAltDiffLimit;       // maximum allowed discrepancy with baro height before GPS use can commence after gaining lock
     AP_Float _gpsVelDiffLimit;      // maximum allowed discrepancy with EKF velocity before GPS use can commence after gaining lock
+    AP_Float _dopplerPosZ;          // Z position of the doppler sensor antenna phase centroid in the vehicle body frame where positive Z is down
+    AP_Float _dopplerRadius[4];     // Horizontal distance of the doppler sensor antenna phase centroid from the vehicle body axis centroid.
 
     // enum for processing options
     enum class Option {
