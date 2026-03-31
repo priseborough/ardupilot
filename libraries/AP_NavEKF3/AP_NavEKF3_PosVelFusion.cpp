@@ -2222,12 +2222,17 @@ void NavEKF3_core::UpdateDopplerAngles(uint8_t index)
     stateStruct.quat.inverse().rotation_matrix(RotMat);
     const Vector3F velBF = RotMat * stateStruct.velocity;
 
+    // Velocity in body frame due to sensor position offset and body angle rates
+    const Vector3F angRate = imuDataDelayed.delAng * (1.0f/imuDataDelayed.delAngDT);
+    const Vector3F sensorPosXYZ = Vector3F(frontend->_dopplerRadius[index]*cosf(yaw), frontend->_dopplerRadius[index]*sinf(yaw), frontend->_dopplerPosZ);
+    const Vector3F velRelBF = angRate % sensorPosXYZ;
+
     // calculate vector in body frame aligned with doppler measurement axis
     const Vector3F sensorVecBF = Vector3F(sinf(pitch)*cosf(yaw), sinf(pitch)*sinf(yaw), cosf(pitch));
 
     // calculate predicted doppler velocity measurement 
     // * operator is overloaded as a dot product
-    const ftype dopplerVelPred = velBF * sensorVecBF;
+    const ftype dopplerVelPred = (velRelBF + velBF) * sensorVecBF;
 
     dopplerAngleEst[index].innov = dopplerVelPred - dopplerVel;
 
@@ -2525,7 +2530,7 @@ void NavEKF3_core::FuseDopplerVelocity(float dopplerVel, float dopplerVelObsVar,
         return;
     }
 
-    // Velocity due to position offset and body angle rates
+    // Velocity in body frame due to sensor position offset and body angle rates
     Vector3F angRate = imuDataDelayed.delAng * (1.0f/imuDataDelayed.delAngDT);
     Vector3F velRelBF = angRate % sensorPosXYZ;
 
@@ -2533,7 +2538,6 @@ void NavEKF3_core::FuseDopplerVelocity(float dopplerVel, float dopplerVelObsVar,
     Matrix3F Tnb;
     stateStruct.quat.inverse().rotation_matrix(Tnb);
     const Vector3F velBF = velRelBF + Tnb * stateStruct.velocity;
-
 
     // calculate vector in body frame aligned with doppler measurement axis
     const Vector3F sensorVecBF = Vector3F(sin(sensorPitch)*cos(sensorYaw), sin(sensorPitch)*sin(sensorYaw), cos(sensorPitch));
