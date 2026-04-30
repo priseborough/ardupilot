@@ -451,10 +451,12 @@ private:
     AP_Enum<LogLevel> _log_level;   // log verbosity level
     AP_Float _gpsVAccThreshold;     // vertical accuracy threshold to use GPS as an altitude source
     AP_Int32 _options;              // bit mask of processing options
-
+    AP_Float _launchAccThreshold;   // launch acceleration required to start nav alignment sequence (m/s/s)
+    AP_Int16 _launchAlignDelay_ms;  // Delay from launch detect to nav alignment (msec)
     // enum for processing options
     enum class Option {
         JammingExpected     = (1<<0),
+        AlignOnLaunchAccel  = (1<<1),
     };
     bool option_is_enabled(Option option) const {
         return (_options & (uint32_t)option) != 0;

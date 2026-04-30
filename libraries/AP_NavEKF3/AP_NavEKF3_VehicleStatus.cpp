@@ -20,6 +20,11 @@ void NavEKF3_core::calcGpsGoodToAlign(void)
         return;
     }
 
+    if (_forcePosVelReset) {
+        gpsGoodToAlign = true;
+        return;
+    }
+
     // User defined multiplier to be applied to check thresholds
     ftype checkScaler = 0.01f*(ftype)frontend->_gpsCheckScaler;
 

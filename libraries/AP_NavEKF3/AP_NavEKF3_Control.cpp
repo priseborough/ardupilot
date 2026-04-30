@@ -9,6 +9,10 @@
 // Control filter mode transitions
 void NavEKF3_core::controlFilterModes()
 {
+    if (_flterUpdatesBlocked) {
+        return;
+    }
+
     // Determine motor arm status
     prevMotorsArmed = motorsArmed;
     motorsArmed = dal.get_armed();

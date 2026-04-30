@@ -1622,6 +1622,11 @@ private:
     AP_NavEKF_Source::SourceYaw yaw_source_last;    // yaw source on previous iteration (used to detect a change)
     bool yaw_source_reset;                          // true when the yaw source has changed but the yaw has not yet been reset
 
+
+    uint32_t _launchTime_ms; // time that the launch accel was detected
+    bool _flterUpdatesBlocked;   // true when nav alignment is blocked
+    bool _forcePosVelReset;     // force alignment of velocity and position to GPS
+
     // logging functions shared by cores:
     void Log_Write_XKF1(uint64_t time_us) const;
     void Log_Write_XKF2(uint64_t time_us) const;

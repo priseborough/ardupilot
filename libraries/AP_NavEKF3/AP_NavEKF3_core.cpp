@@ -427,6 +427,10 @@ void NavEKF3_core::InitialiseVariables()
     EKFGSF_yaw_valid_count = 0;
 
     effectiveMagCal = effective_magCal();
+
+    _launchTime_ms = 0;
+    _flterUpdatesBlocked = false;
+    _forcePosVelReset = false;
 }
 
 // Use a function call rather than a constructor to initialise variables because it enables the filter to be re-started in flight if necessary.
@@ -657,46 +661,55 @@ void NavEKF3_core::UpdateFilter(bool predict)
         // Must be run before SelectMagFusion() to provide an up to date yaw estimate
         runYawEstimatorPrediction();
 
-        // Update states using  magnetometer or external yaw sensor data
-        SelectMagFusion();
+        if (!_flterUpdatesBlocked) {
+            if (_forcePosVelReset) {
+                ResetVelocity(resetDataSource::DEFAULT);
+                ResetPosition(resetDataSource::DEFAULT);
+                ResetHeight();
+                _forcePosVelReset = false;
+            }
 
-        // Update states using GPS and altimeter data
-        SelectVelPosFusion();
+            // Update states using  magnetometer or external yaw sensor data
+            SelectMagFusion();
 
-        // Run the GPS velocity correction step for the GSF yaw estimator algorithm
-        // and use the yaw estimate to reset the main EKF yaw if requested
-        // Muat be run after SelectVelPosFusion() so that fresh GPS data is available
-        runYawEstimatorCorrection();
+            // Update states using GPS and altimeter data
+            SelectVelPosFusion();
 
-#if EK3_FEATURE_BEACON_FUSION
-        // Update states using range beacon data
-        SelectRngBcnFusion();
-#endif
+            // Run the GPS velocity correction step for the GSF yaw estimator algorithm
+            // and use the yaw estimate to reset the main EKF yaw if requested
+            // Muat be run after SelectVelPosFusion() so that fresh GPS data is available
+            runYawEstimatorCorrection();
 
-#if EK3_FEATURE_OPTFLOW_FUSION
-        // Update states using optical flow data
-        SelectFlowFusion();
-#endif
+    #if EK3_FEATURE_BEACON_FUSION
+            // Update states using range beacon data
+            SelectRngBcnFusion();
+    #endif
 
-#if EK3_FEATURE_BODY_ODOM
-        // Update states using body frame odometry data
-        SelectBodyOdomFusion();
-#endif
+    #if EK3_FEATURE_OPTFLOW_FUSION
+            // Update states using optical flow data
+            SelectFlowFusion();
+    #endif
 
-        // Update states using airspeed data
-        SelectTasFusion();
+    #if EK3_FEATURE_BODY_ODOM
+            // Update states using body frame odometry data
+            SelectBodyOdomFusion();
+    #endif
 
-        // Update states using sideslip constraint assumption for fly-forward vehicles or body drag for multicopters
-        SelectBetaDragFusion();
+            // Update states using airspeed data
+            SelectTasFusion();
 
-        // Update the filter status
-        updateFilterStatus();
+            // Update states using sideslip constraint assumption for fly-forward vehicles or body drag for multicopters
+            SelectBetaDragFusion();
 
-        if (imuSampleTime_ms - last_oneHz_ms >= 1000) {
-            // 1Hz tasks
-            last_oneHz_ms = imuSampleTime_ms;
-            moveEKFOrigin();
-            checkUpdateEarthField();
+            // Update the filter status
+            updateFilterStatus();
+
+            if (imuSampleTime_ms - last_oneHz_ms >= 1000) {
+                // 1Hz tasks
+                last_oneHz_ms = imuSampleTime_ms;
+                moveEKFOrigin();
+                checkUpdateEarthField();
+            }
         }
     }
 
@@ -710,7 +723,7 @@ void NavEKF3_core::UpdateFilter(bool predict)
       that state the EKF can't recover, so we do a hard reset and let
       it try again.
      */
-    if (filterStatus.value != 0) {
+    if (filterStatus.value != 0 || _flterUpdatesBlocked) {
         last_filter_ok_ms = dal.millis();
     }
     if (filterStatus.value == 0 &&

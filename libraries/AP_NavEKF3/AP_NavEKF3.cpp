@@ -739,10 +739,29 @@ const AP_Param::GroupInfo NavEKF3::var_info2[] = {
 
     // @Param: OPTIONS
     // @DisplayName: Optional EKF behaviour
-    // @Description: This controls optional EKF behaviour. Setting JammingExpected will change the EKF nehaviour such that if dead reckoning navigation is possible it will require the preflight alignment GPS quality checks controlled by EK3_GPS_CHECK and EK3_CHECK_SCALE to pass before resuming GPS use if GPS lock is lost for more than 2 seconds to prevent bad
-    // @Bitmask: 0:JammingExpected
+    // @Description: This controls optional EKF behaviour. Setting JammingExpected will change the EKF nehaviour such that if dead reckoning navigation is possible it will require the preflight alignment GPS quality checks controlled by EK3_GPS_CHECK and EK3_CHECK_SCALE to pass before resuming GPS use if GPS lock is lost for more than 2 seconds to prevent bad GPS data corrupting EKF states. Setting AlignOnLaunchAccel will cause the EKF to wait until the launch acceleration specified by EK3_LCH_ACC_THR is exceeded before starting the nav alignment sequence.
+    // @Bitmask: 0:JammingExpected,1:AlignOnLaunchAccel
     // @User: Advanced
     AP_GROUPINFO("OPTIONS",  11, NavEKF3, _options, 0),
+
+    // @Param: LCH_ACC_THR
+    // @DisplayName: Nav alignment launch acceleration threshold
+    // @Description: If bit 1 of EK3_OPTIONS is set, then the EKF will not attempt to start navigating until after the  measured acceleration exceeds EK3_LCH_ACC_THR m/s/s.
+    // @Range: 40 160
+    // @Increment: 5.0
+    // @User: Advanced
+    // @Units: m/s/s
+    AP_GROUPINFO("LCH_ACC_THR", 12, NavEKF3, _launchAccThreshold, 80.0f),
+
+    // @Param: LCH_DELAY
+    // @DisplayName: Delay from launch event to nav alignment
+    // @Description: This is the number of msec delay from the launch event time to when navigation starts
+    // @Range: 1000 10000
+    // @Increment: 1000
+    // @User: Advanced
+    // @Units: ms
+    // @RebootRequired: True
+    AP_GROUPINFO("LCH_DELAY", 13, NavEKF3, _launchAlignDelay_ms, 5000),
 
     AP_GROUPEND
 };
