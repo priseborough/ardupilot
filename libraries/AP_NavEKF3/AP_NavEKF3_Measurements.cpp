@@ -474,6 +474,30 @@ void NavEKF3_core::readIMUData(bool startPredictEnabled)
     // Keep track of the number of IMU frames since the last state prediction
     framesSincePredict++;
 
+    // check for launch event
+    if (frontend->option_is_enabled(NavEKF3::Option::AlignOnLaunchAccel) && frontend->_launchAlignDelay_ms > 0) {
+        if (_launchTime_ms == 0) {
+            if (imuDataDownSampledNew.delVel.length() > frontend->_launchAccThreshold * imuDataDownSampledNew.delVelDT) {
+                _launchTime_ms = imuDataDownSampledNew.time_ms;
+                _flterUpdatesBlocked = true;
+                GCS_SEND_TEXT(MAV_SEVERITY_INFO, "EKF3 IMU%u launch lockout start",(unsigned)imu_index);
+            } else {
+                _flterUpdatesBlocked = false;
+            }
+        } else {
+            if ((imuDataDownSampledNew.time_ms - _launchTime_ms) > (uint32_t)frontend->_launchAlignDelay_ms) {
+                _launchTime_ms = 0;
+                _flterUpdatesBlocked = false;
+                _forcePosVelReset = true; // clear this when velocity and posiiton are aligned to GPS
+                GCS_SEND_TEXT(MAV_SEVERITY_INFO, "EKF3 IMU%u launch lockout stop",(unsigned)imu_index);
+            } else {
+                _flterUpdatesBlocked = true;
+            }
+        }
+    } else {
+        _flterUpdatesBlocked = false;
+    }
+
     /*
      * If the target EKF time step has been accumulated, and the frontend has allowed start of a new predict cycle,
      * then store the accumulated IMU data to be used by the state prediction, ignoring the frontend permission if more

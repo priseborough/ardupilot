@@ -739,10 +739,26 @@ const AP_Param::GroupInfo NavEKF3::var_info2[] = {
 
     // @Param: OPTIONS
     // @DisplayName: Optional EKF behaviour
-    // @Description: EKF optional behaviour. Bit 0 (JammingExpected): Setting JammingExpected will change the EKF behaviour such that if dead reckoning navigation is possible it will require the preflight alignment GPS quality checks controlled by EK3_GPS_CHECK and EK3_CHECK_SCALE to pass before resuming GPS use if GPS lock is lost for more than 2 seconds to prevent bad position estimate. Bit 1 (Manual lane switching): DANGEROUS – If enabled, this disables automatic lane switching. If the active lane becomes unhealthy, no automatic switching will occur. Users must manually set EK3_PRIMARY to change lanes. No health checks will be performed on the selected lane. Use with extreme caution.  Bit 2 (Optflow may use terrain alt): Terrain SRTM data will be used if the vehicle climbs above the rangefinder's range allowing optical flow to be used at higher altitudes.
-    // @Bitmask: 0:JammingExpected, 1:ManualLaneSwitching, 2:Optflow may use terrain alt
+    // @Description: EKF optional behaviour. Bit 0 (JammingExpected): Setting JammingExpected will change the EKF behaviour such that if dead reckoning navigation is possible it will require the preflight alignment GPS quality checks controlled by EK3_GPS_CHECK and EK3_CHECK_SCALE to pass before resuming GPS use if GPS lock is lost for more than 2 seconds to prevent bad position estimate. Bit 1 (Manual lane switching): DANGEROUS – If enabled, this disables automatic lane switching. If the active lane becomes unhealthy, no automatic switching will occur. Users must manually set EK3_PRIMARY to change lanes. No health checks will be performed on the selected lane. Use with extreme caution.  Bit 2 (Optflow may use terrain alt): Terrain SRTM data will be used if the vehicle climbs above the rangefinder's range allowing optical flow to be used at higher altitudes. Bit 3 (High G launch Lockout) will cause all EKF measurement updates to be locked out for EK3_LCH_DLY_MS ms if acceleration exceeds EK3_LCH_ACC_THR m/s/s. During this time interval, the INS prediction from IMU data and the covariance prediction calculations will continue, but there will be no state updates due to observations from other sensors such as GPS or barometric pressure altitude.
+    // @Bitmask: 0:JammingExpected, 1:ManualLaneSwitching, 2:Optflow may use terrain alt, 3:High G launch Lockout
     // @User: Advanced
     AP_GROUPINFO("OPTIONS",  11, NavEKF3, _options, 0),
+
+    // @Param: LCH_ACC_THR
+    // @DisplayName: Launch lockout acceleration threshold
+    // @Description: Acceleration above which the EKF updates will be locked out for EK3_LCH_LOCK_MS milliseconds followed by a 3D position and velocity reset. Only enabled if Bit 3 in EK3_OPTIONS is set.
+    // @Range: 30.0 300.0
+    // @Units: m/s/s
+    // @User: Advanced
+    AP_GROUPINFO("LCH_ACC_THR", 12, NavEKF3, _launchAccThreshold, 100.0f),
+
+    // @Param: LCH_DLY_MS
+    // @DisplayName: Launch lockout duration
+    // @Description: This is the number of milliseconds that the EKF updates will be locked out following a high G launch lockout event. Only enabled if Bit 3 in EK3_OPTIONS is set.
+    // @Range: 0 32788
+    // @Units: ms
+    // @User: Advanced
+    AP_GROUPINFO("LCH_DLY_MS", 13, NavEKF3, _launchAlignDelay_ms, 5000),
 
     AP_GROUPEND
 };

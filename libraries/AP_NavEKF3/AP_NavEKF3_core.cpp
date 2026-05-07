@@ -426,6 +426,11 @@ void NavEKF3_core::InitialiseVariables()
     EKFGSF_yaw_valid_count = 0;
 
     effectiveMagCal = effective_magCal();
+
+    _launchTime_ms = 0;
+    _flterUpdatesBlocked = false;
+    _forcePosVelReset = false;
+
 }
 
 // Use a function call rather than a constructor to initialise variables because it enables the filter to be re-started in flight if necessary.
@@ -656,37 +661,39 @@ void NavEKF3_core::UpdateFilter(bool predict)
         // Must be run before SelectMagFusion() to provide an up to date yaw estimate
         runYawEstimatorPrediction();
 
-        // Update states using  magnetometer or external yaw sensor data
-        SelectMagFusion();
+        if (!_flterUpdatesBlocked) {
+            // Update states using  magnetometer or external yaw sensor data
+            SelectMagFusion();
 
-        // Update states using GPS and altimeter data
-        SelectVelPosFusion();
+            // Update states using GPS and altimeter data
+            SelectVelPosFusion();
 
-        // Run the GPS velocity correction step for the GSF yaw estimator algorithm
-        // and use the yaw estimate to reset the main EKF yaw if requested
-        // Muat be run after SelectVelPosFusion() so that fresh GPS data is available
-        runYawEstimatorCorrection();
+            // Run the GPS velocity correction step for the GSF yaw estimator algorithm
+            // and use the yaw estimate to reset the main EKF yaw if requested
+            // Muat be run after SelectVelPosFusion() so that fresh GPS data is available
+            runYawEstimatorCorrection();
 
-#if EK3_FEATURE_BEACON_FUSION
-        // Update states using range beacon data
-        SelectRngBcnFusion();
-#endif
+    #if EK3_FEATURE_BEACON_FUSION
+            // Update states using range beacon data
+            SelectRngBcnFusion();
+    #endif
 
-#if EK3_FEATURE_OPTFLOW_FUSION
-        // Update states using optical flow data
-        SelectFlowFusion();
-#endif
+    #if EK3_FEATURE_OPTFLOW_FUSION
+            // Update states using optical flow data
+            SelectFlowFusion();
+    #endif
 
-#if EK3_FEATURE_BODY_ODOM
-        // Update states using body frame odometry data
-        SelectBodyOdomFusion();
-#endif
+    #if EK3_FEATURE_BODY_ODOM
+            // Update states using body frame odometry data
+            SelectBodyOdomFusion();
+    #endif
 
-        // Update states using airspeed data
-        SelectTasFusion();
+            // Update states using airspeed data
+            SelectTasFusion();
 
-        // Update states using sideslip constraint assumption for fly-forward vehicles or body drag for multicopters
-        SelectBetaDragFusion();
+            // Update states using sideslip constraint assumption for fly-forward vehicles or body drag for multicopters
+            SelectBetaDragFusion();
+        }
 
         // Update the filter status
         updateFilterStatus();

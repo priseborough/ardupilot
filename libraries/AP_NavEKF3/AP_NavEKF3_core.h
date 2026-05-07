@@ -1672,4 +1672,9 @@ private:
     void Log_Write_State_Variances(uint64_t time_us);
     void Log_Write_Timing(uint64_t time_us);
     void Log_Write_GSF(uint64_t time_us);
+
+    // high g launch lockout
+    uint32_t _launchTime_ms; // last time that the high g launch condition was detected (msec)
+    bool _flterUpdatesBlocked; // true when EKF updates are blocked and the INS solution dead reckons without corrections
+    bool _forcePosVelReset; // true when a forces reset of position and velocity has been requested
 };

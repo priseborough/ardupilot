@@ -469,12 +469,15 @@ private:
     AP_Enum<LogLevel> _log_level;   // log verbosity level
     AP_Float _gpsVAccThreshold;     // vertical accuracy threshold to use GPS as an altitude source
     AP_Int32 _options;              // bit mask of processing options
+    AP_Float _launchAccThreshold;   // acceleration required to trigger high g launch protection
+    AP_Int16 _launchAlignDelay_ms;  // number of milliseconds after the high g condition finishes that the EKf waits before aligning position and velocity.
 
     // enum for processing options
     enum class Option {
         JammingExpected         = (1<<0),
         ManualLaneSwitch        = (1<<1),
         OptflowMayUseTerrainAlt = (1<<2),
+        AlignOnLaunchAccel      = (1<<3),
     };
     bool option_is_enabled(Option option) const {
         return (_options & (uint32_t)option) != 0;

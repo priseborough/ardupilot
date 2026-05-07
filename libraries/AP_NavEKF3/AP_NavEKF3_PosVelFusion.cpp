@@ -326,7 +326,7 @@ void NavEKF3_core::ResetHeight(void)
 
     // Reset the vertical velocity state using GPS vertical velocity if we are airborne
     // Check that GPS vertical velocity data is available and can be used
-    if (inFlight &&
+    if ((inFlight || _forcePosVelReset) &&
         (gpsIsInUse || badIMUdata) &&
         frontend->sources.useVelZSource(AP_NavEKF_Source::SourceZ::GPS, core_index) &&
         gpsDataNew.have_vz &&
@@ -564,6 +564,13 @@ void NavEKF3_core::SelectVelPosFusion()
         CalculateVelInnovationsAndVariances(gpsDataDelayed.vel, frontend->_gpsHorizVelNoise.get(), frontend->gpsNEVelVarAccScale, gpsVelInnov, gpsVelVarInnov);
         // record time GPS data was retrieved from the buffer (for timeout checks)
         gpsRetrieveTime_ms = dal.millis();
+
+        if (_forcePosVelReset) {
+            ResetVelocity(resetDataSource::GPS);
+            ResetPosition(resetDataSource::GPS);
+            ResetHeight();
+            _forcePosVelReset = false;
+        }
     }
 
     // detect position source changes.  Trigger position reset if position source is valid
