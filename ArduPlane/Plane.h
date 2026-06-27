@@ -1331,6 +1331,13 @@ public:
     // It's up to the Lua script to ensure the provided location makes sense
     bool set_crosstrack_start(const Location &new_start_location) override;
 
+    // Override the TECS height controller so that it attempts to maintain the demanded descent rate
+    // descent_rate has units of m/s
+    // timeout_ms specifies the duration of the command in milli-seconds. After this time period expires, the TECS height control will revert to normal operation.
+    // Send the command with timeout_ms = 0 to cancel the previous command
+    // Returns false if the command cannot be executed
+    bool set_tecs_descent_rate_override(float descent_rate, uint32_t timeout_ms) override;
+
 #endif // AP_SCRIPTING_ENABLED
 
 };
