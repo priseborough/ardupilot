@@ -559,7 +559,12 @@ void AP_TECS::_update_height_demand(void)
         // control after takeoff to prevent plane pushing nose to level before climbing again. Post takeoff
         // compensation offset is decayed using the same time constant as the height demand filter.
         const float coef = MIN(_DT / (_DT + MAX(_hgt_dem_tconst, _DT)), 1.0f);
-        _hgt_rate_dem = (_hgt_dem_rate_ltd - _hgt_dem_lpf) / _hgt_dem_tconst;
+        if (_descent_rate_override_active()) {
+            // ignore height error and track override value for target sink rate
+            _hgt_rate_dem = - descent_rate_override.descent_rate;
+        } else {
+            _hgt_rate_dem = (_hgt_dem_rate_ltd - _hgt_dem_lpf) / _hgt_dem_tconst;
+        }
         _hgt_dem_lpf = _hgt_dem_rate_ltd * coef + (1.0f - coef) * _hgt_dem_lpf;
         _post_TO_hgt_offset *= (1.0f - coef);
         _hgt_dem = _hgt_dem_lpf + _post_TO_hgt_offset;
@@ -720,7 +725,12 @@ void AP_TECS::_update_throttle_with_airspeed(void)
     }
 
     // rate of change of potential energy is proportional to height error
-    _SPEdot_dem = (_SPE_dem - _SPE_est) / timeConstant();
+    if (_descent_rate_override_active()) {
+        // ignore height error and track override value for target sink rate
+        _SPEdot_dem = - descent_rate_override.descent_rate * GRAVITY_MSS;
+    } else {
+        _SPEdot_dem = (_SPE_dem - _SPE_est) / timeConstant();
+    }
 
     // Calculate total energy error
     _STE_error = constrain_float((_SPE_dem - _SPE_est), SPE_err_min, SPE_err_max) + _SKE_dem - _SKE_est;
@@ -972,6 +982,11 @@ void AP_TECS::_update_pitch(void)
     _SKE_weighting = MIN(_SKE_weighting, 1.0f);
 
     // Calculate demanded specific energy balance and error
+    if (_descent_rate_override_active()) {
+        // ignore height error and track override value for target sink rate
+    } else {
+
+    }
     float SEB_dem = _SPE_dem * SPE_weighting - _SKE_dem * _SKE_weighting;
     float SEB_est = _SPE_est * SPE_weighting - _SKE_est * _SKE_weighting;
     float SEB_error = SEB_dem - SEB_est;
@@ -1528,4 +1543,17 @@ void AP_TECS::offset_altitude(const float alt_offset)
     // _hgt_dem_in_raw
     // _hgt_dem_in
     // Energies
+}
+
+bool AP_TECS::set_descent_rate_override(const float descent_rate, const uint32_t duration_ms)
+{
+    descent_rate_override.descent_rate = descent_rate;
+    descent_rate_override.duration_ms = duration_ms;
+    descent_rate_override.start_ms = AP_HAL::millis();
+    return _descent_rate_override_active();
+}
+
+bool AP_TECS::_descent_rate_override_active(void)
+{
+    return !!_landing.is_on_approach() && !_landing.is_flaring() && descent_rate_override.duration_ms > 0 && AP_HAL::millis() - descent_rate_override.start_ms < descent_rate_override.duration_ms;
 }
