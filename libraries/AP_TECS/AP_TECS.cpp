@@ -1056,7 +1056,8 @@ void AP_TECS::_update_pitch(void)
 
     // integrate SEB rate error and apply integrator state limits
     const bool inhibit_integrator = ((_pitch_dem_unc > _PITCHmaxf) && integSEB_delta > 0.0f) ||
-                                    ((_pitch_dem_unc < _PITCHminf) && integSEB_delta < 0.0f);
+                                    ((_pitch_dem_unc < _PITCHminf) && integSEB_delta < 0.0f) ||
+                                    _descent_rate_override_active();
     if (!inhibit_integrator) {
         _integSEBdot += integSEB_delta;
         _integKE += (_SKE_est - _SKE_dem) * _SKE_weighting * _DT / timeConstant();
