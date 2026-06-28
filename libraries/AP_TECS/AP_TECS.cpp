@@ -554,7 +554,7 @@ void AP_TECS::_update_height_demand(void)
 
         // Limit height rate of change
         if (_descent_rate_override_active()) {
-            const float hgt_leash = 100.0f; // TODO make this value adaptive
+            const float hgt_leash = 0.25f * (_PITCHmaxf - _PITCHminf) * _TAS_state * GRAVITY_MSS * timeConstant(); // allow height tracking to access 50% of pitch range
             if (_hgt_dem_rate_ltd > _height + hgt_leash) {
                 // drag the height profile to keep up with the plane
                 _hgt_dem_rate_ltd = _height + hgt_leash;
