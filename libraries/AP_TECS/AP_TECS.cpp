@@ -975,7 +975,7 @@ void AP_TECS::_update_pitch(void)
         // height. This is needed as the usual relationship of speed
         // and height is broken by the VTOL motors
         _SKE_weighting = 0.0f;
-    } else if ( _flags.underspeed || _flight_stage == AP_FixedWing::FlightStage::TAKEOFF || _flight_stage == AP_FixedWing::FlightStage::ABORT_LANDING || _flags.is_gliding) {
+    } else if ( _flags.underspeed || _flight_stage == AP_FixedWing::FlightStage::TAKEOFF || _flight_stage == AP_FixedWing::FlightStage::ABORT_LANDING || (_flags.is_gliding && !_descent_rate_override_active())) {
         _SKE_weighting = 2.0f;
     } else if (_flags.is_doing_auto_land) {
         if (_spdWeightLand < 0) {
