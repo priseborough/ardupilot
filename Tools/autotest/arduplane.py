@@ -7456,7 +7456,7 @@ class AutoTestPlane(vehicle_test_suite.TestSuite):
             "SIM_APOS_MODE": 10,  # AUTO on arm
             # descent rate controller
             "TDR_ENABLE": 1,
-            "TDR_RATE": 10,
+            "TDR_RATE": 30,
         })
 
         self.load_mission_from_filepath(
@@ -7473,12 +7473,12 @@ class AutoTestPlane(vehicle_test_suite.TestSuite):
         # the glider first pulls up out of the dive, then the mission advances
         # to the LOITER_TO_ALT item where the descent-rate override engages
         self.wait_text("Pullup level", check_context=True, timeout=1000)
-        self.wait_text("TDR: descent rate 10.0 m/s", check_context=True, timeout=300)
+        self.wait_text("TDR: descent rate 30.0 m/s", check_context=True, timeout=300)
 
         # descend through each AMSL altitude, then bump the commanded rate
         rate_schedule = [
-            (15000, 15),
-            (10000, 20),
+            (15000, 20),
+            (10000, 15),
         ]
         for alt, rate in rate_schedule:
             self.wait_altitude(-1000, alt, relative=False, timeout=1200)
