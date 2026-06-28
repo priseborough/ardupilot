@@ -1130,6 +1130,12 @@ void AP_TECS::_update_pitch(void)
         _integSEBdot *= coef;
         _integKE *= coef;
     }
+    if (_descent_rate_override_active()) {
+        // use a more permissive integrator limit centered on 0
+        // this is because we are using a descent rate to pitch feed forward
+        integSEBdot_max = 0.5f * (_PITCHmaxf - _PITCHminf) * gainInv;
+        integSEBdot_min = - integSEBdot_max;
+    }
     _integSEBdot = constrain_float(_integSEBdot, integSEBdot_min, integSEBdot_max);
     const float KE_integ_limit = 0.25f * (_PITCHmaxf - _PITCHminf) * gainInv; // allow speed trim integrator to access 505 of pitch range
     _integKE = constrain_float(_integKE, - KE_integ_limit, KE_integ_limit);
