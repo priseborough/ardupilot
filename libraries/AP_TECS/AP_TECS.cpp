@@ -1116,12 +1116,20 @@ void AP_TECS::_update_pitch(void)
     const bool inhibit_integrator = ((_pitch_dem_unc > _PITCHmaxf) && integSEB_delta > 0.0f) ||
                                     ((_pitch_dem_unc < _PITCHminf) && integSEB_delta < 0.0f);
     if (!inhibit_integrator) {
-        _integSEBdot += integSEB_delta;
         if (_descent_rate_override_active()) {
+            // Apply integrator windup protection if pitch demand saturates
+            if (_pitch_dem_unc < _PITCHminf && integSEB_delta > 0.0f) {
+                _integSEBdot += integSEB_delta;
+            } else if (_pitch_dem_unc > _PITCHmaxf && integSEB_delta < 0.0f) {
+                _integSEBdot += integSEB_delta;
+            } else {
+                _integSEBdot += integSEB_delta;
+            }
             // when overriding descent rate we don't want the airspeed error integrator to fight the height control
             const float coef = 1.0f - _DT / (_DT + timeConstant());
             _integKE *= coef;
         } else {
+            _integSEBdot += integSEB_delta;
             _integKE += (_SKE_est - _SKE_dem) * _SKE_weighting * _DT / timeConstant();
         }
     } else {
