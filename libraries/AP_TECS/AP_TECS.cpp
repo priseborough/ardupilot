@@ -1043,6 +1043,11 @@ void AP_TECS::_update_pitch(void)
         } else {
             _SKE_weighting = constrain_float(_spdWeightLand, 0.0f, 2.0f);
         }
+    } else if (_descent_rate_override_active()) {
+        // This is necessary to be able to accurately track descent rate.
+        // It currently relies on a correctly set upper pitch angle limit for effective underspeed protection.
+        // TODO rework underspeed protection for this use case.
+        _SKE_weighting = 0.0f;
     }
 
     float SPE_weighting = 2.0f - _SKE_weighting;
