@@ -1114,11 +1114,16 @@ void AP_TECS::_update_pitch(void)
 
     // integrate SEB rate error and apply integrator state limits
     const bool inhibit_integrator = ((_pitch_dem_unc > _PITCHmaxf) && integSEB_delta > 0.0f) ||
-                                    ((_pitch_dem_unc < _PITCHminf) && integSEB_delta < 0.0f) ||
-                                    _descent_rate_override_active();
+                                    ((_pitch_dem_unc < _PITCHminf) && integSEB_delta < 0.0f);
     if (!inhibit_integrator) {
         _integSEBdot += integSEB_delta;
-        _integKE += (_SKE_est - _SKE_dem) * _SKE_weighting * _DT / timeConstant();
+        if (_descent_rate_override_active()) {
+            // when overriding descent rate we don't want the airspeed error integrator to fight the height control
+            const float coef = 1.0f - _DT / (_DT + timeConstant());
+            _integKE *= coef;
+        } else {
+            _integKE += (_SKE_est - _SKE_dem) * _SKE_weighting * _DT / timeConstant();
+        }
     } else {
         // fade out integrator if saturating
         const float coef = 1.0f - _DT / (_DT + timeConstant());
