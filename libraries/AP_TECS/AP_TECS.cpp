@@ -1555,5 +1555,5 @@ bool AP_TECS::set_descent_rate_override(const float descent_rate, const uint32_t
 
 bool AP_TECS::_descent_rate_override_active(void)
 {
-    return !!_landing.is_on_approach() && !_landing.is_flaring() && descent_rate_override.duration_ms > 0 && AP_HAL::millis() - descent_rate_override.start_ms < descent_rate_override.duration_ms;
+    return !_landing.is_on_approach() && !_landing.is_flaring() && descent_rate_override.duration_ms > 0 && AP_HAL::millis() - descent_rate_override.start_ms < descent_rate_override.duration_ms;
 }
