@@ -982,11 +982,6 @@ void AP_TECS::_update_pitch(void)
     _SKE_weighting = MIN(_SKE_weighting, 1.0f);
 
     // Calculate demanded specific energy balance and error
-    if (_descent_rate_override_active()) {
-        // ignore height error and track override value for target sink rate
-    } else {
-
-    }
     float SEB_dem = _SPE_dem * SPE_weighting - _SKE_dem * _SKE_weighting;
     float SEB_est = _SPE_est * SPE_weighting - _SKE_est * _SKE_weighting;
     float SEB_error = SEB_dem - SEB_est;
