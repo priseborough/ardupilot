@@ -158,6 +158,13 @@ public:
     // Apply an altitude offset, to compensate for changes in home alt.
     void offset_altitude(const float alt_offset);
 
+    // Override the TECS height controller so that it attempts to maintain the demanded descent rate
+    // descent_rate has units of m/s
+    // timeout_ms specifies the duration of the command in milli-seconds. After this time period expires, the TECS height control will revert to normal operation.
+    // Send the command with timeout_ms = 0 to cancel the previous command
+    // Returns false if the command cannot be executed
+    bool set_descent_rate_override(const float descent_rate, const uint32_t duration_ms);
+
     // Return true if airspeed should be used
     bool use_airspeed() const;
 
@@ -350,10 +357,12 @@ private:
         // true when a reset of airspeed and height states to current is performed on this frame
         bool reset:1;
 
+        // true when overriding descent rate
+        bool descent_rate_override:1;
     };
     union {
         struct flags _flags;
-        uint8_t _flags_byte;
+        uint16_t _flags_word;
     };
 
     // time when underspeed started
@@ -461,6 +470,13 @@ private:
     // aerodynamic load factor
     float _load_factor;
 
+    struct
+    {
+        uint32_t start_ms;
+        uint32_t duration_ms;
+        float descent_rate;
+    } descent_rate_override;
+
     // Update the airspeed internal state using a second order complementary filter
     void _update_speed(float DT);
 
@@ -511,4 +527,6 @@ private:
 
     // Update the allowable pitch range.
     void _update_pitch_limits(const int32_t ptchMinCO_cd);
+
+    bool _descent_rate_override_active(void);
 };

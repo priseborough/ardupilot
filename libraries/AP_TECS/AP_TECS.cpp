@@ -553,7 +553,19 @@ void AP_TECS::_update_height_demand(void)
         _hgt_dem_in_prev = _hgt_dem_in;
 
         // Limit height rate of change
-        if ((hgt_dem - _hgt_dem_rate_ltd) > (_climb_rate_limit * _DT)) {
+        if (_descent_rate_override_active()) {
+            const float hgt_leash = 100.0f; // TODO make this value adaptive
+            if (_hgt_dem_rate_ltd > _height + hgt_leash) {
+                // drag the height profile to keep up with the plane
+                _hgt_dem_rate_ltd = _height + hgt_leash;
+            } else if (_hgt_dem_rate_ltd < _height - hgt_leash) {
+                // drag the height profile to keep up with the plane
+                _hgt_dem_rate_ltd = _height - hgt_leash;
+            } else {
+                // force a descent rate
+                _hgt_dem_rate_ltd = _hgt_dem_rate_ltd - descent_rate_override.descent_rate * _DT;
+            }
+        } else if ((hgt_dem - _hgt_dem_rate_ltd) > (_climb_rate_limit * _DT)) {
             _hgt_dem_rate_ltd = _hgt_dem_rate_ltd + _climb_rate_limit * _DT;
             _sink_fraction = 0.0f;
         } else if ((hgt_dem - _hgt_dem_rate_ltd) < (-_sink_rate_limit * _DT)) {
@@ -574,7 +586,12 @@ void AP_TECS::_update_height_demand(void)
         // control after takeoff to prevent plane pushing nose to level before climbing again. Post takeoff
         // compensation offset is decayed using the same time constant as the height demand filter.
         const float coef = MIN(_DT / (_DT + MAX(_hgt_dem_tconst, _DT)), 1.0f);
-        _hgt_rate_dem = (_hgt_dem_rate_ltd - _hgt_dem_lpf) / _hgt_dem_tconst;
+        if (_descent_rate_override_active()) {
+            // ignore height error and track override value for target sink rate
+            _hgt_rate_dem = - descent_rate_override.descent_rate;
+        } else {
+            _hgt_rate_dem = (_hgt_dem_rate_ltd - _hgt_dem_lpf) / _hgt_dem_tconst;
+        }
         _hgt_dem_lpf = _hgt_dem_rate_ltd * coef + (1.0f - coef) * _hgt_dem_lpf;
         _post_TO_hgt_offset *= (1.0f - coef);
         _hgt_dem = _hgt_dem_lpf + _post_TO_hgt_offset;
@@ -732,7 +749,12 @@ void AP_TECS::_update_throttle_with_airspeed(void)
     }
 
     // rate of change of potential energy is proportional to height error
-    _SPEdot_dem = (_SPE_dem - _SPE_est) / timeConstant();
+    if (_descent_rate_override_active()) {
+        // ignore height error and track override value for target sink rate
+        _SPEdot_dem = - descent_rate_override.descent_rate * GRAVITY_MSS;
+    } else {
+        _SPEdot_dem = (_SPE_dem - _SPE_est) / timeConstant();
+    }
 
     // Calculate total energy error
     _STE_error = constrain_float((_SPE_dem - _SPE_est), SPE_err_min, SPE_err_max) + _SKE_dem - _SKE_est;
@@ -1009,7 +1031,9 @@ void AP_TECS::_update_pitch(void)
         // height. This is needed as the usual relationship of speed
         // and height is broken by the VTOL motors
         _SKE_weighting = 0.0f;
-    } else if ( _flags.underspeed || _flight_stage == AP_FixedWing::FlightStage::TAKEOFF || _flight_stage == AP_FixedWing::FlightStage::ABORT_LANDING || _flags.is_gliding) {
+    } else if ( _flags.underspeed || _flight_stage == AP_FixedWing::FlightStage::TAKEOFF ||
+                _flight_stage == AP_FixedWing::FlightStage::ABORT_LANDING ||
+                (_flags.is_gliding && !_descent_rate_override_active())) {
         _SKE_weighting = 2.0f;
     } else if (_flags.is_doing_auto_land) {
         if (_spdWeightLand < 0) {
@@ -1390,13 +1414,13 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
         // @Field: pmax: pitch upper limit
         // @Field: dspdem: demanded acceleration output ("delta-speed demand")
         // @Field: f: flags
-        // @FieldBits: f: Underspeed,UnachievableDescent,AutoLanding,ReachedTakeoffSpd,GlidingRequested,isGliding,PropulsionFailed,Reset
+        // @FieldBits: f: Underspeed,UnachievableDescent,AutoLanding,ReachedTakeoffSpd,GlidingRequested,isGliding,PropulsionFailed,Reset,DescentRate
         AP::logger().WriteStreaming(
             "TECS",
             "TimeUS," "h," "dh," "hin," "hdem," "dhdem," "spdem," "sp," "dsp," "th," "ph," "pmin," "pmax," "dspdem," "f",
             "s"       "m"  "n"   "m"    "m"     "n"      "n"      "n"   "n"    "-"   "-"   "-"     "-"     "-"       "-",
             "F"       "0"  "0"   "0"    "0"     "0"      "0"      "0"   "0"    "-"   "-"   "-"     "-"     "-"       "-",
-            "Q"       "f"  "f"   "f"    "f"     "f"      "f"      "f"   "f"    "f"   "f"   "f"     "f"     "f"       "B",
+            "Q"       "f"  "f"   "f"    "f"     "f"      "f"      "f"   "f"    "f"   "f"   "f"     "f"     "f"       "H",
             now,
             _height,
             _climb_rate,
@@ -1411,7 +1435,7 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
             _PITCHminf,
             _PITCHmaxf,
             _TAS_rate_dem,
-            _flags_byte
+            _flags_word
         );
     }
 #endif
@@ -1598,6 +1622,32 @@ void AP_TECS::offset_altitude(const float alt_offset)
     // _hgt_dem_in_raw
     // _hgt_dem_in
     // Energies
+}
+
+bool AP_TECS::set_descent_rate_override(const float descent_rate, const uint32_t duration_ms)
+{
+    descent_rate_override.descent_rate = descent_rate;
+    descent_rate_override.duration_ms = duration_ms;
+    descent_rate_override.start_ms = AP_HAL::millis();
+    return _descent_rate_override_active();
+}
+
+bool AP_TECS::_descent_rate_override_active(void)
+{
+    if (_landing.is_on_approach() ||
+        _landing.is_flaring() ||
+        descent_rate_override.duration_ms == 0 ||
+        descent_rate_override.start_ms == 0) {
+        _flags.descent_rate_override = false;
+        return false;
+    }
+    if (AP_HAL::millis() - descent_rate_override.start_ms >= descent_rate_override.duration_ms) {
+        descent_rate_override.duration_ms = 0;
+        _flags.descent_rate_override = false;
+        return false;
+    }
+    _flags.descent_rate_override = true;
+    return true;
 }
 
 // Return true if airspeed should be used (either from a sensor or synthetic)
