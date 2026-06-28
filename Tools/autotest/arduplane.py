@@ -7417,6 +7417,62 @@ class AutoTestPlane(vehicle_test_suite.TestSuite):
         self.wait_text("Flare", check_context=True, timeout=400)
         self.wait_text("Auto disarmed", check_context=True, timeout=200)
 
+    def GliderTECSRate(self):
+        '''test externally-commanded TECS descent rate during LOITER_TO_ALT'''
+        self.customise_SITL_commandline(
+            [],
+            model="glider",
+            defaults_filepath="Tools/autotest/default_params/glider.parm",
+            wipe=True)
+
+        self.set_parameters({
+            "LOG_DISARMED": 1,
+            "AHRS_EKF_TYPE": 10,  # SIM AHRS backend, survives the teleport
+            "EK3_ENABLE": 0,
+            "SCR_ENABLE": 1,
+        })
+
+        self.install_example_script_context("sim_arming_pos.lua")
+        self.install_example_script_context("tecs_descent_rate.lua")
+        self.context_collect('STATUSTEXT')
+        self.reboot_sitl()
+        self.wait_text("Loaded arm pose", check_context=True)
+        self.wait_text("TDR: loaded TECS descent rate control", check_context=True)
+
+        self.set_parameters({
+            # arming-pose teleport: ~20000m AMSL, nose straight down, 10m/s sink
+            "SIM_APOS_ENABLE": 1,
+            "SIM_APOS_POS_D": -19416,
+            "SIM_APOS_PIT": -90,
+            "SIM_APOS_VEL_Z": 10,
+            "SIM_APOS_MODE": 10,  # AUTO on arm
+            # descent rate controller
+            "TDR_ENABLE": 1,
+            "TDR_RATE": 10,
+        })
+
+        self.load_mission_from_filepath(
+            os.path.join(testdir, "ArduPlane_Tests", "GliderPullup", "glider-pullup-mission.txt"))
+        self.change_mode('AUTO')
+        self.wait_ready_to_arm()
+        self.arm_vehicle()
+        self.wait_text("Forcing arm pose", check_context=True)
+        self.wait_text("TDR: descent rate 10.0 m/s", check_context=True)
+
+        # descend through each AMSL altitude, then bump the commanded rate
+        rate_schedule = [
+            (15000, 15),
+            (10000, 20),
+        ]
+        for alt, rate in rate_schedule:
+            self.wait_altitude(-1000, alt, relative=False, timeout=1200)
+            self.set_parameter("TDR_RATE", rate)
+            self.wait_text("TDR: descent rate %.1f m/s" % rate, check_context=True)
+
+        # confirm it keeps descending under the final rate
+        self.wait_altitude(-1000, 9000, relative=False, timeout=600)
+        self.disarm_vehicle(force=True)
+
     def BadRollChannelDefined(self):
         '''ensure we don't die with a  bad Roll channel defined'''
         self.set_parameter("RCMAP_ROLL", 17)
@@ -8469,6 +8525,7 @@ class AutoTestPlane(vehicle_test_suite.TestSuite):
             self.ForceArm,
             self.MAV_CMD_EXTERNAL_WIND_ESTIMATE,
             self.GliderPullup,
+            self.GliderTECSRate,
             self.BadRollChannelDefined,
             self.VolzMission,
             self.mavlink_AIRSPEED,
