@@ -538,7 +538,19 @@ void AP_TECS::_update_height_demand(void)
         _hgt_dem_in_prev = _hgt_dem_in;
 
         // Limit height rate of change
-        if ((hgt_dem - _hgt_dem_rate_ltd) > (_climb_rate_limit * _DT)) {
+        if (_descent_rate_override_active()) {
+            const float hgt_leash = 100.0f; // TODO make this value adaptive
+            if (_hgt_dem_rate_ltd > _height + hgt_leash) {
+                // drag the height profile to keep up with the plane
+                _hgt_dem_rate_ltd = _height + hgt_leash;
+            } else if (_hgt_dem_rate_ltd < _height - hgt_leash) {
+                // drag the height profile to keep up with the plane
+                _hgt_dem_rate_ltd = _height - hgt_leash;
+            } else {
+                // force a descent rate
+                _hgt_dem_rate_ltd = _hgt_dem_rate_ltd - descent_rate_override.descent_rate * _DT;
+            }
+        } else if ((hgt_dem - _hgt_dem_rate_ltd) > (_climb_rate_limit * _DT)) {
             _hgt_dem_rate_ltd = _hgt_dem_rate_ltd + _climb_rate_limit * _DT;
             _sink_fraction = 0.0f;
         } else if ((hgt_dem - _hgt_dem_rate_ltd) < (-_sink_rate_limit * _DT)) {
