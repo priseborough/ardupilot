@@ -1142,6 +1142,12 @@ void AP_TECS::_update_pitch(void)
         _pitch_dem_unc += (_TAS_dem_adj - _pitch_ff_v0) * _pitch_ff_k;
     }
 
+    // add a feed forward term from sink rate to pitch
+    if (_descent_rate_override_active() && is_positive(_TAS_dem_adj)) {
+        const float pitch_trim = asinf(constrain_float(- descent_rate_override.descent_rate / _TAS_dem_adj, sinf(_PITCHminf), sinf(_PITCHmaxf)));
+        _pitch_dem_unc += pitch_trim;
+    }
+
     // Constrain pitch demand
     _pitch_dem = constrain_float(_pitch_dem_unc, _PITCHminf, _PITCHmaxf);
 
