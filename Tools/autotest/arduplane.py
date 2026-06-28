@@ -7430,7 +7430,13 @@ class AutoTestPlane(vehicle_test_suite.TestSuite):
             "AHRS_EKF_TYPE": 10,  # SIM AHRS backend, survives the teleport
             "EK3_ENABLE": 0,
             "SCR_ENABLE": 1,
+            # pull-up recovery from the high-altitude dive, as in GliderPullup
+            "PUP_ENABLE": 1,
+            "SERVO6_FUNCTION": 0,  # balloon lift
+            "SERVO10_FUNCTION": 156  # lift release
         })
+
+        self.set_servo(6, 1000)
 
         self.install_example_script_context("sim_arming_pos.lua")
         self.install_example_script_context("tecs_descent_rate.lua")
@@ -7442,8 +7448,10 @@ class AutoTestPlane(vehicle_test_suite.TestSuite):
         self.set_parameters({
             # arming-pose teleport: ~20000m AMSL, nose straight down, 10m/s sink
             "SIM_APOS_ENABLE": 1,
-            "SIM_APOS_POS_D": -19416,
-            "SIM_APOS_PIT": -90,
+            "SIM_APOS_POS_D": -20000,
+            "SIM_APOS_PIT": -70,
+            "SIM_APOS_VEL_X": 0,
+            "SIM_APOS_VEL_Y": 0,
             "SIM_APOS_VEL_Z": 10,
             "SIM_APOS_MODE": 10,  # AUTO on arm
             # descent rate controller
@@ -7455,9 +7463,17 @@ class AutoTestPlane(vehicle_test_suite.TestSuite):
             os.path.join(testdir, "ArduPlane_Tests", "GliderPullup", "glider-pullup-mission.txt"))
         self.change_mode('AUTO')
         self.wait_ready_to_arm()
+
+        self.progress("Start balloon lift")
+        self.set_servo(6, 2000)
+
         self.arm_vehicle()
         self.wait_text("Forcing arm pose", check_context=True)
-        self.wait_text("TDR: descent rate 10.0 m/s", check_context=True)
+        
+        # the glider first pulls up out of the dive, then the mission advances
+        # to the LOITER_TO_ALT item where the descent-rate override engages
+        self.wait_text("Pullup level", check_context=True, timeout=1000)
+        self.wait_text("TDR: descent rate 10.0 m/s", check_context=True, timeout=300)
 
         # descend through each AMSL altitude, then bump the commanded rate
         rate_schedule = [
