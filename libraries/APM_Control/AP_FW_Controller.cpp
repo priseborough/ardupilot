@@ -332,13 +332,22 @@ void AP_FW_Controller::reset()
 // Apply positive and negative rate limits to passed in value
 float AP_FW_Controller::rate_limit_degs(float rate_degs) const
 {
-    const float pos_rate_limit = get_positive_rate_limit_degs();
+
+    float pos_rate_limit = get_positive_rate_limit_degs();
     if (is_positive(pos_rate_limit)) {
+        // allow a more restrictive rate limit to be set externally
+        if (AP_HAL::millis() - rate_lim_last_set_ms < 150) {
+            pos_rate_limit = MIN(rate_upper_limit_dps, pos_rate_limit);
+        }
         rate_degs = MIN(rate_degs, pos_rate_limit);
     }
 
-    const float neg_rate_limit = get_negative_rate_limit_degs();
+    float neg_rate_limit = get_negative_rate_limit_degs();
     if (is_positive(neg_rate_limit)) {
+        // allow a more restrictive rate limit to be set externally
+        if (AP_HAL::millis() - rate_lim_last_set_ms < 150) {
+            neg_rate_limit = MIN(-rate_lower_limit_dps, neg_rate_limit);
+        }
         rate_degs = MAX(rate_degs, -neg_rate_limit);
     }
 

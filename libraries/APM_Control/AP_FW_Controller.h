@@ -62,6 +62,18 @@ public:
     // Get angle P gain
     float get_angle_p() const;
 
+    // Set min and max rate limits in deg per second
+    // requires rate_lim_max > rate_lim_min
+    // Times out after 150msec and reverts to internal default
+    void set_pitch_rate_limits_dps(float rate_lim_min, float rate_lim_max) {
+        if (rate_lim_max <= rate_lim_min) {
+            return;
+        }
+        rate_lim_last_set_ms = AP_HAL::millis();
+        rate_lower_limit_dps = rate_lim_min;
+        rate_upper_limit_dps = rate_lim_max;
+    }
+
 protected:
     const AP_FixedWing &aparm;
     AP_AutoTune::ATGains gains;
@@ -71,6 +83,9 @@ protected:
     AC_PID rate_pid;
     float angle_err_deg;
     float ff_scale = 1.0;
+    uint32_t rate_lim_last_set_ms;
+    float rate_upper_limit_dps;
+    float rate_lower_limit_dps;
 
     AP_PIDInfo _pid_info;
 
