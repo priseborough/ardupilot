@@ -208,6 +208,7 @@ public:
     virtual void set_target_throttle_rate_rpy(float throttle_pct, float roll_rate_dps, float pitch_rate_dps, float yaw_rate_dps) {}
     virtual void set_rudder_offset(float rudder_pct, bool run_yaw_rate_controller) {}
     virtual bool nav_scripting_enable(uint8_t mode) {return false;}
+    virtual void set_pitch_rate_limits_dps(float rate_lim_min_dps, float rate_lim_max_dps) {}
 
     virtual bool update_target_location(const Location &old_loc, const Location &new_loc) { return false; }
 
