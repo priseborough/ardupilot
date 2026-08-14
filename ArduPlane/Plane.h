@@ -1237,6 +1237,7 @@ private:
     void set_target_throttle_rate_rpy(float throttle_pct, float roll_rate_dps, float pitch_rate_dps, float yaw_rate_dps) override;
     void set_rudder_offset(float rudder_pct, bool run_yaw_rate_controller) override;
     bool nav_scripting_enable(uint8_t mode) override;
+    void set_pitch_rate_limits_dps(float rate_lim_min_dps, float rate_lim_max_dps) override;
 #endif
  
     enum Failsafe_Action {

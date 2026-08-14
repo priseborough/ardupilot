@@ -1294,6 +1294,13 @@ void Plane::set_target_throttle_rate_rpy(float throttle_pct, float roll_rate_dps
     nav_scripting.current_ms = AP_HAL::millis();
 }
 
+// support for adaptive pirtch rate limits in scripting
+// requires rate_lirate_lim_max_dps > rate_lim_min_dps
+void Plane::set_pitch_rate_limits_dps(float rate_lim_min_dps, float rate_lim_max_dps)
+{
+    pitchController.set_pitch_rate_limits_dps(rate_lim_min_dps, rate_lim_min_dps);
+}
+
 // support for rudder offset override in aerobatic scripting
 void Plane::set_rudder_offset(float rudder_pct, bool run_yaw_rate_controller)
 {
